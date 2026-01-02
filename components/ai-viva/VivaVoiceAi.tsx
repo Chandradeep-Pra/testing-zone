@@ -1,13 +1,13 @@
 "use client";
 
 import { Clock, PhoneOff } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import useSpeechToText from "react-hook-speech-to-text";
+import { useRef, useState } from "react";
 
 import { CandidatePanel } from "./CandidatePanel";
 import { AiPanel } from "./AiPanel";
 import { useVivaSession } from "./useVivaSession";
 import { useSpeechOutput } from "./useSpeechOutput";
+import { useSpeechInput } from "./useSpeechInput";
 import { vivaContext } from "@/ai-viva-data/vivaContext";
 import { ExhibitImage } from "./ExhibitImage";
 
@@ -28,7 +28,6 @@ export default function VivaVoiceAi() {
   const [aiThinking, setAiThinking] = useState(false);
   const [aiSpeaking, setAiSpeaking] = useState(false);
 
-  // 👇 will be used in next step (image rendering)
   const [activeExhibitId, setActiveExhibitId] = useState<string | null>(null);
 
   /* ----------------------------------------
@@ -37,54 +36,31 @@ export default function VivaVoiceAi() {
   const [candidateTranscript, setCandidateTranscript] = useState("");
   const [candidateHistory, setCandidateHistory] = useState<string[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   /* ----------------------------------------
-     Speech-to-Text (browser)
+     Speech Input (browser, examiner-controlled)
   ----------------------------------------- */
-  const {
-    isRecording,
-    results,
-    interimResult,
-    startSpeechToText,
-    stopSpeechToText,
-  } = useSpeechToText({
-    continuous: true,
-    useLegacyResults: false,
-  });
+  const { start, stop } = useSpeechInput(
+    // 🟡 Interim captions
+    (interim) => {
+      setCandidateTranscript(interim);
+    },
 
-  const activeExhibit = vivaContext.exhibits.find(
-  e => e.id === activeExhibitId
-);
+    // 🟢 Final transcript
+    async (finalText) => {
+      setCandidateTranscript(finalText);
+      setCandidateHistory((h) => [...h, finalText]);
 
-  /* ----------------------------------------
-     Interim captions
-  ----------------------------------------- */
-  useEffect(() => {
-    if (!interimResult) return;
-    setCandidateTranscript(interimResult);
-  }, [interimResult]);
+      stop(); // 🔇 lock mic
+      setIsListening(false);
+      setAiThinking(true);
 
-  /* ----------------------------------------
-     Final transcript → Gemini → TTS
-  ----------------------------------------- */
-  useEffect(() => {
-    if (!results.length) return;
-
-    const finalText = results[results.length - 1]?.transcript?.trim();
-    if (!finalText) return;
-
-    setCandidateTranscript(finalText);
-    setCandidateHistory((h) => [...h, finalText]);
-
-    (async () => {
       try {
-        setAiThinking(true);
-        stopSpeechToText(); // 🔇 lock mic immediately
-
         const data = await next(finalText);
         if (!data || data.type === "wait") return;
 
-        // 🧠 Exhibit trigger (stored only)
+        // 🧠 Exhibit trigger
         if (data.action?.startsWith("open-img-")) {
           setActiveExhibitId(data.action.replace("open-img-", ""));
         }
@@ -95,14 +71,19 @@ export default function VivaVoiceAi() {
 
           speak(data.text, () => {
             setAiSpeaking(false);
-            startSpeechToText(); // 🎤 re-enable mic
+            setIsListening(true);
+            start(); // 🎤 reopen mic
           });
         }
       } finally {
         setAiThinking(false);
       }
-    })();
-  }, [results]);
+    }
+  );
+
+  const activeExhibit = vivaContext.exhibits.find(
+    (e) => e.id === activeExhibitId
+  );
 
   /* ----------------------------------------
      Start Viva (gesture required)
@@ -116,11 +97,11 @@ export default function VivaVoiceAi() {
 
     setAiTranscript(data.text);
     setAiSpeaking(true);
-    stopSpeechToText();
 
     speak(data.text, () => {
       setAiSpeaking(false);
-      startSpeechToText();
+      setIsListening(true);
+      start(); // 🎤 mic ON
     });
   }
 
@@ -129,7 +110,6 @@ export default function VivaVoiceAi() {
   ----------------------------------------- */
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col w-full">
-
       {/* Start Overlay */}
       {overlayVisible && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70">
@@ -157,34 +137,36 @@ export default function VivaVoiceAi() {
       {/* Panels */}
       <div className="flex flex-1 p-6 gap-6">
         <AiPanel
-  speaking={aiSpeaking}
-  thinking={aiThinking}
-  transcript={aiTranscript}
-  exhibit={
-    activeExhibit?.kind === "image" ? (
-      <ExhibitImage
-  src={`/exhibits/${activeExhibit.file}`}
-  label={activeExhibit.label}
-  onClose={() => setActiveExhibitId(null)}
-/>
-
-    ) : null
-  }
-/>
-
+          speaking={aiSpeaking}
+          thinking={aiThinking}
+          transcript={aiTranscript}
+          exhibit={
+            activeExhibit?.kind === "image" ? (
+              <ExhibitImage
+                src={`/exhibits/${activeExhibit.file}`}
+                label={activeExhibit.label}
+                onClose={() => setActiveExhibitId(null)}
+              />
+            ) : null
+          }
+        />
 
         <CandidatePanel
           speaking={false}
-          listening={isRecording}
+          listening={isListening}
           transcript={candidateTranscript}
           history={candidateHistory}
           showHistory={showHistory}
-          onToggleHistory={() => setShowHistory(v => !v)}
+          onToggleHistory={() => setShowHistory((v) => !v)}
           onStartTalk={() => {
             if (aiSpeaking) return;
-            startSpeechToText();
+            setIsListening(true);
+            start();
           }}
-          onStopTalk={stopSpeechToText}
+          onStopTalk={() => {
+            setIsListening(false);
+            stop();
+          }}
         />
       </div>
 
