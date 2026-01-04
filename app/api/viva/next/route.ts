@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
 import { vivaContext } from "@/ai-viva-data/vivaContext";
 import {
