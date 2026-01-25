@@ -1,0 +1,88 @@
+import { NextRequest, NextResponse } from "next/server";
+import { geminiModel } from "@/lib/gemni";
+
+/* ----------------------------------------
+   Normalize Gemini Output
+----------------------------------------- */
+function normalizeGeminiResponse(raw: any) {
+  if (!raw) {
+    return { type: "question", text: "Failed to generate a question.", action: null };
+  }
+
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { type: "question", text: raw, action: null };
+    }
+  }
+
+  if (raw?.text && typeof raw.text === "string") {
+    try {
+      return JSON.parse(raw.text);
+    } catch {
+      return {
+        type: raw.type ?? "question",
+        text: raw.text,
+        action: raw.action ?? null };
+    }
+  }
+
+  if (raw?.type && raw?.text) return raw;
+
+  return { type: "question", text: "Failed to generate a question.", action: null };
+}
+
+/* ----------------------------------------
+   POST Handler
+----------------------------------------- */
+export async function POST(req: NextRequest) {
+  const { previousQA, imageDetails, imageQuestionAsked } = await req.json();
+
+  if (!Array.isArray(previousQA) || !Array.isArray(imageDetails)) {
+    return NextResponse.json({ error: "Invalid input." }, { status: 400 });
+  }
+
+  const lastQuestions = previousQA.map(qa => `Q: ${qa.question}`).join("\n");
+  const lastAnswers = previousQA.map(qa => `A: ${qa.answer}`).join("\n");
+  const availableImage = imageDetails.find(img => img.available);
+
+  const prompt = `
+You are an FRCS viva examiner tasked with generating a single, concise question for the candidate. Follow these rules:
+
+1. Decide whether to use an image or generate a follow-up question based on the context.
+2. If using an image, include the image details and mark it as used.
+3. If not using an image, generate a follow-up question based on the last questions and answers provided.
+
+CONTEXT:
+${
+  availableImage
+    ? `IMAGE DETAILS:\n- Name: ${availableImage.image_name}\n- Description: ${availableImage.image_description}\n\nMark the image as used: true.`
+    : `PREVIOUS QUESTIONS AND ANSWERS:\n${lastQuestions}\n\n${lastAnswers}\n\n`
+}
+
+Write the question now without any greetings or additional context.
+`;
+
+  if (availableImage) {
+    // Mark the image as used
+    availableImage.available = false;
+  }
+
+  try {
+    const result = await geminiModel.generateContent(prompt);
+
+    // Debugging: Log the raw response
+    console.log("Raw Gemini Response:", result.response.text());
+
+    const normalizedResponse = normalizeGeminiResponse(result.response.text());
+
+    return NextResponse.json({
+      question: normalizedResponse.text,
+      imageDetails
+    });
+  } catch (error) {
+    console.error("Error generating follow-up question:", error);
+    return NextResponse.json({ error: "Failed to generate follow-up question." }, { status: 500 });
+  }
+}
