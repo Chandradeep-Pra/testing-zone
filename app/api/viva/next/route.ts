@@ -37,7 +37,7 @@ function normalizeGeminiResponse(raw: any) {
 }
 
 /* ============================================================
-   2. Session Store (UPGRADED)
+   2. Session Store (LONG-LIVED EXAMINER)
 ============================================================ */
 const sessions = new Map<
   string,
@@ -66,7 +66,7 @@ function getOrCreateSession(sessionId: string) {
 }
 
 /* ============================================================
-   3. Session Initialization (ONCE)
+   3. Session Initialization (ONCE ONLY)
 ============================================================ */
 function initializeSession(session) {
   session.basePrompt = `
@@ -80,26 +80,33 @@ ${vivaContext.exhibits
   .map(e => `- ${e.id}: ${e.description}`)
   .join("\n")}
 `;
-
-  session.examinerMemory = "";
   session.initialized = true;
 }
 
 /* ============================================================
-   4. Examiner Memory Update (LIGHTWEIGHT)
+   4. Examiner Memory (COMPRESSED & CUMULATIVE)
 ============================================================ */
-function updateExaminerMemory(answer: string, state: ExaminerState, session) {
+function updateExaminerMemory(answer: string, session) {
   const a = answer.toLowerCase();
   const notes: string[] = [];
 
-  if (a.includes("malignancy") || a.includes("cancer")) {
-    notes.push("Recognised malignancy risk.");
+  if (a.includes("history") || a.includes("examination")) {
+    notes.push("Outlined appropriate clinical evaluation.");
   }
   if (a.includes("ct") || a.includes("cystoscopy")) {
-    notes.push("Identified appropriate investigations.");
+    notes.push("Selected correct investigations.");
   }
-  if (a.includes("biopsy") || a.includes("bcg")) {
-    notes.push("Outlined correct management steps.");
+  if (a.includes("turbt")) {
+    notes.push("Planned TURBT.");
+  }
+  if (a.includes("mitomycin")) {
+    notes.push("Appropriate use of intravesical chemotherapy.");
+  }
+  if (a.includes("pt1") || a.includes("high grade")) {
+    notes.push("Recognised high-risk NMIBC.");
+  }
+  if (a.includes("bcg")) {
+    notes.push("Discussed intravesical BCG therapy.");
   }
 
   if (notes.length) {
@@ -108,9 +115,9 @@ function updateExaminerMemory(answer: string, state: ExaminerState, session) {
 }
 
 /* ============================================================
-   5. Gemini Caller (LEAN & CONTEXTUAL)
+   5. Gemini Caller (LEAN, CONTEXTUAL)
 ============================================================ */
-async function callGemini({ session, userAnswer }: any) {
+async function callGemini({ session, lastAnswer }: any) {
   const prompt = `
 ${session.basePrompt}
 
@@ -118,7 +125,7 @@ EXAMINER MEMORY:
 ${session.examinerMemory || "No prior answers yet."}
 
 LAST CANDIDATE ANSWER:
-"${userAnswer || ""}"
+"${lastAnswer || ""}"
 
 Ask the next SINGLE viva question.
 `;
@@ -163,7 +170,7 @@ function buildEndResponse(state: ExaminerState, session) {
 }
 
 /* ============================================================
-   7. POST Handler (FINAL)
+   7. POST Handler (FINAL FLOW)
 ============================================================ */
 export async function POST(req: NextRequest) {
   const { sessionId, userAnswer, timeElapsedSec } = await req.json();
@@ -177,23 +184,39 @@ export async function POST(req: NextRequest) {
 
   state.timeElapsedSec = timeElapsedSec;
 
+  /* ---- END CHECK ---- */
   if (shouldEndViva(state)) {
     return NextResponse.json(buildEndResponse(state, session));
   }
 
+  /* ---- OPENING QUESTION ---- */
+  if (state.questionsAsked === 0) {
+    const aiResponse = await callGemini({
+      session,
+      lastAnswer: ""
+    });
+
+    state.questionsAsked += 1;
+    return NextResponse.json(aiResponse);
+  }
+
+  /* ---- WAIT (HUMAN-LIKE) ---- */
   if (!userAnswer || !userAnswer.trim()) {
     return NextResponse.json({ type: "wait" });
   }
 
-  updateExaminerMemory(userAnswer, state, session);
+  updateExaminerMemory(userAnswer, session);
 
   let aiResponse;
   try {
-    aiResponse = await callGemini({ session, userAnswer });
+    aiResponse = await callGemini({
+      session,
+      lastAnswer: userAnswer
+    });
   } catch {
     aiResponse = {
       type: "question",
-      text: "Taking everything into account, what would you do next?",
+      text: "What would you do next?",
       action: null
     };
   }

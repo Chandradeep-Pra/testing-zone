@@ -3,12 +3,12 @@ export const vivaContext = {
     id: "case-hematuria-001",
     title: "Painless Hematuria Evaluation",
     level: "Intermediate",
-    stem: "A 47-year-old male presents with a 3-week history of painless visible hematuria, without associated dysuria, fever, flank pain, or recent trauma. There is no history of anticoagulant use. He is haemodynamically stable at presentation.",
+    stem: "A 56 year gentleman referred to one stop Hematuria clinic for intermittent VH for last 1 month.",
     objectives: [
-      "Formulate a differential diagnosis for painless hematuria",
+      "Formulate evaluation plan for painless hematuria",
       "Select and prioritise appropriate investigations",
       "Interpret imaging and report findings",
-      "Demonstrate safe clinical judgement and escalation"
+      "Demonstrate safe clinical management as per guidelines"
     ]
   },
 
@@ -27,7 +27,7 @@ export const vivaContext = {
       label: "Urine Cytology",
       file: "rep-urine-001.jpeg",
       description:
-        "Urine cytology reveals atypical urothelial cells."
+        "Flexible cystoscopy reveals papillary lesion in the bladder."
     }
   ],
 
