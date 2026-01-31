@@ -17,7 +17,7 @@ type Message = {
 export function VivaChat() {
   const [messages, setMessages] = useState<Message[]>([]);
 const [input, setInput] = useState("");
-const [timeLeft, setTimeLeft] = useState(600);
+const [timeLeft, setTimeLeft] = useState(40 * 60);
 const [ended, setEnded] = useState(false);
 const [loading, setLoading] = useState(false);
 

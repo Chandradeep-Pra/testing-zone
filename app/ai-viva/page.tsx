@@ -108,8 +108,8 @@ export default function VivaPage() {
   /* Placeholder for next subtask */
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center">
-      {/* {started && <VivaChat />} */}
-      {started && <VivaVoiceAi />}
+      {started && <VivaChat />}
+      {/* {started && <VivaVoiceAi />} */}
 
     </main>
   );
