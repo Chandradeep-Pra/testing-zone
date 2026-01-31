@@ -5,31 +5,23 @@ import {
   ExaminerState,
   createInitialExaminerState
 } from "@/ai-viva-data/examinerState";
-import { ConversationTurn } from "@/ai-viva-data/types";
 import { geminiModel } from "@/lib/gemni";
 import { EXAMINER_SYSTEM_PROMPT } from "@/ai-viva-data/examinerPrompt";
 
-/* ----------------------------------------
-   Normalize Gemini Output (HARDENED)
------------------------------------------ */
+/* ============================================================
+   1. Gemini Output Normalisation (HARDENED)
+============================================================ */
 function normalizeGeminiResponse(raw: any) {
-  if (!raw) {
-    return { type: "question", text: "Please continue.", action: null };
-  }
+  if (!raw) return { type: "question", text: "Please continue.", action: null };
 
-  // Gemini may return JSON string inside text
   if (typeof raw === "string") {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return { type: "question", text: raw, action: null };
-    }
+    try { return JSON.parse(raw); }
+    catch { return { type: "question", text: raw, action: null }; }
   }
 
   if (raw?.text && typeof raw.text === "string") {
-    try {
-      return JSON.parse(raw.text);
-    } catch {
+    try { return JSON.parse(raw.text); }
+    catch {
       return {
         type: raw.type ?? "question",
         text: raw.text,
@@ -44,72 +36,18 @@ function normalizeGeminiResponse(raw: any) {
   return { type: "question", text: "Please continue.", action: null };
 }
 
-/* ----------------------------------------
-   Gemini Caller
------------------------------------------ */
-async function callGemini({
-  vivaContext,
-  examinerState,
-  conversation
-}: {
-  vivaContext: any;
-  examinerState: ExaminerState;
-  conversation: ConversationTurn[];
-}) {
-  const lastUserAnswer =
-    conversation.slice().reverse().find(c => c.role === "user")?.text ?? "";
-
-  const exhibitRegistry = vivaContext.exhibits
-    .map((e: any) => `- ${e.id} → ${e.label}: ${e.description}`)
-    .join("\n");
-
-  const prompt = `
-${EXAMINER_SYSTEM_PROMPT}
-
-CASE CONTEXT:
-${vivaContext.case.stem}
-
-OBJECTIVES (INTERNAL):
-${vivaContext.case.objectives.join("\n")}
-
-AVAILABLE EXHIBITS (USE EXACT IDS ONLY):
-${exhibitRegistry}
-
-ALREADY COVERED OBJECTIVES:
-${examinerState.coveredObjectives.length
-  ? examinerState.coveredObjectives.join("\n")
-  : "None"}
-
-IMPORTANT RULES:
-- Ask ONE examiner-style question only
-- Never repeat a question
-- Each exhibit may be requested AT MOST ONCE
-- If candidate response is unclear, move forward
-- After an exhibit, shift to management or escalation
-
-RECENT CONVERSATION:
-${conversation
-  .slice(-8)
-  .map(c => `${c.role.toUpperCase()}: ${c.text}`)
-  .join("\n")}
-
-LAST CANDIDATE ANSWER:
-"${lastUserAnswer}"
-`;
-
-  const result = await geminiModel.generateContent(prompt);
-  return normalizeGeminiResponse(result.response.text());
-}
-
-/* ----------------------------------------
-   In-Memory Session Store
------------------------------------------ */
+/* ============================================================
+   2. Session Store (LONG-LIVED EXAMINER)
+============================================================ */
 const sessions = new Map<
   string,
   {
     examinerState: ExaminerState;
-    conversation: ConversationTurn[];
     usedExhibits: Set<string>;
+
+    initialized: boolean;
+    basePrompt: string;
+    examinerMemory: string;
   }
 >();
 
@@ -117,20 +55,91 @@ function getOrCreateSession(sessionId: string) {
   if (!sessions.has(sessionId)) {
     sessions.set(sessionId, {
       examinerState: createInitialExaminerState(),
-      conversation: [],
-      usedExhibits: new Set()
+      usedExhibits: new Set(),
+
+      initialized: false,
+      basePrompt: "",
+      examinerMemory: ""
     });
   }
   return sessions.get(sessionId)!;
 }
 
-/* ----------------------------------------
-   Helpers
------------------------------------------ */
+/* ============================================================
+   3. Session Initialization (ONCE ONLY)
+============================================================ */
+function initializeSession(session) {
+  session.basePrompt = `
+${EXAMINER_SYSTEM_PROMPT}
+
+CASE CONTEXT:
+${vivaContext.case.stem}
+
+AVAILABLE EXHIBITS:
+${vivaContext.exhibits
+  .map(e => `- ${e.id}: ${e.description}`)
+  .join("\n")}
+`;
+  session.initialized = true;
+}
+
+/* ============================================================
+   4. Examiner Memory (COMPRESSED & CUMULATIVE)
+============================================================ */
+function updateExaminerMemory(answer: string, session) {
+  const a = answer.toLowerCase();
+  const notes: string[] = [];
+
+  if (a.includes("history") || a.includes("examination")) {
+    notes.push("Outlined appropriate clinical evaluation.");
+  }
+  if (a.includes("ct") || a.includes("cystoscopy")) {
+    notes.push("Selected correct investigations.");
+  }
+  if (a.includes("turbt")) {
+    notes.push("Planned TURBT.");
+  }
+  if (a.includes("mitomycin")) {
+    notes.push("Appropriate use of intravesical chemotherapy.");
+  }
+  if (a.includes("pt1") || a.includes("high grade")) {
+    notes.push("Recognised high-risk NMIBC.");
+  }
+  if (a.includes("bcg")) {
+    notes.push("Discussed intravesical BCG therapy.");
+  }
+
+  if (notes.length) {
+    session.examinerMemory += "\n- " + notes.join(" ");
+  }
+}
+
+/* ============================================================
+   5. Gemini Caller (LEAN, CONTEXTUAL)
+============================================================ */
+async function callGemini({ session, lastAnswer }: any) {
+  const prompt = `
+${session.basePrompt}
+
+EXAMINER MEMORY:
+${session.examinerMemory || "No prior answers yet."}
+
+LAST CANDIDATE ANSWER:
+"${lastAnswer || ""}"
+
+Ask the next SINGLE viva question.
+`;
+
+  const result = await geminiModel.generateContent(prompt);
+  return normalizeGeminiResponse(result.response.text());
+}
+
+/* ============================================================
+   6. Helpers
+============================================================ */
 function shouldEndViva(state: ExaminerState) {
   return (
-    state.timeElapsedSec >=
-      vivaContext.viva_rules.max_duration_minutes * 60 ||
+    state.timeElapsedSec >= vivaContext.viva_rules.max_duration_minutes * 60 ||
     state.questionsAsked >= vivaContext.viva_rules.max_questions
   );
 }
@@ -143,7 +152,7 @@ function snapScore(score: number): 4 | 5 | 6 | 7 | 8 {
   return 8;
 }
 
-function buildEndResponse(state: ExaminerState) {
+function buildEndResponse(state: ExaminerState, session) {
   return {
     type: "end",
     finalScores: {
@@ -151,117 +160,76 @@ function buildEndResponse(state: ExaminerState) {
       higher_order: snapScore(state.dimensionScores.higher_order),
       clinical_skills: snapScore(state.dimensionScores.clinical_skills),
       professionalism: snapScore(state.dimensionScores.professionalism)
+    },
+    report: {
+      summary: session.examinerMemory,
+      coveredObjectives: state.coveredObjectives,
+      level: vivaContext.case.level
     }
   };
 }
 
-/* ----------------------------------------
-   POST Handler
------------------------------------------ */
+/* ============================================================
+   7. POST Handler (FINAL FLOW)
+============================================================ */
 export async function POST(req: NextRequest) {
   const { sessionId, userAnswer, timeElapsedSec } = await req.json();
+
   const session = getOrCreateSession(sessionId);
   const state = session.examinerState;
 
+  if (!session.initialized) {
+    initializeSession(session);
+  }
+
   state.timeElapsedSec = timeElapsedSec;
 
+  /* ---- END CHECK ---- */
   if (shouldEndViva(state)) {
-    return NextResponse.json(buildEndResponse(state));
+    return NextResponse.json(buildEndResponse(state, session));
   }
 
-  /* ----------------------------------------
-     Opening Question (ONCE)
-  ----------------------------------------- */
+  /* ---- OPENING QUESTION ---- */
   if (state.questionsAsked === 0) {
-    const opening = {
-      type: "question",
-      text:
-        "Good morning. I will ask you a series of focused questions about this case. " +
-        "Please answer concisely. Let us begin. " +
-        "What are the possible causes of painless hematuria?",
-      action: null
-    };
+    const aiResponse = await callGemini({
+      session,
+      lastAnswer: ""
+    });
 
     state.questionsAsked += 1;
-    session.conversation.push({ role: "ai", text: opening.text });
-
-    return NextResponse.json(opening);
+    return NextResponse.json(aiResponse);
   }
 
-  /* ----------------------------------------
-     WAIT (voice-safe)
-  ----------------------------------------- */
+  /* ---- WAIT (HUMAN-LIKE) ---- */
   if (!userAnswer || !userAnswer.trim()) {
     return NextResponse.json({ type: "wait" });
   }
 
-  session.conversation.push({ role: "user", text: userAnswer });
+  updateExaminerMemory(userAnswer, session);
 
-  /* ----------------------------------------
-     Heuristic Objective Tracking
-  ----------------------------------------- */
-  const a = userAnswer.toLowerCase();
-
-  if (
-    a.includes("ct") ||
-    a.includes("urine") ||
-    a.includes("cystoscopy")
-  ) {
-    if (!state.coveredObjectives.includes("investigations")) {
-      state.coveredObjectives.push("investigations");
-    }
-  }
-
-  if (
-    a.includes("carcinoma") ||
-    a.includes("tumor") ||
-    a.includes("malignancy")
-  ) {
-    if (!state.coveredObjectives.includes("differential")) {
-      state.coveredObjectives.push("differential");
-    }
-  }
-
-  /* ----------------------------------------
-     Gemini Question Generation
-  ----------------------------------------- */
   let aiResponse;
-
   try {
     aiResponse = await callGemini({
-      vivaContext,
-      examinerState: state,
-      conversation: session.conversation
+      session,
+      lastAnswer: userAnswer
     });
-  } catch (err) {
-    console.error("❌ GEMINI ERROR:", err);
-
+  } catch {
     aiResponse = {
       type: "question",
-      text:
-        "Based on the information so far, how would you manage this patient?",
+      text: "What would you do next?",
       action: null
     };
   }
 
-  /* ----------------------------------------
-     HARD EXHIBIT GUARD
-  ----------------------------------------- */
   if (aiResponse.action?.startsWith("open-img-")) {
     const exhibitId = aiResponse.action.replace("open-img-", "");
-
     if (session.usedExhibits.has(exhibitId)) {
       aiResponse.action = null;
-      aiResponse.text =
-        "Taking all findings into account, what would be your next step in management?";
     } else {
       session.usedExhibits.add(exhibitId);
     }
   }
 
-  /* ----------------------------------------
-     Apply Scoring
-  ----------------------------------------- */
   if (aiResponse.scoreDelta) {
     for (const key of Object.keys(aiResponse.scoreDelta)) {
       state.dimensionScores[key] += aiResponse.scoreDelta[key];
@@ -271,11 +239,6 @@ export async function POST(req: NextRequest) {
   if (aiResponse.type === "question") {
     state.questionsAsked += 1;
   }
-
-  session.conversation.push({
-    role: "ai",
-    text: aiResponse.text
-  });
 
   return NextResponse.json(aiResponse);
 }
