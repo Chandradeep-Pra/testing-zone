@@ -131,7 +131,21 @@ Ask the next SINGLE viva question.
 `;
 
   const result = await geminiModel.generateContent(prompt);
-  return normalizeGeminiResponse(result.response.text());
+
+  // console.log("Gemini Raw Response:", await result.response.text());
+  // return normalizeGeminiResponse(result.response.text());
+  const rawText = await result.response.text();
+
+console.log("Gemini Raw Response:", rawText);
+
+const cleaned = rawText
+  .replace(/^```json\s*/i, "")
+  .replace(/^```\s*/i, "")
+  .replace(/```$/i, "")
+  .trim();
+
+return normalizeGeminiResponse(cleaned);
+
 }
 
 /* ============================================================
@@ -184,6 +198,7 @@ export async function POST(req: NextRequest) {
 
   state.timeElapsedSec = timeElapsedSec;
 
+
   /* ---- END CHECK ---- */
   if (shouldEndViva(state)) {
     return NextResponse.json(buildEndResponse(state, session));
@@ -235,6 +250,13 @@ export async function POST(req: NextRequest) {
       state.dimensionScores[key] += aiResponse.scoreDelta[key];
     }
   }
+
+  console.log("📊 CUMULATIVE VIVA SCORES:", {
+  basic_knowledge: state.dimensionScores.basic_knowledge,
+  higher_order: state.dimensionScores.higher_order,
+  clinical_skills: state.dimensionScores.clinical_skills,
+  professionalism: state.dimensionScores.professionalism,
+});
 
   if (aiResponse.type === "question") {
     state.questionsAsked += 1;

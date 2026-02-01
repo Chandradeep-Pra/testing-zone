@@ -61,9 +61,13 @@ export default function VivaVoiceAi() {
         if (!data || data.type === "wait") return;
 
         // 🧠 Exhibit trigger
+        console.log("Received AI response:", data);
+        
         if (data.action?.startsWith("open-img-")) {
           setActiveExhibitId(data.action.replace("open-img-", ""));
         }
+
+        console.log("AI Viva Question:", data.text);
 
         if (data.text) {
           setAiTranscript(data.text);
@@ -98,6 +102,7 @@ export default function VivaVoiceAi() {
     setAiTranscript(data.text);
     setAiSpeaking(true);
 
+    console.log("AI Viva Question:", data.text);
     speak(data.text, () => {
       setAiSpeaking(false);
       setIsListening(true);
@@ -135,7 +140,7 @@ export default function VivaVoiceAi() {
       </div>
 
       {/* Panels */}
-      <div className="flex flex-1 p-6 gap-6">
+      <div className="flex flex-1 flex-col md:flex-row p-6 gap-6">
         <AiPanel
           speaking={aiSpeaking}
           thinking={aiThinking}
