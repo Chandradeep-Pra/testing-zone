@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Clock } from "lucide-react";
+import { useVivaSession } from "./useVivaSession";
 
 type Exhibit = {
   label: string;
@@ -20,6 +21,7 @@ const [input, setInput] = useState("");
 const [timeLeft, setTimeLeft] = useState(40 * 60);
 const [ended, setEnded] = useState(false);
 const [loading, setLoading] = useState(false);
+const { next } = useVivaSession();
 
 const bottomRef = useRef<HTMLDivElement>(null);
 

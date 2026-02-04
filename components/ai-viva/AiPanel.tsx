@@ -9,7 +9,8 @@ type Props = {
   exhibit?: React.ReactNode; // optional: image / report / viewer
 };
 
-export function AiPanel({
+export function 
+AiPanel({
   speaking,
   thinking = false,
   transcript,
