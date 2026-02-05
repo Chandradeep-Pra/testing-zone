@@ -1,3 +1,5 @@
+//@ts-ignore
+
 import { useEffect, useRef, useState } from "react";
 import { Send, Clock } from "lucide-react";
 import { useVivaSession } from "./useVivaSession";
