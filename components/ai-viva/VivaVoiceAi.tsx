@@ -97,6 +97,28 @@ export default function VivaVoiceAi() {
     }
   }
 
+  async function endViva() {
+  stop();
+  setIsListening(false);
+  setThinking(true);
+
+  try {
+    const data = await next("", true); // 🔑 EXIT
+
+    if (data?.evaluation) {
+      sessionStorage.setItem(
+        "viva-final-score",
+        JSON.stringify(data.evaluation)
+      );
+
+      window.location.href = "/ai-viva/score";
+    }
+  } finally {
+    setThinking(false);
+  }
+}
+
+
   /* ----------------------------------------
      UI
   ----------------------------------------- */
@@ -173,9 +195,14 @@ export default function VivaVoiceAi() {
 
       <div className="h-16 border-t border-neutral-800 px-8 flex items-center justify-between">
         <span className="text-neutral-400 text-sm">🎙 Voice session active</span>
-        <button className="bg-red-600 p-3 rounded-full">
-          <PhoneOff size={18} />
-        </button>
+        <button
+  onClick={endViva}
+  className="bg-red-600 p-3 rounded-full cursor-pointer hover:bg-red-700 flex items-center gap-2"
+>
+  End Viva
+</button>
+
+
         <span className="text-neutral-400 text-sm">Secure Session</span>
       </div>
     </main>
