@@ -10,27 +10,28 @@ import { AiPanel } from "./AiPanel";
 import { useVivaSession } from "./useVivaSession";
 import { useSpeechOutput } from "./useSpeechOutput";
 import { useSpeechInput } from "./useSpeechInput";
-import { vivaContext } from "@/ai-viva-data/vivaContext";
-import { ExhibitImage } from "./ExhibitImage";
+import { useVivaEngine } from "./useVivaEngine";
 
 export default function VivaVoiceAi() {
-  const { next } = useVivaSession();
+  const { next } = useVivaEngine();
+  const {
+    transcript,
+    speaking,
+    thinking,
+    exhibit,
+    setThinking,
+    applyApiResponse,
+    markSpeechEnded,
+    clearExhibit,
+  } = useVivaSession();
+
   const { speak } = useSpeechOutput();
 
   /* ----------------------------------------
-     Session / guards
+     Session guards
   ----------------------------------------- */
   const hasStartedRef = useRef(false);
   const [overlayVisible, setOverlayVisible] = useState(true);
-
-  /* ----------------------------------------
-     AI state
-  ----------------------------------------- */
-  const [aiTranscript, setAiTranscript] = useState("");
-  const [aiThinking, setAiThinking] = useState(false);
-  const [aiSpeaking, setAiSpeaking] = useState(false);
-
-  const [activeExhibitId, setActiveExhibitId] = useState<string | null>(null);
 
   /* ----------------------------------------
      Candidate state
@@ -41,83 +42,90 @@ export default function VivaVoiceAi() {
   const [isListening, setIsListening] = useState(false);
 
   /* ----------------------------------------
-     Speech Input (browser, examiner-controlled)
+     Speech Input
   ----------------------------------------- */
   const { start, stop } = useSpeechInput(
-    // 🟡 Interim captions
     (interim) => {
       setCandidateTranscript(interim);
     },
 
-    // 🟢 Final transcript
     async (finalText) => {
       setCandidateTranscript(finalText);
       setCandidateHistory((h) => [...h, finalText]);
 
-      stop(); // 🔇 lock mic
+      stop();
       setIsListening(false);
-      setAiThinking(true);
+      setThinking(true);
 
       try {
         const data = await next(finalText);
-        if (!data || data.type === "wait") return;
+        if (!data?.question) return;
 
-        // 🧠 Exhibit trigger
-        console.log("Received AI response:", data);
-        
-        if (data.action?.startsWith("open-img-")) {
-          setActiveExhibitId(data.action.replace("open-img-", ""));
-        }
+        applyApiResponse(data);
 
-        console.log("AI Viva Question:", data.text);
-
-        if (data.text) {
-          setAiTranscript(data.text);
-          setAiSpeaking(true);
-
-          speak(data.text, () => {
-            setAiSpeaking(false);
-            setIsListening(true);
-            start(); // 🎤 reopen mic
-          });
-        }
+        speak(data.question, () => {
+          markSpeechEnded();
+          setIsListening(true);
+          start();
+        });
       } finally {
-        setAiThinking(false);
+        setThinking(false);
       }
     }
   );
 
-  const activeExhibit = vivaContext.exhibits.find(
-    (e) => e.id === activeExhibitId
-  );
-
   /* ----------------------------------------
-     Start Viva (gesture required)
+     Start Viva
   ----------------------------------------- */
   async function startViva() {
     if (hasStartedRef.current) return;
     hasStartedRef.current = true;
 
-    const data = await next("");
-    if (!data?.text) return;
+    setThinking(true);
 
-    setAiTranscript(data.text);
-    setAiSpeaking(true);
+    try {
+      const data = await next("");
+      if (!data?.question) return;
 
-    console.log("AI Viva Question:", data.text);
-    speak(data.text, () => {
-      setAiSpeaking(false);
-      setIsListening(true);
-      start(); // 🎤 mic ON
-    });
+      applyApiResponse(data);
+
+      speak(data.question, () => {
+        markSpeechEnded();
+        setIsListening(true);
+        start();
+      });
+    } finally {
+      setThinking(false);
+    }
   }
+
+  async function endViva() {
+  stop();
+  setIsListening(false);
+  setThinking(true);
+
+  try {
+    const data = await next("", true); // 🔑 EXIT
+
+    if (data?.evaluation) {
+      sessionStorage.setItem(
+        "viva-final-score",
+        JSON.stringify(data.evaluation)
+      );
+
+      window.location.href = "/ai-viva/score";
+    }
+  } finally {
+    setThinking(false);
+  }
+}
+
 
   /* ----------------------------------------
      UI
   ----------------------------------------- */
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col w-full">
-      {/* Start Overlay */}
       {overlayVisible && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70">
           <button
@@ -125,15 +133,13 @@ export default function VivaVoiceAi() {
               setOverlayVisible(false);
               await startViva();
             }}
-            className="px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400
-                       text-black text-lg font-medium shadow-lg"
+            className="px-8 py-4 rounded-xl bg-emerald-500 text-black text-lg font-medium"
           >
             Start Viva
           </button>
         </div>
       )}
 
-      {/* Top Bar */}
       <div className="h-12 px-6 flex items-center justify-between border-b border-neutral-800 text-sm">
         <div className="font-medium">AI Viva Examination</div>
         <div className="flex items-center gap-2 text-neutral-400">
@@ -141,19 +147,31 @@ export default function VivaVoiceAi() {
         </div>
       </div>
 
-      {/* Panels */}
       <div className="flex flex-1 flex-col md:flex-row p-6 gap-6">
         <AiPanel
-          speaking={aiSpeaking}
-          thinking={aiThinking}
-          transcript={aiTranscript}
+          speaking={speaking}
+          thinking={thinking}
+          transcript={transcript}
           exhibit={
-            activeExhibit?.kind === "image" ? (
-              <ExhibitImage
-                src={`/exhibits/${activeExhibit.file}`}
-                label={activeExhibit.label}
-                onClose={() => setActiveExhibitId(null)}
-              />
+            exhibit?.type === "image" ? (
+              <div className="relative max-w-3xl">
+                <img
+                  src={exhibit.src}
+                  alt="Viva exhibit"
+                  className="rounded-xl shadow-2xl max-h-[80vh]"
+                />
+                {exhibit.description && (
+                  <div className="mt-3 text-sm text-neutral-300 text-center">
+                    {exhibit.description}
+                  </div>
+                )}
+                <button
+                  onClick={clearExhibit}
+                  className="absolute top-3 right-3 bg-black/70 text-white text-xs px-3 py-1 rounded-full"
+                >
+                  Close
+                </button>
+              </div>
             ) : null
           }
         />
@@ -166,7 +184,7 @@ export default function VivaVoiceAi() {
           showHistory={showHistory}
           onToggleHistory={() => setShowHistory((v) => !v)}
           onStartTalk={() => {
-            if (aiSpeaking) return;
+            if (speaking) return;
             setIsListening(true);
             start();
           }}
@@ -177,12 +195,16 @@ export default function VivaVoiceAi() {
         />
       </div>
 
-      {/* Bottom Bar */}
       <div className="h-16 border-t border-neutral-800 px-8 flex items-center justify-between">
         <span className="text-neutral-400 text-sm">🎙 Voice session active</span>
-        <button className="bg-red-600 p-3 rounded-full">
-          <PhoneOff size={18} />
-        </button>
+        <button
+  onClick={endViva}
+  className="bg-red-600 p-3 rounded-full cursor-pointer hover:bg-red-700 flex items-center gap-2"
+>
+  End Viva
+</button>
+
+
         <span className="text-neutral-400 text-sm">Secure Session</span>
       </div>
     </main>
