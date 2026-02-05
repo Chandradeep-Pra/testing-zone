@@ -32,7 +32,7 @@ export const vivaContext = {
   ],
 
   viva_rules: {
-    max_duration_minutes: 40,
+    max_duration_minutes: 10,
     max_questions: 10,
     question_style: "single_question_only",
     allow_candidate_request: true
