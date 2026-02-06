@@ -35,15 +35,11 @@ function normalizeGeminiResponse(raw: any) {
 // Define constants for the image details
 const IMAGE_DETAILS = [
   {
-    link: "https://res.cloudinary.com/dvdt6jfo8/image/upload/v1770191268/PHOTO-2026-01-23-21-20-50_eqkazp.jpg",
-    description: "CT scan shows 3 cm polyploidal enhancing mass arising from the base of the bladder. Upper tracts are normal.",
+    link: "https://res.cloudinary.com/dvdt6jfo8/image/upload/v1770381011/PHOTO-2026-02-05-21-52-58_trthtk.jpg",
+    description: "IPSS 22,  has bothersome nocturia , very poor flow ( Qmax- 3ml/sec) with a PVR of 160 cc . On Digital rectal examination-  a large 80 cc prostate is palpable . He also has a brother who had prostate cancer . How do want to proceed further ",
     available: true,
   },
-  {
-    link: "https://res.cloudinary.com/dvdt6jfo8/image/upload/v1770195606/PHOTO-2025-12-11-18-24-41_bkmjxj.jpg",
-    description: "Cystoscopy shows papillary bladder tumor from the posterior wall of the bladder.",
-    available: true,
-  },
+  
 ];
 
 // Define constants for the scoring parameters
