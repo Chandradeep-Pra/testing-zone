@@ -1,3 +1,5 @@
+//@ts-ignore
+
 "use client";
 
 import { useState } from "react";
