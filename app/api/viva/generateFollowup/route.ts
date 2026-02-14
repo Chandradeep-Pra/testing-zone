@@ -35,15 +35,11 @@ function normalizeGeminiResponse(raw: any) {
 // Define constants for the image details
 const IMAGE_DETAILS = [
   {
-    link: "https://res.cloudinary.com/dvdt6jfo8/image/upload/v1770191268/PHOTO-2026-01-23-21-20-50_eqkazp.jpg",
-    description: "CT scan shows 3 cm polyploidal enhancing mass arising from the base of the bladder. Upper tracts are normal.",
+    link: "https://res.cloudinary.com/dvdt6jfo8/image/upload/v1770381011/PHOTO-2026-02-05-21-52-58_trthtk.jpg",
+    description: "IPSS 22,  has bothersome nocturia , very poor flow ( Qmax- 3ml/sec) with a PVR of 160 cc . On Digital rectal examination-  a large 80 cc prostate is palpable . He also has a brother who had prostate cancer . How do want to proceed further ",
     available: true,
   },
-  {
-    link: "https://res.cloudinary.com/dvdt6jfo8/image/upload/v1770195606/PHOTO-2025-12-11-18-24-41_bkmjxj.jpg",
-    description: "Cystoscopy shows papillary bladder tumor from the posterior wall of the bladder.",
-    available: true,
-  },
+  
 ];
 
 // Define constants for the scoring parameters
@@ -271,15 +267,19 @@ Provide the evaluation in the following format:
   const prompt = `
 
 You are an FRCS viva examiner tasked with generating a single, concise question for the candidate. 
+
 Your task is to generate a follow up question like a viva examinee 
 
 This is the {pre}
 
-Previous QA: ${JSON.stringify(previousQA)}
+
+
+This is the Previous QA: ${JSON.stringify(previousQA)}
 
 Use the following image if required:
 Image Link: ${availableImage ? availableImage.link : "No image available"}
 Image Description: ${availableImage ? availableImage.description : "No description available"}
+The image description is available only to you and not to the candidates so that you can ask question on the basis of it or use it when suitable
 
 Write the question now without any greetings or additional context.
 If the candidate clearly asks to stop (e.g. "end the viva", "I want to stop", "finish"), 
