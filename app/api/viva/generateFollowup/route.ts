@@ -267,7 +267,11 @@ Provide the evaluation in the following format:
   const prompt = `
 
 You are an FRCS viva examiner tasked with generating a single, concise question for the candidate. 
-Your task is to generate a follow up question like a viva examinee
+
+Your task is to generate a follow up question like a viva examinee 
+
+This is the {pre}
+
 
 
 This is the Previous QA: ${JSON.stringify(previousQA)}
@@ -278,6 +282,8 @@ Image Description: ${availableImage ? availableImage.description : "No descripti
 The image description is available only to you and not to the candidates so that you can ask question on the basis of it or use it when suitable
 
 Write the question now without any greetings or additional context.
+If the candidate clearly asks to stop (e.g. "end the viva", "I want to stop", "finish"), 
+respond with a short closing statement and append EXACTLY:END!!!
 `;
 
   if (availableImage) {
