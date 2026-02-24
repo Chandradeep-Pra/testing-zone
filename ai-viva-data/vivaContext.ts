@@ -17,7 +17,7 @@ export const vivaContext = {
     id: "case-luts-001",
    title: "LUTS case",
    level: "Intermediate",
-    stem: "A 63 year gentleman presented with voiding LUTS with a PSA of 9.7 ng/ml and is sexually active. How to evaluate ?",
+    stem: "A 63 year gentleman presented with voiding LUTS and is sexually active. How to evaluate ?",
     objectives: [
       "Select and prioritise appropriate investigations",
       "Interpret imaging and report findings",
