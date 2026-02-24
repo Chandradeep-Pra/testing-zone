@@ -249,7 +249,7 @@ Provide the evaluation in the following format:
      🔑 FIRST QUESTION (DETERMINISTIC, NO GEMINI)
   -------------------------------------------------- */
   if (previousQA.length === 0) {
-    const firstQuestion = `${vivaContext.case.stem} How would you assess this patient initially?`;
+    const firstQuestion = `${vivaContext.case.stem}`;
 
     return NextResponse.json({
       question: firstQuestion,
