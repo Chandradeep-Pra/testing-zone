@@ -270,11 +270,9 @@ You are an FRCS viva examiner tasked with generating a single, concise question 
 
 Your task is to generate a follow up question like a viva examinee 
 
-This is the {pre}
-
-
-
 This is the Previous QA: ${JSON.stringify(previousQA)}
+
+Please make sure to keep the follow up question within the context of ${vivaContext.case.stem} which is the case of the question
 
 Use the following image if required:
 Image Link: ${availableImage ? availableImage.link : "No image available"}
