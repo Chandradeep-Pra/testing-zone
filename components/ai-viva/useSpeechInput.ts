@@ -50,20 +50,21 @@ export function useSpeechInput(
     };
 
     rec.onresult = (e: SpeechRecognitionEvent) => {
-      let interim = "";
-      let final = "";
+  let interim = "";
+  let final = "";
 
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const res = e.results[i];
-        const text = res[0].transcript;
+  for (let i = e.resultIndex; i < e.results.length; i++) {
+    const res = e.results[i];
+    const text = res[0].transcript;
 
-        if (res.isFinal) final += text;
-        else interim += text;
-      }
+    if (res.isFinal) final += text;
+    else interim += text;
+  }
 
-      if (interim) onInterim(interim.trim());
-      if (final) onFinal(final.trim());
-    };
+  onInterim(interim.trim());
+
+  if (final) onFinal(final.trim());
+};
 
     recognitionRef.current = rec;
 
