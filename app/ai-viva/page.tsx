@@ -1,116 +1,122 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   PlayCircle,
   Clock,
   Mic,
   FileText,
-  Stethoscope
+  Stethoscope,
 } from "lucide-react";
 
 import { vivaContext } from "@/ai-viva-data/vivaContext";
-import { VivaChat } from "@/components/ai-viva/ChatViva";
-import VivaVoiceAi from "@/components/ai-viva/VivaVoiceAi";
 
-export default function VivaPage() {
-  const [started, setStarted] = useState(false);
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 
-  if (!started) {
-    return (
-      <main className="min-h-screen bg-neutral-950 text-neutral-100 p-8 w-full">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
-          {/* LEFT — CASE DETAILS */}
-          <div className="border border-neutral-800 rounded-xl p-6 space-y-4">
-            <div className="flex items-center gap-2 text-neutral-300">
-              <Stethoscope size={18} />
-              <span className="text-sm uppercase tracking-wide">
-                Case Overview
-              </span>
+export default function VivaIntroPage() {
+  const router = useRouter();
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-8">
+      <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-8">
+
+        {/* LEFT — CASE DETAILS */}
+        <Card className="bg-slate-900 border-slate-800 shadow-xl rounded-2xl">
+          <CardHeader className="space-y-4">
+            <div className="flex items-center gap-2 text-emerald-400 text-sm uppercase tracking-wide font-medium">
+              <Stethoscope size={16} />
+              Case Overview
             </div>
 
-            <h1 className="text-2xl font-semibold">
+            <CardTitle className="text-3xl font-semibold text-slate-100">
               {vivaContext.case.title}
-            </h1>
+            </CardTitle>
 
-            <div className="text-sm text-neutral-400">
-              Level: {vivaContext.case.level}
-            </div>
+            <CardDescription>
+              <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Level: {vivaContext.case.level}
+              </Badge>
+            </CardDescription>
+          </CardHeader>
 
-            <p className="text-neutral-200 leading-relaxed">
+          <CardContent className="space-y-5">
+            <p className="text-slate-300 leading-relaxed">
               {vivaContext.case.stem}
             </p>
 
             <div>
-              <h3 className="text-sm font-semibold text-neutral-300 mb-2">
+              <h3 className="text-sm font-semibold text-slate-200 mb-3">
                 Objectives
               </h3>
-              <ul className="list-disc list-inside space-y-1 text-neutral-400">
+              <ul className="space-y-2 text-sm text-slate-400">
                 {vivaContext.case.objectives.map((obj, i) => (
-                  <li key={i}>{obj}</li>
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    {obj}
+                  </li>
                 ))}
               </ul>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* RIGHT — INSTRUCTIONS */}
-          <div className="border border-neutral-800 rounded-xl p-6 flex flex-col justify-between">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-neutral-300">
-                <FileText size={18} />
-                <span className="text-sm uppercase tracking-wide">
-                  Viva Instructions
-                </span>
-              </div>
+        {/* RIGHT — INSTRUCTIONS */}
+        <Card className="bg-slate-900 border-slate-800 shadow-xl rounded-2xl flex flex-col justify-between">
+          <CardHeader>
+            <div className="flex items-center gap-2 text-slate-400 text-sm uppercase tracking-wide font-medium">
+              <FileText size={16} />
+              Viva Instructions
+            </div>
+          </CardHeader>
 
-              <ul className="space-y-3 text-neutral-300 text-sm">
-                <li className="flex gap-2">
-                  <Clock size={16} />
-                  <span>
-                    Duration: {vivaContext.viva_rules.max_duration_minutes} minutes
-                  </span>
-                </li>
-                <li className="flex gap-2">
-                  <Mic size={16} />
-                  <span>Voice-based, one question at a time</span>
-                </li>
-                <li className="flex gap-2">
-                  <PlayCircle size={16} />
-                  <span>No interruptions, examiner-led</span>
-                </li>
-              </ul>
-
-              <p className="text-xs text-neutral-500 leading-relaxed">
-                This is a simulated clinical viva. The examiner will adapt
-                questions based on your responses. Scores will be provided
-                at the end.
-              </p>
+          <CardContent className="space-y-5 text-sm text-slate-300">
+            <div className="flex items-center gap-3">
+              <Clock size={16} className="text-emerald-400" />
+              <span>
+                Duration: {vivaContext.viva_rules.max_duration_minutes} minutes
+              </span>
             </div>
 
-            <button
-              onClick={() => setStarted(true)}
-              className="
-                mt-6 w-full flex items-center justify-center gap-2
-                bg-white text-black rounded-lg py-3 font-medium
-                hover:bg-neutral-200 transition
-              "
+            <div className="flex items-center gap-3">
+              <Mic size={16} className="text-emerald-400" />
+              <span>Voice-based, one question at a time</span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <PlayCircle size={16} className="text-emerald-400" />
+              <span>Examiner-led structured viva</span>
+            </div>
+
+            <p className="text-xs text-slate-500 pt-3">
+              This is a simulated clinical viva examination.
+              The examiner will adapt questions based on your responses.
+              A structured score report will be provided at the end.
+            </p>
+          </CardContent>
+
+          <CardFooter>
+            <Button
+              size="lg"
+              className="w-full gap-2 bg-emerald-600 hover:bg-emerald-500 text-white"
+              onClick={() => router.push("/ai-viva/session")}
             >
-              <PlayCircle />
+              <PlayCircle size={18} />
               Start Viva
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
+            </Button>
+          </CardFooter>
+        </Card>
 
-  /* Placeholder for next subtask */
-  return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center">
-      {/* {started && <VivaChat />} */}
-      {started && <VivaVoiceAi />}
-
+      </div>
     </main>
   );
 }

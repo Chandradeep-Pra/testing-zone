@@ -6,11 +6,10 @@ type Props = {
   speaking: boolean;
   thinking?: boolean;
   transcript: string;
-  exhibit?: React.ReactNode; // optional: image / report / viewer
+  exhibit?: React.ReactNode;
 };
 
-export function 
-AiPanel({
+export function AiPanel({
   speaking,
   thinking = false,
   transcript,
@@ -18,43 +17,47 @@ AiPanel({
 }: Props) {
   return (
     <div
-      className={`flex-1 rounded-2xl border relative overflow-hidden w-full
+      className={`relative h-full w-full rounded-xl border overflow-hidden
         ${speaking
-          ? "border-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.35)]"
+          ? "border-emerald-400 shadow-[0_0_25px_rgba(52,211,153,0.35)]"
           : thinking
-          ? "border-yellow-400 shadow-[0_0_30px_rgba(250,204,21,0.25)]"
-          : "border-neutral-800"
+          ? "border-yellow-400 shadow-[0_0_25px_rgba(250,204,21,0.25)]"
+          : "border-slate-800"
         }`}
     >
       {/* Header */}
-      <div className="absolute top-4 left-4 text-xs uppercase tracking-widest text-neutral-400">
+      <div className="absolute top-4 left-4 text-xs uppercase tracking-widest text-slate-400">
         AI Examiner
       </div>
 
       {/* Status Indicator */}
-      {speaking && (
-        <div className="absolute top-4 right-4 text-xs text-emerald-400">
-          Speaking…
-        </div>
-      )}
+      <div className="absolute top-4 right-4 text-xs">
+        {speaking && (
+          <span className="text-emerald-400">Speaking…</span>
+        )}
+        {!speaking && thinking && (
+          <span className="text-yellow-400">Thinking…</span>
+        )}
+      </div>
 
-      {!speaking && thinking && (
-        <div className="absolute top-4 right-4 text-xs text-yellow-400">
-          Thinking…
-        </div>
-      )}
-
-      {/* Avatar */}
-      <div className="h-full flex items-center justify-center bg-neutral-900">
-        <div className="w-28 h-28 rounded-full bg-neutral-800 flex items-center justify-center text-2xl font-semibold">
+      {/* Center AI Presence */}
+      <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
+        <div
+          className={`w-32 h-32 rounded-full flex items-center justify-center
+            text-3xl font-semibold bg-slate-800 transition-all
+            ${speaking ? "scale-105" : ""}
+          `}
+        >
           AI
         </div>
       </div>
 
-      {/* Exhibit Overlay (Image / Report / Viewer) */}
+      {/* Exhibit Overlay */}
       {exhibit && (
-        <div className="absolute inset-0 z-10 bg-black/60 backdrop-blur-sm
-                        flex items-center justify-center">
+        <div
+          className="absolute inset-0 z-20 bg-black/70 backdrop-blur-sm
+                     flex items-center justify-center p-6"
+        >
           {exhibit}
         </div>
       )}
@@ -62,9 +65,12 @@ AiPanel({
       {/* Transcript */}
       {(transcript || thinking) && (
         <div
-          className="absolute bottom-6 left-1/2 -translate-x-1/2
-                     max-w-xl bg-black/70 backdrop-blur
-                     px-5 py-3 rounded-xl text-lg text-center
+          className="absolute bottom-8 left-1/2 -translate-x-1/2
+                     max-w-2xl w-[80%]
+                     bg-black/70 backdrop-blur
+                     px-6 py-4 rounded-xl
+                     text-base text-center text-slate-100
+                     border border-slate-800
                      max-h-40 overflow-y-auto"
         >
           {thinking ? "Let me think…" : transcript}
