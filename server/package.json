@@ -4,7 +4,7 @@
   "main": "stt-server.js",
   "type": "module",
   "scripts": {
-    "start": "node stt-server.js"
+    "start": "node stt-stream.js"
   },
   "dependencies": {
     "@google-cloud/speech": "^6.6.0",
