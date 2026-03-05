@@ -3,7 +3,9 @@ import WebSocket, { WebSocketServer } from "ws";
 
 const client = new speech.SpeechClient();
 
-const wss = new WebSocketServer({ port: 3002 });
+const PORT = process.env.PORT || 3002;
+
+const wss = new WebSocketServer({ port: PORT });
 
 wss.on("connection", (ws) => {
 
