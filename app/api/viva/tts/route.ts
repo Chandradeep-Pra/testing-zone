@@ -30,6 +30,7 @@
 
 import textToSpeech from "@google-cloud/text-to-speech";
 
+export async function POST(req) {
 const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
 
 if (!raw) {
@@ -46,7 +47,6 @@ const client = new textToSpeech.TextToSpeechClient({
   projectId: creds.project_id,
 });
 
-export async function POST(req) {
   const { text } = await req.json();
 
   const [response] = await client.synthesizeSpeech({
