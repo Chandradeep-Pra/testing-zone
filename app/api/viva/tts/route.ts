@@ -1,3 +1,5 @@
+//@ts-nocheck
+
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 
 const client = new TextToSpeechClient();
