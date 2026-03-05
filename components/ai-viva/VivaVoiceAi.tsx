@@ -262,7 +262,7 @@ const liveCandidateMsgId = useRef(null);
      UI
   ----------------------------------------- */
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col w-full relative">
+    <main className="h-screen  bg-slate-950 text-slate-100 flex flex-col w-full relative">
 
       {/* READY OVERLAY */}
       {readyVisible && (
@@ -370,7 +370,8 @@ const liveCandidateMsgId = useRef(null);
         />
       </div> */}
 
-      <div className="flex-1 grid grid-cols-[3fr_1fr] gap-4 p-4">
+      {/* <div className="flex-1 grid grid-cols-[3fr_1fr] gap-4 p-4"> */}
+      <div className="flex-1 grid grid-cols-[3fr_1fr] gap-4 p-4 h-full min-h-0">
 
   {/* ================================
       AI AREA (75%)
@@ -446,7 +447,8 @@ const liveCandidateMsgId = useRef(null);
   {/* ================================
       CHAT HISTORY PANEL (25%)
   ================================= */}
-  <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
+  {/* <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden"> */}
+ <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden min-h-0">
 
     {/* Header */}
     <div className="px-4 py-3 border-b border-slate-800 text-sm text-slate-400">

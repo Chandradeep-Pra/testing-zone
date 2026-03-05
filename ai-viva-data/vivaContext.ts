@@ -13,12 +13,13 @@
 //   },
 
 export const vivaContext = {
-  case: {
-    id: "case-luts-001",
-   title: "LUTS case",
-   level: "Intermediate",
-    stem: "A 63 year gentleman presented with voiding LUTS and is sexually active. How to evaluate ?",
+ case: {
+    id: "case-hematuria-001",
+    title: "Painless Hematuria Evaluation",
+    level: "Intermediate",
+    stem: "A 56 year gentleman referred to one stop Hematuria clinic for intermittent VH for last 1 month.",
     objectives: [
+      "Formulate evaluation plan for painless hematuria",
       "Select and prioritise appropriate investigations",
       "Interpret imaging and report findings",
       "Demonstrate safe clinical management as per guidelines"
