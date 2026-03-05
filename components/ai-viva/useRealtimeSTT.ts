@@ -35,7 +35,7 @@ export function useRealtimeSTT(
 
   async function start() {
     // 1️⃣ WebSocket to STT server
-    const ws = new WebSocket("ws://localhost:5001");
+    const ws = new WebSocket("wss://testing-zone-hx7q.onrender.com");
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
 
