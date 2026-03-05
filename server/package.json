@@ -1,0 +1,13 @@
+{
+  "name": "viva-stt-server",
+  "version": "1.0.0",
+  "main": "stt-server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node stt-server.js"
+  },
+  "dependencies": {
+    "@google-cloud/speech": "^6.6.0",
+    "ws": "^8.17.0"
+  }
+}
