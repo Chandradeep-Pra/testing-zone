@@ -31,24 +31,43 @@ export function AiPanel({
       </div>
 
       {/* Status Indicator */}
-      <div className="absolute top-4 right-4 text-xs">
+      <div className="absolute top-4 right-4 text-xs flex items-center space-x-1">
         {speaking && (
           <span className="text-emerald-400">Speaking…</span>
         )}
         {!speaking && thinking && (
-          <span className="text-yellow-400">Thinking…</span>
+          <span className="text-yellow-400 flex items-center">
+            Thinking…
+            <span className="ml-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+          </span>
         )}
       </div>
 
       {/* Center AI Presence */}
       <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
+        {/* ripple/halo when speaking */}
+        {speaking && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-40 h-40 rounded-full bg-emerald-400 opacity-30 animate-ping" />
+          </div>
+        )}
+
+        {/* main avatar */}
         <div
-          className={`w-32 h-32 rounded-full flex items-center justify-center
+          className={`relative w-32 h-32 rounded-full flex items-center justify-center
             text-3xl font-semibold bg-slate-800 transition-all
             ${speaking ? "scale-105" : ""}
+            ${thinking && !speaking ? "border-4 border-yellow-400 animate-pulse" : ""}
           `}
         >
           AI
+          {thinking && !speaking && (
+            <div className="absolute bottom-1 flex space-x-1">
+              <span className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-75" />
+              <span className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-150" />
+              <span className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce delay-300" />
+            </div>
+          )}
         </div>
       </div>
 
