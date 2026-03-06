@@ -1,13 +1,22 @@
 import speech from "@google-cloud/speech";
-import WebSocket, { WebSocketServer } from "ws";
+import { WebSocketServer } from "ws";
 
-const client = new speech.SpeechClient();
+const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+
+const client = new speech.SpeechClient({
+  credentials
+});
 
 const PORT = process.env.PORT || 3002;
 
 const wss = new WebSocketServer({ port: PORT });
 
+console.log(`🎤 STT WebSocket running on port ${PORT}`);
+
 wss.on("connection", (ws) => {
+
+  console.log("🔌 Client connected");
 
   const recognizeStream = client
     .streamingRecognize({
@@ -35,7 +44,6 @@ wss.on("connection", (ws) => {
       },
       interimResults: true
     })
-
     .on("data", (data) => {
 
       const transcript =
@@ -51,9 +59,8 @@ wss.on("connection", (ws) => {
       }
 
     })
-
     .on("error", (err) => {
-      console.error("STT error:", err);
+      console.error("❌ STT error:", err);
     });
 
   ws.on("message", (msg) => {
@@ -61,9 +68,8 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
+    console.log("🔌 Client disconnected");
     recognizeStream.destroy();
   });
 
 });
-
-console.log("🎤 STT streaming server running on ws://localhost:3002");
