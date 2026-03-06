@@ -1,12 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 type Props = {
   speaking: boolean;
   thinking?: boolean;
   transcript: string;
   exhibit?: React.ReactNode;
+  amplitude?: number;
 };
 
 export function AiPanel({
@@ -14,18 +15,33 @@ export function AiPanel({
   thinking = false,
   transcript,
   exhibit,
+  amplitude = 0,
 }: Props) {
+
+  const [activeExhibit, setActiveExhibit] = useState<React.ReactNode | null>(null);
+
+  useEffect(() => {
+    if (exhibit) setActiveExhibit(exhibit);
+  }, [exhibit]);
+
+  useEffect(() => {
+    if (speaking || thinking) setActiveExhibit(null);
+  }, [speaking, thinking]);
+
+  const audioScale = 1 + amplitude * 0.25;
+
   return (
     <div
       className={`relative h-full w-full rounded-xl border overflow-hidden bg-slate-950
       ${
         speaking
-          ? "border-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.35)]"
+          ? "border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.35)]"
           : thinking
-          ? "border-yellow-400 shadow-[0_0_25px_rgba(234,179,8,0.25)]"
+          ? "border-yellow-400 shadow-[0_0_30px_rgba(234,179,8,0.25)]"
           : "border-slate-800"
       }`}
     >
+
       {/* Header */}
       <div className="absolute top-4 left-4 text-xs uppercase tracking-widest text-slate-400">
         AI Examiner
@@ -39,26 +55,42 @@ export function AiPanel({
         )}
       </div>
 
-      {/* Center */}
+      {/* CENTER */}
       <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
 
-        {/* THINKING ORBIT */}
-        {!speaking && thinking && (
-          <div className="absolute w-40 h-40 animate-spin">
-            <div className="absolute w-3 h-3 bg-yellow-400 rounded-full top-0 left-1/2 -translate-x-1/2" />
-            <div className="absolute w-3 h-3 bg-yellow-400 rounded-full bottom-0 left-1/2 -translate-x-1/2" />
-            <div className="absolute w-3 h-3 bg-yellow-400 rounded-full left-0 top-1/2 -translate-y-1/2" />
-            <div className="absolute w-3 h-3 bg-yellow-400 rounded-full right-0 top-1/2 -translate-y-1/2" />
-          </div>
+        {/* THINKING NEURAL WAVES */}
+        {thinking && (
+          <>
+            <div className="absolute w-64 h-64 rounded-full border border-yellow-400/20 animate-ai-wave-expand" />
+            <div className="absolute w-64 h-64 rounded-full border border-yellow-400/20 animate-ai-wave-expand delay-1000" />
+            <div className="absolute w-64 h-64 rounded-full border border-yellow-400/20 animate-ai-wave-expand delay-2000" />
+
+            {/* floating particles */}
+            <div className="absolute w-48 h-48 animate-ai-orbit-slow">
+              <div className="absolute w-2 h-2 bg-yellow-400 rounded-full top-0 left-1/2 -translate-x-1/2" />
+              <div className="absolute w-2 h-2 bg-yellow-400 rounded-full bottom-0 left-1/2 -translate-x-1/2" />
+              <div className="absolute w-2 h-2 bg-yellow-400 rounded-full left-0 top-1/2 -translate-y-1/2" />
+              <div className="absolute w-2 h-2 bg-yellow-400 rounded-full right-0 top-1/2 -translate-y-1/2" />
+            </div>
+          </>
         )}
 
         {/* AI CORE */}
         <div
+          style={{
+            transform: `scale(${audioScale})`,
+          }}
           className={`relative w-28 h-28 rounded-full flex items-center justify-center
-          text-2xl font-semibold bg-slate-800 transition-all
-          ${speaking ? "scale-105 animate-pulse" : ""}
-          ${thinking ? "border-2 border-yellow-400" : ""}
-        `}
+          text-2xl font-semibold
+          bg-gradient-to-br from-slate-700 to-slate-900
+          transition-all duration-150
+          ${
+            speaking
+              ? "shadow-[0_0_40px_rgba(16,185,129,0.6)]"
+              : thinking
+              ? "shadow-[0_0_35px_rgba(234,179,8,0.4)]"
+              : "animate-ai-breath"
+          }`}
         >
           AI
         </div>
@@ -66,19 +98,30 @@ export function AiPanel({
         {/* SPEAKING WAVE */}
         {speaking && (
           <div className="absolute bottom-32 flex items-end space-x-1">
-            <div className="w-2 h-6 bg-emerald-400 rounded animate-bounce" />
-            <div className="w-2 h-10 bg-emerald-400 rounded animate-bounce delay-75" />
-            <div className="w-2 h-7 bg-emerald-400 rounded animate-bounce delay-150" />
-            <div className="w-2 h-12 bg-emerald-400 rounded animate-bounce delay-200" />
-            <div className="w-2 h-8 bg-emerald-400 rounded animate-bounce delay-300" />
+            {[0,1,2,3,4,5,6].map((i) => {
+
+              const height =
+                10 +
+                amplitude * 45 +
+                Math.random() * 6;
+
+              return (
+                <div
+                  key={i}
+                  className="w-2 bg-emerald-400 rounded transition-all duration-75"
+                  style={{ height }}
+                />
+              );
+            })}
           </div>
         )}
+
       </div>
 
       {/* Exhibit */}
-      {exhibit && (
+      {activeExhibit && (
         <div className="absolute inset-0 z-20 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6">
-          {exhibit}
+          {activeExhibit}
         </div>
       )}
 

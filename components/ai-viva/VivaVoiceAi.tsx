@@ -30,7 +30,7 @@ export default function VivaVoiceAi() {
     clearExhibit,
   } = useVivaSession();
 
-  const { speak } = useSpeechOutput();
+  const { speak, amplitude } = useSpeechOutput();
 
   /* ----------------------------------------
      Session guards
@@ -373,6 +373,7 @@ export default function VivaVoiceAi() {
   <div className="relative bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
 
     <AiPanel
+    amplitude={amplitude}
       speaking={speaking}
       thinking={thinking}
       exhibit={
