@@ -7,86 +7,83 @@ export function useSpeechInput(
   onInterim: (t: string) => void,
   onFinal: (t: string) => void
 ) {
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const listeningRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+    // Connect to STT WebSocket server
+    const ws = new WebSocket("ws://localhost:3002");
+    wsRef.current = ws;
 
-    if (!SpeechRecognition) {
-      console.warn("SpeechRecognition not supported");
-      return;
-    }
-
-    const rec: SpeechRecognition = new SpeechRecognition();
-
-    rec.lang = "en-US";
-    rec.interimResults = true;
-    rec.continuous = true;
-
-    rec.onstart = () => {
-      listeningRef.current = true;
-      console.log("🎤 Mic started");
+    ws.onopen = () => {
+      console.log("🔌 Connected to STT server");
     };
 
-    rec.onend = () => {
-      listeningRef.current = false;
-      console.log("🛑 Mic ended");
-    };
-
-    rec.onerror = (e: any) => {
-      listeningRef.current = false;
-
-      if (e.error === "aborted") {
-        // benign — controlled lifecycle
-        return;
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.transcript) {
+          if (data.final) {
+            onFinal(data.transcript);
+          } else {
+            onInterim(data.transcript);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse STT message:", err);
       }
-
-      console.error("Speech error:", e.error);
     };
 
-    rec.onresult = (e: SpeechRecognitionEvent) => {
-  let interim = "";
-  let final = "";
+    ws.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
 
-  for (let i = e.resultIndex; i < e.results.length; i++) {
-    const res = e.results[i];
-    const text = res[0].transcript;
-
-    if (res.isFinal) final += text;
-    else interim += text;
-  }
-
-  onInterim(interim.trim());
-
-  if (final) onFinal(final.trim());
-};
-
-    recognitionRef.current = rec;
+    ws.onclose = () => {
+      console.log("🔌 Disconnected from STT server");
+    };
 
     return () => {
-      // ❌ DO NOT abort here
-      recognitionRef.current = null;
+      ws.close();
+      mediaRecorderRef.current?.stop();
     };
   }, [onInterim, onFinal]);
 
-  function start() {
-    const rec = recognitionRef.current;
-    if (!rec || listeningRef.current) return;
+  async function start() {
+    if (listeningRef.current) return;
 
     try {
-      rec.start();
-    } catch {
-      // ignore
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, {
+        mimeType: "audio/webm;codecs=opus" // or "audio/wav" if supported
+      });
+
+      recorder.ondataavailable = (event) => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        listeningRef.current = false;
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      recorder.start(100); // Send data every 100ms
+      mediaRecorderRef.current = recorder;
+      listeningRef.current = true;
+      console.log("🎤 Mic started (server STT)");
+    } catch (err) {
+      console.error("Failed to start recording:", err);
     }
   }
 
   function stop() {
-    recognitionRef.current?.stop();
+    mediaRecorderRef.current?.stop();
+    listeningRef.current = false;
+    console.log("🛑 Mic stopped");
   }
 
   return {

@@ -1,7 +1,7 @@
 import speech from "@google-cloud/speech";
 import { WebSocketServer } from "ws";
 
-const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+const credentials = JSON.parse(process.env.local.GOOGLE_APPLICATION_CREDENTIALS_JSON);
 credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
 
 const client = new speech.SpeechClient({
