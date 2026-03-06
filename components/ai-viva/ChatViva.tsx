@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Clock } from "lucide-react";
 import { useVivaSession } from "./useVivaSession";
+import { useCountdown } from "./useCountdown";
 
 type Exhibit = {
   label: string;
@@ -19,44 +20,36 @@ type Message = {
 
 export function VivaChat() {
   const [messages, setMessages] = useState<Message[]>([]);
-const [input, setInput] = useState("");
-const [timeLeft, setTimeLeft] = useState(40 * 60);
-const [ended, setEnded] = useState(false);
-const [loading, setLoading] = useState(false);
-const { next } = useVivaSession();
+  const [input, setInput] = useState("");
+  const [ended, setEnded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { next } = useVivaSession();
 
-const bottomRef = useRef<HTMLDivElement>(null);
+  const { secondsLeft, minutes, seconds } = useCountdown(
+    40 * 60,
+    !ended
+  );
 
-// stable session id
-const sessionIdRef = useRef<string>(
-  typeof crypto !== "undefined"
-    ? crypto.randomUUID()
-    : "demo-session"
-);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-
-  // countdown timer
-  useEffect(() => {
-  if (timeLeft <= 0) return;
-  const t = setInterval(() => setTimeLeft((t) => t - 1), 1000);
-  return () => clearInterval(t);
-}, [timeLeft]);
-
-const minutes = Math.floor(timeLeft / 60);
-const seconds = timeLeft % 60;
-
+  // stable session id
+  const sessionIdRef = useRef<string>(
+    typeof crypto !== "undefined"
+      ? crypto.randomUUID()
+      : "demo-session"
+  );
 
   // start viva – get first question
- useEffect(() => {
-  bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-}, [messages]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-useEffect(() => {
-  fetchNext("");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+  useEffect(() => {
+    fetchNext("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-function extractText(text: unknown): string {
+  function extractText(text: unknown): string {
   if (typeof text !== "string") return "";
 
   // If Gemini returned JSON as a string, unwrap it
@@ -74,7 +67,7 @@ function extractText(text: unknown): string {
 
 
 
- async function fetchNext(userAnswer: string) {
+  async function fetchNext(userAnswer: string) {
   setLoading(true);
 
   const res = await fetch("/api/viva/next", {
@@ -83,7 +76,7 @@ function extractText(text: unknown): string {
     body: JSON.stringify({
       sessionId: sessionIdRef.current,
       userAnswer,
-      timeElapsedSec: 600 - timeLeft
+      timeElapsedSec: 600 - secondsLeft
     })
   });
 

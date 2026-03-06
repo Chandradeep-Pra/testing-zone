@@ -66,14 +66,3 @@ const client = new textToSpeech.TextToSpeechClient({
     },
   });
 }
-
-
-{
-  "account": "",
-  "client_id": "
-  "client_secret": "
-  "quota_project_id": "
-  "refresh_token": 
-  "type": "authorized_user",
-  "universe_domain": "googleapis.com"
-}

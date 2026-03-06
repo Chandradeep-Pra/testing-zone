@@ -12,6 +12,7 @@ import { useSpeechInput } from "./useSpeechInput";
 import { useVivaEngine } from "./useVivaEngine";
 import ReadyOverlay from "./ReadyOverlay";
 import ChatTimeline from "./ChatTimeline";
+import { useCountdown } from "./useCountdown";
 
 const VIVA_DURATION_SEC = 10 * 60;
 
@@ -42,35 +43,16 @@ export default function VivaVoiceAi() {
   const [vivaStarted, setVivaStarted] = useState(false);
 
   const [messages, setMessages] = useState([]);
-const liveCandidateMsgId = useRef(null);
+  const liveCandidateMsgId = useRef(null);
 
   /* ----------------------------------------
      Timer
   ----------------------------------------- */
-  const [remainingSec, setRemainingSec] = useState(VIVA_DURATION_SEC);
-
-  useEffect(() => {
-    if (!vivaStarted || endingRef.current) return;
-
-    const interval = setInterval(() => {
-      setRemainingSec((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          endViva();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [vivaStarted]);
-
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, "0")}`;
-  };
+  const { minutes, seconds } = useCountdown(
+    VIVA_DURATION_SEC,
+    vivaStarted && !ending,
+    endViva
+  );
 
   /* ----------------------------------------
      Candidate state
@@ -316,7 +298,7 @@ const liveCandidateMsgId = useRef(null);
     text-emerald-400
   ">
     <Clock size={16} />
-    {formatTime(remainingSec)}
+    {minutes}:{seconds.toString().padStart(2, "0")}
   </div>
 
 </div>
