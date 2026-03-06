@@ -45,6 +45,9 @@ export default function VivaVoiceAi() {
   const [messages, setMessages] = useState([]);
   const liveCandidateMsgId = useRef(null);
 
+  // whether the conversation history panel is visible
+  const [showChat, setShowChat] = useState(false);
+
   /* ----------------------------------------
      Timer
   ----------------------------------------- */
@@ -288,17 +291,26 @@ export default function VivaVoiceAi() {
     Urologics AI
   </div>
 
-  {/* RIGHT — Timer */}
-  <div className="
-    flex items-center gap-2
-    bg-slate-800/70
-    border border-emerald-500/20
-    px-4 py-2 rounded-full
-    text-sm font-medium
-    text-emerald-400
-  ">
-    <Clock size={16} />
-    {minutes}:{seconds.toString().padStart(2, "0")}
+  {/* RIGHT — Timer + history toggle */}
+  <div className="flex items-center gap-2">
+    <button
+      onClick={() => setShowChat((v) => !v)}
+      className="px-2 py-1 bg-slate-800/70 border border-slate-700 rounded text-xs text-slate-200 hover:bg-slate-700 transition"
+    >
+      {showChat ? "Hide History" : "Show History"}
+    </button>
+
+    <div className="
+      flex items-center gap-2
+      bg-slate-800/70
+      border border-emerald-500/20
+      px-4 py-2 rounded-full
+      text-sm font-medium
+      text-emerald-400
+    ">
+      <Clock size={16} />
+      {minutes}:{seconds.toString().padStart(2, "0")}
+    </div>
   </div>
 
 </div>
@@ -353,7 +365,7 @@ export default function VivaVoiceAi() {
       </div> */}
 
       {/* <div className="flex-1 grid grid-cols-[3fr_1fr] gap-4 p-4"> */}
-      <div className="flex-1 grid grid-cols-[3fr_1fr] gap-4 p-4 h-full min-h-0">
+      <div className={`flex-1 grid gap-4 p-4 h-full min-h-0 ${showChat ? "grid-cols-[3fr_1fr]" : "grid-cols-1"}`}>
 
   {/* ================================
       AI AREA (75%)
@@ -426,21 +438,31 @@ export default function VivaVoiceAi() {
 
   </div>
 
-  {/* ================================
-      CHAT HISTORY PANEL (25%)
-  ================================= */}
-  {/* <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden"> */}
- <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden min-h-0">
+  {showChat && (
+    <>
+      {/* ================================
+          CHAT HISTORY PANEL (25%)
+      ================================= */}
+      {/* <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden"> */}
+      <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden min-h-0">
 
-    {/* Header */}
-    <div className="px-4 py-3 border-b border-slate-800 text-sm text-slate-400">
-      Conversation History
-    </div>
+        {/* Header */}
+        <div className="px-4 py-3 border-b border-slate-800 text-sm text-slate-400 flex items-center justify-between">
+          <span>Conversation History</span>
+          <button
+            onClick={() => setShowChat(false)}
+            className="text-xs text-slate-400 hover:text-slate-200"
+          >
+            Close
+          </button>
+        </div>
 
-    {/* Messages */}
-    <ChatTimeline messages={messages} />
+        {/* Messages */}
+        <ChatTimeline messages={messages} />
 
-  </div>
+      </div>
+    </>
+  )}
 
 </div>
 

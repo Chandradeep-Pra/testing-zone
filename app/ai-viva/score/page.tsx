@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Trophy,
   CheckCircle2,
@@ -13,62 +13,86 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-const report = {
-  caseTitle: "LUTS Case Examination",
-  overallScore: 6,
-  strengthsOverall: [
-    "Structured investigation approach",
-    "Safe management decisions",
-    "Clear communication"
-  ],
-  weaknessesOverall: [
-    "Limited imaging justification depth",
-    "Insufficient differential expansion",
-    "Superficial risk explanation"
-  ],
-  domains: [
-    {
-      name: "Basic Knowledge",
-      score: 7,
-      summary:
-        "Good prioritisation and foundational understanding.",
-      reasoning:
-        "You demonstrated solid understanding of investigation sequencing and malignancy risk factors. However, referencing guidelines explicitly would strengthen high-level justification."
-    },
-    {
-      name: "Higher Order Processing",
-      score: 5,
-      summary:
-        "Logical structure but lacked deeper analytical explanation.",
-      reasoning:
-        "While reasoning was coherent, analytical depth was limited when discussing imaging selection and risk stratification."
-    },
-    {
-      name: "Clinical Skills",
-      score: 6,
-      summary:
-        "Safe decisions overall but limited breadth in reasoning.",
-      reasoning:
-        "Clinical management was safe and appropriate, but differential diagnosis exploration lacked expansion under pressure."
-    },
-    {
-      name: "Professionalism",
-      score: 8,
-      summary:
-        "Clear, composed, and confident communication.",
-      reasoning:
-        "Communication was structured and confident throughout the session, demonstrating professional composure."
-    }
-  ],
-  improvementPlan: [
-    "Articulate imaging rationale clearly.",
-    "Expand structured differential framework.",
-    "Support decisions with guideline-level reasoning."
-  ]
+import { vivaContext } from "@/ai-viva-data/vivaContext"; // use for case title
+
+// evaluation object persisted by VivaVoiceAi.endViva
+
+interface EvalDimension {
+  score: number;
+  reason: string;
+}
+
+type EvaluationResponse = {
+  basic_knowledge: EvalDimension;
+  higher_order_processing: EvalDimension;
+  clinical_skills: EvalDimension;
+  professionalism: EvalDimension;
+  [key: string]: EvalDimension;
 };
+
+interface DomainReport {
+  name: string;
+  score: number;
+  summary: string;
+  reasoning: string;
+}
+
+interface Report {
+  caseTitle: string;
+  overallScore: number;
+  strengthsOverall: string[];
+  weaknessesOverall: string[];
+  domains: DomainReport[];
+  improvementPlan: string[];
+}
 
 export default function ReviewPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
+
+  // load evaluation from sessionStorage and convert to report structure
+  useEffect(() => {
+    const raw = sessionStorage.getItem("viva-final-score");
+    if (raw) {
+      try {
+        const evalObj: EvaluationResponse = JSON.parse(raw);
+        const domains: DomainReport[] = Object.entries(evalObj).map(
+          ([key, val]) => ({
+            name: key
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase()),
+            score: val.score,
+            summary: "", // could be derived from reasoning if desired
+            reasoning: val.reason,
+          })
+        );
+
+        const overall = Math.round(
+          Object.values(evalObj).reduce((a, d) => a + d.score, 0) /
+            domains.length
+        );
+
+        setReport({
+          caseTitle: vivaContext.case.title,
+          overallScore: overall,
+          strengthsOverall: [],
+          weaknessesOverall: [],
+          domains,
+          improvementPlan: [],
+        });
+      } catch (e) {
+        console.error("failed to parse evaluation", e);
+      }
+    }
+  }, []);
+
+  if (!report) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <p className="text-slate-400">Loading score…</p>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 px-6 py-10">
@@ -101,49 +125,55 @@ export default function ReviewPage() {
         </section>
 
         {/* STRENGTHS & WEAKNESSES */}
-        <section className="grid md:grid-cols-2 gap-8">
+        {(report.strengthsOverall.length > 0 || report.weaknessesOverall.length > 0) && (
+          <section className="grid md:grid-cols-2 gap-8">
 
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <CheckCircle2 size={18} className="text-emerald-400" />
-              <h2 className="text-sm font-medium text-emerald-400">
-                Strengths
-              </h2>
-            </div>
-
-            <div className="space-y-2">
-              {report.strengthsOverall.map((item, i) => (
-                <div
-                  key={i}
-                  className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-lg text-sm"
-                >
-                  {item}
+            {report.strengthsOverall.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 size={18} className="text-emerald-400" />
+                  <h2 className="text-sm font-medium text-emerald-400">
+                    Strengths
+                  </h2>
                 </div>
-              ))}
-            </div>
-          </div>
 
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle size={18} className="text-red-400" />
-              <h2 className="text-sm font-medium text-red-400">
-                Weaknesses
-              </h2>
-            </div>
-
-            <div className="space-y-2">
-              {report.weaknessesOverall.map((item, i) => (
-                <div
-                  key={i}
-                  className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg text-sm"
-                >
-                  {item}
+                <div className="space-y-2">
+                  {report.strengthsOverall.map((item, i) => (
+                    <div
+                      key={i}
+                      className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-lg text-sm"
+                    >
+                      {item}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            )}
 
-        </section>
+            {report.weaknessesOverall.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle size={18} className="text-red-400" />
+                  <h2 className="text-sm font-medium text-red-400">
+                    Weaknesses
+                  </h2>
+                </div>
+
+                <div className="space-y-2">
+                  {report.weaknessesOverall.map((item, i) => (
+                    <div
+                      key={i}
+                      className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg text-sm"
+                    >
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </section>
+        )}
 
         {/* DOMAIN PERFORMANCE */}
         <section className="space-y-6 border-t border-slate-800 pt-6">
@@ -212,25 +242,27 @@ export default function ReviewPage() {
         </section>
 
         {/* NEXT FOCUS AREA */}
-        <section className="space-y-4 border-t border-slate-800 pt-6">
+        {report.improvementPlan.length > 0 && (
+          <section className="space-y-4 border-t border-slate-800 pt-6">
 
-          <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
-            Next Focus Areas
-          </h2>
+            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
+              Next Focus Areas
+            </h2>
 
-          <div className="flex flex-wrap gap-3">
-            {report.improvementPlan.map((item, i) => (
-              <Badge
-                key={i}
-                variant="secondary"
-                className="bg-slate-800 text-slate-200 px-3 py-1 text-sm"
-              >
-                {item}
-              </Badge>
-            ))}
-          </div>
+            <div className="flex flex-wrap gap-3">
+              {report.improvementPlan.map((item, i) => (
+                <Badge
+                  key={i}
+                  variant="secondary"
+                  className="bg-slate-800 text-slate-200 px-3 py-1 text-sm"
+                >
+                  {item}
+                </Badge>
+              ))}
+            </div>
 
-        </section>
+          </section>
+        )}
 
       </div>
     </main>
