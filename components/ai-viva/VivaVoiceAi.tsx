@@ -385,11 +385,11 @@ export default function VivaVoiceAi() {
               className="rounded-xl shadow-xl max-h-[70vh]"
             />
 
-            {exhibit.description && (
+            {/* {exhibit.description && (
               <div className="mt-3 text-sm text-slate-300 text-center">
                 {exhibit.description}
               </div>
-            )}
+            )} */}
 
             <button
               onClick={clearExhibit}
