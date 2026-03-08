@@ -52,39 +52,58 @@ export default function ReviewPage() {
 
   // load evaluation from sessionStorage and convert to report structure
   useEffect(() => {
-    const raw = sessionStorage.getItem("viva-final-score");
-    if (raw) {
-      try {
-        const evalObj: EvaluationResponse = JSON.parse(raw);
-        const domains: DomainReport[] = Object.entries(evalObj).map(
-          ([key, val]) => ({
-            name: key
-              .replace(/_/g, " ")
-              .replace(/\b\w/g, (c) => c.toUpperCase()),
-            score: val.score,
-            summary: "", // could be derived from reasoning if desired
-            reasoning: val.reason,
-          })
-        );
+  const raw = sessionStorage.getItem("viva-final-score");
 
-        const overall = Math.round(
-          Object.values(evalObj).reduce((a, d) => a + d.score, 0) /
-            domains.length
-        );
+  if (!raw) return;
 
-        setReport({
-          caseTitle: vivaContext.case.title,
-          overallScore: overall,
-          strengthsOverall: [],
-          weaknessesOverall: [],
-          domains,
-          improvementPlan: [],
-        });
-      } catch (e) {
-        console.error("failed to parse evaluation", e);
-      }
-    }
-  }, []);
+  try {
+    const evalObj = JSON.parse(raw);
+
+    const domainKeys = [
+      "basic_knowledge",
+      "higher_order_processing",
+      "clinical_skills",
+      "professionalism",
+    ];
+
+    const domains: DomainReport[] = domainKeys.map((key) => {
+      const val = evalObj[key];
+
+      return {
+        name: key
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase()),
+
+        score: Number(val?.score) || 0,
+
+        summary: val?.summary || "",
+
+        reasoning: val?.reason || "",
+      };
+    });
+
+    const overall = Math.round(
+      domains.reduce((sum, d) => sum + d.score, 0) / domains.length
+    );
+
+    setReport({
+      caseTitle: vivaContext.case.title,
+
+      overallScore: overall,
+
+      strengthsOverall: evalObj.strengthsOverall || [],
+
+      weaknessesOverall: evalObj.weaknessesOverall || [],
+
+      improvementPlan: evalObj.improvementPlan || [],
+
+      domains,
+    });
+
+  } catch (e) {
+    console.error("failed to parse evaluation", e);
+  }
+}, []);
 
   if (!report) {
     return (
@@ -115,7 +134,7 @@ export default function ReviewPage() {
 
             <div className="text-right">
               <div className="text-4xl font-semibold text-emerald-400">
-                {report.overallScore}
+                {report.overallScore} 
               </div>
               <div className="text-xs text-slate-500">
                 Overall / 8

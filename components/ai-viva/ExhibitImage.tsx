@@ -16,7 +16,7 @@ export function ExhibitImage({ src, label, onClose }: Props) {
         Close
       </button>
 
-      <div className="text-sm text-neutral-300 mb-2">{label}</div>
+      {/* <div className="text-sm text-neutral-300 mb-2">{label}</div> */}
 
       <img
         src={src}

@@ -52,9 +52,9 @@ const client = new textToSpeech.TextToSpeechClient({
   const [response] = await client.synthesizeSpeech({
     input: { text },
     voice: {
-      languageCode: "en-gb",
-      // name: "en-US-Chirp3-HD-Charon",
-      name: "en-GB-Chirp3-HD-Puck",
+      languageCode: "en-US",
+      name: "en-US-Chirp3-HD-Charon",
+      // name: "en-GB-Chirp3-HD-Puck",
     },
     audioConfig: {
       audioEncoding: "MP3",

@@ -21,53 +21,62 @@ const client = new speech.SpeechClient({
    Uses `gcloud auth application-default login`
 ------------------------------------------------------- */
 
-// const client = new speech.SpeechClient();
 
-/* -------------------------------------------------------
-   SERVER
-------------------------------------------------------- */
+// const client = new speech.SpeechClient();
 
 const PORT = process.env.PORT || 3002;
 
 const wss = new WebSocketServer({ port: PORT });
 
-console.log(`🎤 STT WebSocket running on port ${PORT}`);
-
-/* -------------------------------------------------------
-   CONNECTION
-------------------------------------------------------- */
+console.log(`🎤 STT WebSocket server running on port ${PORT}`);
 
 wss.on("connection", (ws) => {
 
   console.log("🔌 Client connected");
 
   let recognizeStream = null;
-  let streamClosed = false;
+  let silenceTimer = null;
   let restartTimer = null;
+  let streamClosed = false;
 
-  /* ---------------------------
-     Create Google STT stream
-  ---------------------------- */
+  function send(data) {
 
-  function createStream() {
+    if (ws.readyState === ws.OPEN) {
+      ws.send(JSON.stringify(data));
+    }
+
+  }
+
+  /* --------------------------------------------------
+     Start Google STT stream
+  -------------------------------------------------- */
+
+  function startStream() {
+
+    console.log("🎤 Starting Google STT stream");
 
     streamClosed = false;
 
-    recognizeStream = client
-      .streamingRecognize({
+    recognizeStream =
+      client.streamingRecognize({
+
         config: {
+
           encoding: "LINEAR16",
           sampleRateHertz: 16000,
           audioChannelCount: 1,
           languageCode: "en-US",
-          model: "latest_short",
+
+          model: "medical_dictation",
+          useEnhanced: true,
+
           enableAutomaticPunctuation: true,
+          profanityFilter: false,
 
           speechContexts: [
             {
               phrases: [
 
-                /* Urology */
                 "hematuria",
                 "uroflowmetry",
                 "post void residual",
@@ -77,104 +86,78 @@ wss.on("connection", (ws) => {
                 "lower urinary tract symptoms",
                 "LUTS",
                 "TURP",
-                "transurethral resection of prostate",
-
-                /* Cardiology */
-                "hypertension",
-                "diabetes mellitus",
-                "hyperlipidemia",
-                "myocardial infarction",
-                "coronary artery disease",
-                "heart failure",
-                "atrial fibrillation",
-
-                /* Neurology */
-                "stroke",
-                "transient ischemic attack",
-                "subarachnoid hemorrhage",
-                "intracranial pressure",
-
-                /* Gastroenterology */
-                "gastroesophageal reflux disease",
-                "GERD",
-                "peptic ulcer disease",
-                "hepatomegaly",
-                "splenomegaly",
-                "cirrhosis",
-
-                /* Respiratory */
-                "pneumonia",
-                "chronic obstructive pulmonary disease",
-                "COPD",
-                "tuberculosis",
-                "pulmonary embolism",
-
-                /* Endocrine */
-                "hypothyroidism",
-                "hyperthyroidism",
-                "Cushing syndrome",
-                "Addison disease",
-
-                /* Emergency */
-                "anaphylaxis",
-                "septic shock",
-                "cardiac arrest",
-                "ventricular tachycardia",
-                "ventricular fibrillation"
+                "transurethral resection of prostate"
 
               ],
-              boost: 18
+              boost: 20
             }
           ]
+
         },
 
         interimResults: true
+
       })
 
       /* ---------------------------
-         Transcript response
+         Transcript event
       ---------------------------- */
 
       .on("data", (data) => {
 
+        if (!data.results || !data.results[0]) return;
+
+        const result = data.results[0];
         const transcript =
-          data.results?.[0]?.alternatives?.[0]?.transcript;
+          result.alternatives?.[0]?.transcript;
 
-        const isFinal =
-          data.results?.[0]?.isFinal;
+        if (!transcript) return;
 
-        if (transcript && ws.readyState === ws.OPEN) {
+        console.log(
+          result.isFinal
+            ? `✅ Final: ${transcript}`
+            : `… Interim: ${transcript}`
+        );
 
-          ws.send(JSON.stringify({
-            transcript,
-            final: isFinal
-          }));
+        send({
+          transcript,
+          final: result.isFinal
+        });
 
+        /* ---------------------------
+           Silence detection
+        ---------------------------- */
+
+        if (silenceTimer) {
+          clearTimeout(silenceTimer);
         }
+
+        silenceTimer = setTimeout(() => {
+
+          console.log("🛑 Silence detected → speech ended");
+
+          send({ speechEnded: true });
+
+        }, 2800);
 
       })
 
-      /* ---------------------------
-         Error handling
-      ---------------------------- */
-
       .on("error", (err) => {
 
-        console.error("❌ STT error:", err);
+        console.error("❌ Google STT error:", err);
         streamClosed = true;
 
       })
 
       .on("close", () => {
 
-        console.log("⚠️ STT stream closed");
+        console.log("⚠️ Google STT stream closed");
         streamClosed = true;
 
       });
 
     /* ---------------------------
-       Restart stream every 55s
-       (Google streaming limit)
+       Restart before 60s limit
     ---------------------------- */
 
     restartTimer = setTimeout(() => {
@@ -191,18 +174,14 @@ wss.on("connection", (ws) => {
 
   }
 
-  /* ---------------------------
-     Audio chunks from client
-  ---------------------------- */
+  /* --------------------------------------------------
+     Receive audio from client
+  -------------------------------------------------- */
 
   ws.on("message", (msg) => {
 
     if (!recognizeStream || streamClosed) {
-
-      console.log("🎤 Starting STT stream");
-
-      createStream();
-
+      startStream();
     }
 
     if (recognizeStream?.writable) {
@@ -210,23 +189,22 @@ wss.on("connection", (ws) => {
       try {
         recognizeStream.write(msg);
       } catch {
-        console.log("write skipped");
+        console.warn("⚠️ Audio write skipped");
       }
 
     }
 
   });
 
-  /* ---------------------------
+  /* --------------------------------------------------
      Client disconnected
-  ---------------------------- */
+  -------------------------------------------------- */
 
   ws.on("close", () => {
 
     console.log("🔌 Client disconnected");
 
-    streamClosed = true;
-
+    if (silenceTimer) clearTimeout(silenceTimer);
     if (restartTimer) clearTimeout(restartTimer);
 
     if (recognizeStream) {
