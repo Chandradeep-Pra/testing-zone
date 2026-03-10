@@ -95,11 +95,11 @@ export default function ChatTimeline({ messages }) {
                 "
               />
 
-              {msg.description && (
+              {/* {msg.description && (
                 <div className="text-xs text-slate-400">
                   {msg.description}
                 </div>
-              )}
+              )} */}
 
             </div>
           );

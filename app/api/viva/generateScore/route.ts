@@ -2,40 +2,95 @@ import { NextRequest, NextResponse } from "next/server";
 import { geminiModel } from "@/lib/gemni";
 
 export async function POST(req: NextRequest) {
-  const { questionsAndAnswers } = await req.json();
 
-  if (!Array.isArray(questionsAndAnswers)) {
-    return NextResponse.json({ error: "Invalid input. Expected an array of questions and answers." }, { status: 400 });
+  const { previousQA } = await req.json();
+
+  if (!Array.isArray(previousQA)) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const combinedQA = questionsAndAnswers.map(({ question, answer }) => `Q: ${question}\nA: ${answer}`).join("\n\n");
+  const transcript = previousQA
+    .map((q: any) => `Q: ${q.question}\nA: ${q.answer}`)
+    .join("\n\n");
 
   const prompt = `
-You are an FRCS examiner tasked with evaluating a candidate's responses across four dimensions: basic knowledge, higher order processing, clinical skills, and professionalism. Analyze all the provided questions and answers together and provide a single evaluation for each dimension. For each dimension, give a score (from 4 to 8) and a detailed reason for the score.
+You are an FRCS Urology examiner.
 
-Questions and Answers:
-${combinedQA}
+Evaluate the candidate performance in this viva.
 
-Provide the evaluation in the following format:
+Score each domain from 4–8.
+
+Domains:
+1. basic_knowledge
+2. higher_order_processing
+3. clinical_skills
+4. professionalism
+
+Provide:
+
+• score (4-8)
+• short summary
+• detailed reasoning
+
+Also provide:
+
+• strengthsOverall (3–5 bullet points)
+• weaknessesOverall (3–5 bullet points)
+• improvementPlan (3–5 specific learning topics)
+
+Transcript:
+${transcript}
+
+Return ONLY JSON in this format:
+
 {
-  "basic_knowledge": { "score": <score>, "reason": "<reason>" },
-  "higher_order_processing": { "score": <score>, "reason": "<reason>" },
-  "clinical_skills": { "score": <score>, "reason": "<reason>" },
-  "professionalism": { "score": <score>, "reason": "<reason>" }
+  "basic_knowledge": {
+    "score": 6,
+    "summary": "",
+    "reason": ""
+  },
+  "higher_order_processing": {
+    "score": 6,
+    "summary": "",
+    "reason": ""
+  },
+  "clinical_skills": {
+    "score": 6,
+    "summary": "",
+    "reason": ""
+  },
+  "professionalism": {
+    "score": 6,
+    "summary": "",
+    "reason": ""
+  },
+
+  "strengthsOverall": [],
+  "weaknessesOverall": [],
+  "improvementPlan": []
 }
 `;
 
   try {
+
     const result = await geminiModel.generateContent(prompt);
-    const rawResponse = result.response.text();
 
-    // Attempt to sanitize and parse the response
-    const sanitizedResponse = rawResponse.replace(/```json|```/g, "").trim();
-    const evaluation = JSON.parse(sanitizedResponse);
+    const raw = result.response.text()
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
 
-    return NextResponse.json({ evaluation });
-  } catch (error) {
-    console.error("Error analyzing responses with Gemini:", error);
-    return NextResponse.json({ error: "Failed to analyze responses. Ensure the Gemini response is valid JSON." }, { status: 500 });
+    const evaluation = JSON.parse(raw);
+
+    return NextResponse.json(evaluation);
+
+  } catch (err) {
+
+    console.error("Score generation failed:", err);
+
+    return NextResponse.json(
+      { error: "Score generation failed" },
+      { status: 500 }
+    );
   }
 }
