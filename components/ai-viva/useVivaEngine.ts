@@ -1,4 +1,7 @@
+"use client";
+
 import { useRef } from "react";
+import { useRouter } from "next/navigation";
 
 type QA = { question: string; answer: string };
 
@@ -11,135 +14,99 @@ export type VivaApiResponse = {
   exit?: boolean;
 };
 
-type VivaMemory = {
-  topicsCovered: string[];
-  currentTopic: string | null;
-  weaknesses: string[];
-  difficulty: number;
-};
-
-const TOPIC_FLOW = [
-  "history",
-  "investigations",
-  "interpretation",
-  "management",
-  "complications",
-];
-
-function detectExit(text: string) {
-  if (!text) return false;
-
-  const t = text.toLowerCase();
-
-  const exitWords = [
-    "end viva",
-    "exit viva",
-    "stop viva",
-    "finish viva",
-    "end the viva",
-  ];
-
-  return exitWords.some((w) => t.includes(w));
-}
-
 export function useVivaEngine() {
-
   const previousQARef = useRef<QA[]>([]);
+  const router = useRouter();
 
-  const memoryRef = useRef<VivaMemory>({
-    topicsCovered: [],
-    currentTopic: null,
-    weaknesses: [],
-    difficulty: 1,
-  });
+  async function next(userAnswer: string, exit = false): Promise<VivaApiResponse> {
+    try {
+      const history = previousQARef.current;
 
-  function getNextTopic() {
-
-    const mem = memoryRef.current;
-
-    const next = TOPIC_FLOW.find(
-      (t) => !mem.topicsCovered.includes(t)
-    );
-
-    return next || "management";
-  }
-
-  async function next(
-    userAnswer: string,
-    exit = false
-  ): Promise<VivaApiResponse> {
-
-    /* -----------------------------
-       Save candidate answer
-    ----------------------------- */
-
-    if (previousQARef.current.length > 0 && userAnswer) {
-
-      previousQARef.current[
-        previousQARef.current.length - 1
-      ].answer = userAnswer;
-
-    }
-
-    /* -----------------------------
-       Detect exit command
-    ----------------------------- */
-
-    if (detectExit(userAnswer)) {
-
-      return {
-        exit: true,
-      };
-
-    }
-
-    /* -----------------------------
-       Determine next topic
-    ----------------------------- */
-
-    const nextTopic = getNextTopic();
-
-    memoryRef.current.currentTopic = nextTopic;
-
-    /* -----------------------------
-       Call API
-    ----------------------------- */
-
-    const res = await fetch("/api/viva/generateFollowup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        previousQA: previousQARef.current,
-        topic: nextTopic,
-        memory: memoryRef.current,
-        exit,
-      }),
-    });
-
-    const data = await res.json();
-
-    /* -----------------------------
-       Update engine memory
-    ----------------------------- */
-
-    if (data.question) {
-
-      if (!memoryRef.current.topicsCovered.includes(nextTopic)) {
-
-        memoryRef.current.topicsCovered.push(nextTopic);
-
+      // attach answer to last question
+      if (history.length > 0 && userAnswer) {
+        history[history.length - 1].answer = userAnswer;
       }
 
-      previousQARef.current.push({
-        question: data.question,
-        answer: "",
+      const res = await fetch("/api/viva/generateFollowup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          previousQA: history,
+          exit,
+        }),
       });
 
-    }
+      if (!res.ok) {
+        throw new Error("API error");
+      }
 
-    return data;
+      const data: VivaApiResponse = await res.json();
+
+      // push next question
+      if (!exit && data?.question) {
+        history.push({
+          question: data.question,
+          answer: "",
+        });
+      }
+
+      return data;
+
+    } catch (err) {
+      console.error("Viva engine error:", err);
+
+      return {
+        question: "Sorry, something went wrong generating the next question.",
+      };
+    }
   }
 
-  return { next };
+  async function generateScore() {
+    try {
+      const history = previousQARef.current;
 
+      const res = await fetch("/api/viva/generateScore", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          previousQA: history,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Score API failed");
+      }
+
+      const data = await res.json();
+
+      // store for ReviewPage
+      sessionStorage.setItem(
+        "viva-final-score",
+        JSON.stringify(data)
+      );
+
+      // move to score page
+      router.push("/ai-viva/score");
+
+    } catch (err) {
+      console.error("Score generation error:", err);
+    }
+  }
+
+  function reset() {
+    previousQARef.current = [];
+  }
+
+  function getHistory() {
+    return previousQARef.current;
+  }
+
+  return {
+    next,
+    generateScore,
+    reset,
+    getHistory,
+  };
 }
