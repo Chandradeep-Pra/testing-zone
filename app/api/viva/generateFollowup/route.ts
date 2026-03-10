@@ -137,6 +137,7 @@ Rules:
 - Follow logical viva progression.
 - Challenge incomplete answers.
 - Maintain UK consultant tone.
+- Do not ask more than 2 or 3 question on each stage.
 
 Stage guide:
 assessment → patient evaluation
