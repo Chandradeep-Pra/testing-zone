@@ -1,7 +1,7 @@
 //@ts-nocheck
 "use client";
 
-import { Clock, PhoneOff } from "lucide-react";
+import { Clock, PhoneOff, Camera, CameraOff, MessageSquare, Plug } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CandidatePanel } from "./CandidatePanel";
@@ -17,7 +17,8 @@ import { useCountdown } from "./useCountdown";
 const VIVA_DURATION_SEC = 10 * 60;
 
 export default function VivaVoiceAi() {
-  const { next } = useVivaEngine();
+
+  const { generateScore, next } = useVivaEngine();
 
   const {
     transcript,
@@ -32,9 +33,6 @@ export default function VivaVoiceAi() {
 
   const { speak, amplitude } = useSpeechOutput();
 
-  /* ----------------------------------------
-     Session guards
-  ----------------------------------------- */
   const hasStartedRef = useRef(false);
   const endingRef = useRef(false);
 
@@ -45,125 +43,150 @@ export default function VivaVoiceAi() {
   const [messages, setMessages] = useState([]);
   const liveCandidateMsgId = useRef(null);
 
-  // whether the conversation history panel is visible
   const [showChat, setShowChat] = useState(false);
-
-  /* ----------------------------------------
-     Timer
-  ----------------------------------------- */
-  const { minutes, seconds } = useCountdown(
-    VIVA_DURATION_SEC,
-    vivaStarted && !ending,
-    endViva
-  );
-
-  /* ----------------------------------------
-     Candidate state
-  ----------------------------------------- */
- 
+  const [cameraOn, setCameraOn] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
-  /* ----------------------------------------
-     Speech Input
-  ----------------------------------------- */
- const { start, stop } = useSpeechInput(
-
-  // INTERIM SPEECH
-  (interim) => {
-    if (ending) return;
-
-  setMessages((msgs) => {
-  const exists = msgs.find((m) => m.id === liveCandidateMsgId.current);
-
-  if (!exists) return msgs;
-
-  return msgs.map((m) =>
-    m.id === liveCandidateMsgId.current
-      ? { ...m, text: interim }
-      : m
+  const { minutes, seconds } = useCountdown(
+    VIVA_DURATION_SEC,
+    vivaStarted && !ending
   );
-});
-  },
 
-  // FINAL SPEECH
-  async (finalText) => {
-    if (ending || endingRef.current) return;
+  /* --------------------------------------------------
+     AUTO END WHEN 20 SECONDS LEFT
+  -------------------------------------------------- */
 
-    stop();
-    setIsListening(false);
-    setThinking(true);
+  useEffect(() => {
 
-    // finalize message
-    setMessages((msgs) =>
-      msgs.map((m) =>
-        m.id === liveCandidateMsgId.current
-          ? { ...m, text: finalText, live: false }
-          : m
-      )
-    );
+    if (!vivaStarted || ending) return;
 
-    try {
-      const data = await next(finalText);
-      if (!data?.question) return;
+    const remaining = minutes * 60 + seconds;
 
-      // push AI question to timeline
-      setMessages((msgs) => [
-        ...msgs,
-        {
-          id: crypto.randomUUID(),
-          role: "ai",
-          text: data.question,
-        },
-      ]);
+    if (remaining === 20 && !endingRef.current) {
 
-      // push image if exists
-      if (data.imageUsed) {
+      endingRef.current = true;
+
+      speak(
+        "Thank you. We are concluding the viva now. Generating your score.",
+        async () => {
+          await endViva();
+        }
+      );
+
+    }
+
+  }, [minutes, seconds]);
+
+
+  /* --------------------------------------------------
+     SPEECH INPUT
+  -------------------------------------------------- */
+
+  const { start, stop } = useSpeechInput(
+
+    (interim) => {
+
+      if (ending) return;
+
+      setMessages((msgs) => {
+        const exists = msgs.find((m) => m.id === liveCandidateMsgId.current);
+        if (!exists) return msgs;
+
+        return msgs.map((m) =>
+          m.id === liveCandidateMsgId.current
+            ? { ...m, text: interim }
+            : m
+        );
+      });
+
+    },
+
+    async (finalText) => {
+
+      if (ending || endingRef.current) return;
+
+      stop();
+      setIsListening(false);
+      setThinking(true);
+
+      setMessages((msgs) =>
+        msgs.map((m) =>
+          m.id === liveCandidateMsgId.current
+            ? { ...m, text: finalText, live: false }
+            : m
+        )
+      );
+
+      try {
+
+        const data = await next(finalText);
+        if (!data?.question) return;
+
         setMessages((msgs) => [
           ...msgs,
           {
             id: crypto.randomUUID(),
-            role: "image",
-            src: data.imageLink,
-            description: data.imageDescription,
+            role: "ai",
+            text: data.question,
           },
         ]);
-      }
 
-      applyApiResponse(data);
-
-      speak(data.question, () => {
-        markSpeechEnded();
-
-        if (!endingRef.current) {
-          const id = crypto.randomUUID();
-          liveCandidateMsgId.current = id;
-
-          // create live candidate message
+        if (data.imageUsed) {
           setMessages((msgs) => [
             ...msgs,
             {
-              id,
-              role: "candidate",
-              text: "",
-              live: true,
+              id: crypto.randomUUID(),
+              role: "image",
+              src: data.imageLink,
+              description: data.imageDescription,
             },
           ]);
-
-          setIsListening(true);
-          start();
         }
-      });
 
-    } finally {
-      setThinking(false);
+        applyApiResponse(data);
+
+        speak(data.question, () => {
+
+          markSpeechEnded();
+
+          if (!endingRef.current) {
+
+            const id = crypto.randomUUID();
+            liveCandidateMsgId.current = id;
+
+            setMessages((msgs) => [
+              ...msgs,
+              {
+                id,
+                role: "candidate",
+                text: "",
+                live: true,
+              },
+            ]);
+
+            setIsListening(true);
+            start();
+          }
+
+        });
+
+      } finally {
+
+        setThinking(false);
+
+      }
+
     }
-  }
-);
 
-  /* ----------------------------------------
-     Controlled Start (via overlay)
-  ----------------------------------------- */
+  );
+
+
+  /* --------------------------------------------------
+     BEGIN VIVA
+  -------------------------------------------------- */
+
   async function handleBegin() {
+
     if (hasStartedRef.current) return;
     hasStartedRef.current = true;
 
@@ -171,78 +194,65 @@ export default function VivaVoiceAi() {
     setVivaStarted(true);
     setThinking(true);
 
-   
-
     try {
-      const data = await next("");
-      if (!data?.question) return;
 
-       setMessages([
-  {
-    id: crypto.randomUUID(),
-    role: "ai",
-    text: data.question,
-  },
-]);
+      const data = await next("");
+
+      setMessages([
+        {
+          id: crypto.randomUUID(),
+          role: "ai",
+          text: data.question,
+        },
+      ]);
 
       applyApiResponse(data);
 
       speak(data.question, () => {
-  markSpeechEnded();
 
-  const id = crypto.randomUUID();
-  liveCandidateMsgId.current = id;
+        markSpeechEnded();
 
-  setMessages((msgs) => [
-    ...msgs,
-    {
-      id,
-      role: "candidate",
-      text: "",
-      live: true,
-    },
-  ]);
+        const id = crypto.randomUUID();
+        liveCandidateMsgId.current = id;
 
-  setIsListening(true);
+        setMessages((msgs) => [
+          ...msgs,
+          {
+            id,
+            role: "candidate",
+            text: "",
+            live: true,
+          },
+        ]);
 
-  setTimeout(() => {
-    start();
-  }, 50);
-});
+        setIsListening(true);
+
+        setTimeout(() => start(), 50);
+
+      });
+
     } finally {
+
       setThinking(false);
+
     }
+
   }
 
-  /* ----------------------------------------
-     END VIVA
-  ----------------------------------------- */
-  async function endViva() {
-    if (endingRef.current) return;
 
-    endingRef.current = true;
+  /* --------------------------------------------------
+     END VIVA
+  -------------------------------------------------- */
+
+  async function endViva() {
+
+    if (ending) return;
+
     setEnding(true);
 
-    stop();
-    setIsListening(false);
-    setThinking(true);
+    await generateScore();
 
-    try {
-      const data = await next("", true);
-
-      if (data?.evaluation) {
-        sessionStorage.setItem(
-          "viva-final-score",
-          JSON.stringify(data.evaluation)
-        );
-      }
-
-      window.location.href = "/ai-viva/score";
-    } catch {
-      window.location.href = "/ai-viva/score";
-    }
   }
-
   /* ----------------------------------------
      UI
   ----------------------------------------- */
@@ -270,101 +280,25 @@ export default function VivaVoiceAi() {
       )}
 
       {/* TOP BAR */}
-     <div className="
-  h-16 px-8
-  flex items-center justify-between
-  bg-slate-900/80 backdrop-blur-md
-  border-b border-slate-800
-  shadow-sm
-">
+     <div className="h-16 px-8 flex items-center justify-between bg-slate-900/60 backdrop-blur-xl border-b border-slate-800">
 
-  {/* LEFT — Session Label */}
-  <div className="flex items-center gap-3">
-    <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-    <span className="text-sm uppercase tracking-wider text-slate-400">
-      Live Viva Session
-    </span>
-  </div>
+        <div className="flex items-center gap-3">
+          <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-sm uppercase tracking-wide text-slate-400">
+            Live Viva
+          </span>
+        </div>
 
-  {/* CENTER — Title */}
-  <div className="text-sm font-medium text-slate-200">
-    Urologics AI
-  </div>
+        <div className="text-slate-200 font-medium">
+          Urologics AI Examiner
+        </div>
 
-  {/* RIGHT — Timer + history toggle */}
-  <div className="flex items-center gap-2">
-    <button
-      onClick={() => setShowChat((v) => !v)}
-      className="px-2 py-1 bg-slate-800/70 border border-slate-700 rounded text-xs text-slate-200 hover:bg-slate-700 transition"
-    >
-      {showChat ? "Hide History" : "Show History"}
-    </button>
+        <div className="flex items-center gap-3 px-5 py-2 rounded-full bg-slate-800/70 border border-emerald-500/20 text-lg font-semibold text-emerald-400">
+          <Clock size={18} />
+          {minutes}:{seconds.toString().padStart(2, "0")}
+        </div>
 
-    <div className="
-      flex items-center gap-2
-      bg-slate-800/70
-      border border-emerald-500/20
-      px-4 py-2 rounded-full
-      text-sm font-medium
-      text-emerald-400
-    ">
-      <Clock size={16} />
-      {minutes}:{seconds.toString().padStart(2, "0")}
-    </div>
-  </div>
-
-</div>
-
-      {/* PANELS */}
-      {/* <div className="flex flex-1 flex-col md:flex-row p-6 gap-6">
-        <AiPanel
-          speaking={speaking}
-          thinking={thinking}
-          transcript={transcript}
-          exhibit={
-            exhibit?.type === "image" ? (
-              <div className="relative max-w-3xl">
-                <img
-                  src={exhibit.src}
-                  alt="Viva exhibit"
-                  className="rounded-xl shadow-2xl max-h-[80vh]"
-                />
-                {exhibit.description && (
-                  <div className="mt-3 text-sm text-slate-300 text-center">
-                    {exhibit.description}
-                  </div>
-                )}
-                <button
-                  onClick={clearExhibit}
-                  className="absolute top-3 right-3 bg-black/70 text-white text-xs px-3 py-1 rounded-full"
-                >
-                  Close
-                </button>
-              </div>
-            ) : null
-          }
-        />
-
-        <CandidatePanel
-          speaking={false}
-          listening={isListening}
-          transcript={candidateTranscript}
-          history={candidateHistory}
-          showHistory={showHistory}
-          onToggleHistory={() => setShowHistory((v) => !v)}
-          onStartTalk={() => {
-            if (speaking || ending) return;
-            setIsListening(true);
-            start();
-          }}
-          onStopTalk={() => {
-            setIsListening(false);
-            stop();
-          }}
-        />
-      </div> */}
-
-      {/* <div className="flex-1 grid grid-cols-[3fr_1fr] gap-4 p-4"> */}
+      </div>
       <div className={`flex-1 grid gap-4 p-4 h-full min-h-0 ${showChat ? "grid-cols-[3fr_1fr]" : "grid-cols-1"}`}>
 
   {/* ================================
@@ -404,37 +338,19 @@ export default function VivaVoiceAi() {
 
     {/* Candidate Overlay */}
     <div className="absolute top-4 right-4 w-[260px]">
-      <CandidatePanel
-        speaking={false}
-        listening={isListening}
-        transcript=""
-        onStartTalk={() => {
-  if (speaking || ending) return;
-
-  const id = crypto.randomUUID();
-  liveCandidateMsgId.current = id;
-
-  setMessages((msgs) => [
-    ...msgs,
-    {
-      id,
-      role: "candidate",
-      text: "",
-      live: true,
-    },
-  ]);
-
-  setIsListening(true);
-
-  setTimeout(() => {
-    start();
-  }, 50);
-}}
-        onStopTalk={() => {
-          setIsListening(false);
-          stop();
-        }}
-      />
+     <CandidatePanel
+              cameraOn={cameraOn}
+              listening={isListening}
+              onStartTalk={() => {
+                if (speaking || ending) return;
+                setIsListening(true);
+                start();
+              }}
+              onStopTalk={() => {
+                setIsListening(false);
+                stop();
+              }}
+            />
     </div>
 
   </div>
@@ -468,21 +384,33 @@ export default function VivaVoiceAi() {
 </div>
 
       {/* BOTTOM BAR */}
-      <div className="h-16 border-t border-slate-800 px-8 flex items-center justify-between">
-        <span className="text-slate-400 text-sm">
-          🎙 Voice session active
-        </span>
+      <div className="h-16 flex items-center justify-center gap-6 bg-slate-900/60 backdrop-blur-xl border-t border-slate-800">
+
+        <button
+          onClick={() => setShowChat((v) => !v)}
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 border border-slate-700 hover:bg-slate-700"
+        >
+          <MessageSquare size={16} />
+          {showChat ? "Hide History" : "Show History"}
+        </button>
+
+        <button
+          onClick={() => setCameraOn((v) => !v)}
+          className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 border border-slate-700 hover:bg-slate-700"
+        >
+          {cameraOn ? <CameraOff size={16} /> : <Camera size={16} />}
+          {cameraOn ? "Camera Off" : "Camera On"}
+        </button>
+
 
         <button
           onClick={endViva}
-          className="bg-red-600 p-3 rounded-full hover:bg-red-700 transition"
+          className="flex items-center gap-2 px-5 py-2 rounded-full bg-red-600 hover:bg-red-700"
         >
-          <PhoneOff size={18} />
+          <PhoneOff size={16} />
+          End Viva
         </button>
 
-        <span className="text-slate-400 text-sm">
-          Secure Session
-        </span>
       </div>
     </main>
   );

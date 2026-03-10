@@ -1,36 +1,11 @@
 //@ts-nocheck
 
-// import { TextToSpeechClient } from "@google-cloud/text-to-speech";
-
-// const client = new TextToSpeechClient();
-
-// export async function POST(req: Request) {
-//   const { text } = await req.json();
-
-//   const [response] = await client.synthesizeSpeech({
-//     input: { text },
-
-//     voice: {
-//       languageCode: "en-US",
-//       name: "en-US-Chirp3-HD-Charon",
-//     },
-
-//     audioConfig: {
-//   audioEncoding: "LINEAR16",
-//   sampleRateHertz: 24000
-// }
-//   });
-
-//   return new Response(response.audioContent as Uint8Array, {
-//     headers: {
-//       "Content-Type": "audio/wav",
-//     },
-//   });
-// }
-
 import textToSpeech from "@google-cloud/text-to-speech";
 
-export async function POST(req) {
+/* ---------------------------
+   INIT CLIENT ONCE
+---------------------------- */
+
 const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
 
 if (!raw) {
@@ -47,23 +22,34 @@ const client = new textToSpeech.TextToSpeechClient({
   projectId: creds.project_id,
 });
 
+/* ---------------------------
+   API ROUTE
+---------------------------- */
+
+export async function POST(req: Request) {
+
   const { text } = await req.json();
 
   const [response] = await client.synthesizeSpeech({
+
     input: { text },
+
     voice: {
       languageCode: "en-US",
       name: "en-US-Chirp3-HD-Charon",
-      // name: "en-GB-Chirp3-HD-Puck",
     },
+
     audioConfig: {
       audioEncoding: "MP3",
     },
+
   });
 
   return new Response(response.audioContent, {
     headers: {
       "Content-Type": "audio/mpeg",
+      "Cache-Control": "no-store",
     },
   });
+
 }
