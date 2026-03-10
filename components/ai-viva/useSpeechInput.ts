@@ -147,7 +147,7 @@ export function useSpeechInput(onInterim, onFinal) {
 
     if (!wsRef.current) {
 
-      const ws = new WebSocket("wss://testing-zone-hx7q.onrender.com/");
+      const ws = new WebSocket("wss://testing-zone-hx7q.onrender.com");
       // const ws = new WebSocket("ws://localhost:3002");
       ws.binaryType = "arraybuffer";
 
