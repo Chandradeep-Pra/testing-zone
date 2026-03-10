@@ -7,14 +7,15 @@ import { vivaContext } from "@/ai-viva-data/vivaContext";
 ------------------------- */
 
 function detectStage(previousQA: any[]) {
+
   const q = previousQA.length;
 
-  if (q === 0) return "assessment";
-  if (q <= 2) return "investigations";
-  if (q <= 4) return "interpretation";
-  if (q <= 6) return "management";
+  if (q === 0) return "history";
+  if (q <= 2) return "examination";
+  if (q <= 4) return "investigations";
+  if (q <= 6) return "diagnosis";
 
-  return "theory";
+  return "treatment";
 }
 
 /* -------------------------
@@ -22,11 +23,12 @@ function detectStage(previousQA: any[]) {
 ------------------------- */
 
 function getExhibit(stage: string) {
-  if (stage === "interpretation") {
+
+  if (stage === "diagnosis") {
     return vivaContext.exhibits[0] ?? null;
   }
 
-  if (stage === "management") {
+  if (stage === "treatment") {
     return vivaContext.exhibits[1] ?? null;
   }
 
@@ -131,23 +133,24 @@ ${stage}
 
 Conversation:
 ${history}
-
 Rules:
-- Ask ONE short viva question.
-- Follow logical viva progression.
-- Challenge incomplete answers.
-- Maintain UK consultant tone.
-- Do not ask more than 2 or 3 question on each stage.
+- Ask ONE short viva question only.
+- Maintain formal UK consultant examiner tone.
+- Questions must follow clinical reasoning.
+- Challenge incomplete or unsafe answers.
+- Do not explain the case.
+- Avoid long multi-part questions.
+- Do not exceed 2 questions per stage.
 
 Stage guide:
-assessment → patient evaluation
-investigations → what tests to order
-interpretation → interpret imaging
-management → treatment plan
-theory → guideline or complication question
+history → key symptoms, duration, risk factors
+examination → focused physical examination
+investigations → appropriate tests and rationale
+diagnosis → interpret findings or imaging
+treatment → management plan and options
 
 Exhibit:
-${exhibit ? exhibit.description : "None"}
+${exhibit ? "Imaging shown to candidate" : "None"}
 
 Ask the next question.
 `;
