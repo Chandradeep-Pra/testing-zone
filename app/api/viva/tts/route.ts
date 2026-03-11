@@ -100,8 +100,8 @@ export async function POST(req: Request) {
     },
 
     voice: {
-      languageCode: "en-US",
-      name: "en-US-Aoede",
+      languageCode: "en-GB",
+      name: "en-GB-Neural2-B",
     },
 
     audioConfig: {
