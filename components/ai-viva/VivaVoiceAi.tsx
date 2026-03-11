@@ -281,55 +281,49 @@ export default function VivaVoiceAi() {
         </div>
       )}
 
-      {/* TOP BAR */}
-     <div className="h-16 px-8 flex items-center justify-between bg-slate-900/60 backdrop-blur-xl border-b border-slate-800">
+      {/* TOP BAR - MOBILE RESPONSIVE */}
+      <div className="h-14 sm:h-16 px-3 sm:px-6 md:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 bg-slate-900/60 backdrop-blur-xl border-b border-slate-800">
 
-        <div className="flex items-center gap-3">
-          <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-sm uppercase tracking-wide text-slate-400">
+        <div className="flex items-center gap-2 sm:gap-3 order-2 sm:order-1">
+          <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs sm:text-sm uppercase tracking-wide text-slate-400">
             Live Viva
           </span>
         </div>
 
-        <div className="text-slate-200 font-medium">
+        <div className="text-slate-200 font-medium text-xs sm:text-sm md:text-base order-1 sm:order-2">
           Urologics AI Examiner
         </div>
 
-        <div className="flex items-center gap-3 px-5 py-2 rounded-full bg-slate-800/70 border border-emerald-500/20 text-lg font-semibold text-emerald-400">
-          <Clock size={18} />
-          {minutes}:{seconds.toString().padStart(2, "0")}
+        <div className="flex items-center gap-1.5 sm:gap-3 px-3 sm:px-5 py-1.5 sm:py-2 rounded-full bg-slate-800/70 border border-emerald-500/20 text-sm sm:text-lg font-semibold text-emerald-400 order-3">
+          <Clock size={14} className="sm:h-[18px] sm:w-[18px]" />
+          <span className="text-xs sm:text-base">{minutes}:{seconds.toString().padStart(2, "0")}</span>
         </div>
 
       </div>
-      <div className={`flex-1 grid gap-4 p-4 h-full min-h-0 ${showChat ? "grid-cols-[3fr_1fr]" : "grid-cols-1"}`}>
+      <div className={`flex-1 flex flex-col md:grid gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4 h-full min-h-0 ${showChat ? "md:grid-cols-[3fr_1fr]" : "md:grid-cols-1"}`}>
 
   {/* ================================
-      AI AREA (75%)
+      AI AREA - MOBILE RESPONSIVE
   ================================= */}
-  <div className="relative bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+  <div className="relative bg-slate-950 border border-slate-800 rounded-lg md:rounded-xl overflow-hidden flex-1 md:flex-none min-h-0">
 
     <AiPanel
-    amplitude={amplitude}
+      amplitude={amplitude}
       speaking={speaking}
       thinking={thinking}
       exhibit={
         exhibit?.type === "image" ? (
-          <div className="relative max-w-3xl mx-auto">
+          <div className="relative max-w-full md:max-w-3xl mx-auto h-full flex items-center justify-center">
             <img
               src={exhibit.src}
               alt="Viva exhibit"
-              className="rounded-xl shadow-xl max-h-[70vh]"
+              className="rounded-lg md:rounded-xl shadow-xl max-h-[60vh] md:max-h-[70vh] w-auto"
             />
-
-            {/* {exhibit.description && (
-              <div className="mt-3 text-sm text-slate-300 text-center">
-                {exhibit.description}
-              </div>
-            )} */}
 
             <button
               onClick={clearExhibit}
-              className="absolute top-3 right-3 bg-black/70 text-white text-xs px-3 py-1 rounded-full"
+              className="absolute top-2 right-2 md:top-3 md:right-3 bg-black/70 hover:bg-black/90 text-white text-xs px-2 md:px-3 py-1 rounded-full transition-colors"
             >
               Close
             </button>
@@ -338,21 +332,21 @@ export default function VivaVoiceAi() {
       }
     />
 
-    {/* Candidate Overlay */}
-    <div className="absolute top-4 right-4 w-[260px]">
-     <CandidatePanel
-              cameraOn={cameraOn}
-              listening={isListening}
-              onStartTalk={() => {
-                if (speaking || ending) return;
-                setIsListening(true);
-                start();
-              }}
-              onStopTalk={() => {
-                setIsListening(false);
-                stop();
-              }}
-            />
+    {/* Candidate Overlay - MOBILE RESPONSIVE */}
+    <div className="absolute top-1.5 right-1.5 md:top-4 md:right-4 w-20 md:w-[260px] h-24 md:h-auto aspect-video md:aspect-auto">
+      <CandidatePanel
+        cameraOn={cameraOn}
+        listening={isListening}
+        onStartTalk={() => {
+          if (speaking || ending) return;
+          setIsListening(true);
+          start();
+        }}
+        onStopTalk={() => {
+          setIsListening(false);
+          stop();
+        }}
+      />
     </div>
 
   </div>
@@ -363,14 +357,14 @@ export default function VivaVoiceAi() {
           CHAT HISTORY PANEL (25%)
       ================================= */}
       {/* <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden"> */}
-      <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden min-h-0">
+      <div className="bg-slate-950 border border-slate-800 rounded-lg md:rounded-xl flex flex-col overflow-hidden min-h-0 max-h-[40vh] md:max-h-none md:flex-1">
 
         {/* Header */}
-        <div className="px-4 py-3 border-b border-slate-800 text-sm text-slate-400 flex items-center justify-between">
+        <div className="px-3 md:px-4 py-2 md:py-3 border-b border-slate-800 text-xs md:text-sm text-slate-400 flex items-center justify-between flex-shrink-0">
           <span>Conversation History</span>
           <button
             onClick={() => setShowChat(false)}
-            className="text-xs text-slate-400 hover:text-slate-200"
+            className="text-xs text-slate-400 hover:text-slate-200 md:hidden"
           >
             Close
           </button>
@@ -385,38 +379,51 @@ export default function VivaVoiceAi() {
 
 </div>
 
-      {/* BOTTOM BAR */}
-      <div className="h-16 flex items-center justify-center gap-6 bg-slate-900/60 backdrop-blur-xl border-t border-slate-800">
+      {/* BOTTOM BAR - MOBILE RESPONSIVE */}
+      <div className="h-12 sm:h-14 md:h-16 flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:gap-6 px-2 sm:px-3 md:px-4 py-1 sm:py-2 bg-slate-900/60 backdrop-blur-xl border-t border-slate-800 overflow-x-auto">
 
         <button
           onClick={() => setShowChat((v) => !v)}
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 border border-slate-700 hover:bg-slate-700"
+          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
+          title="Toggle history"
         >
-          <MessageSquare size={16} />
-          {showChat ? "Hide History" : "Show History"}
+          <MessageSquare size={14} className="sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">{showChat ? "Hide" : "Show"} History</span>
+          <span className="inline sm:hidden">{showChat ? "Hide" : "Show"}</span>
         </button>
 
         <button
           onClick={() => setCameraOn((v) => !v)}
           disabled={!cameraEnabled}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full border ${
+          className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
             cameraEnabled
               ? "bg-slate-800 border-slate-700 hover:bg-slate-700 cursor-pointer"
               : "bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed"
           }`}
           title={cameraEnabled ? "Toggle camera" : "Camera not enabled in system check"}
         >
-          {cameraOn ? <CameraOff size={16} /> : <Camera size={16} />}
-          {cameraOn ? "Camera Off" : "Camera On"}
+          {cameraOn ? (
+            <>
+              <CameraOff size={14} className="sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Camera Off</span>
+            </>
+          ) : (
+            <>
+              <Camera size={14} className="sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Camera On</span>
+            </>
+          )}
         </button>
-
 
         <button
           onClick={endViva}
-          className="flex items-center gap-2 px-5 py-2 rounded-full bg-red-600 hover:bg-red-700"
+          disabled={!vivaStarted || ending}
+          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-5 py-1.5 sm:py-2 rounded-full bg-red-600/80 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
+          title="End viva examination"
         >
-          <PhoneOff size={16} />
-          End Viva
+          <PhoneOff size={14} className="sm:h-[18px] sm:w-[18px]" />
+          <span className="hidden sm:inline">End Viva</span>
+          <span className="inline sm:hidden">End</span>
         </button>
 
       </div>
