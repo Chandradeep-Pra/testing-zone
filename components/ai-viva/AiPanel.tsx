@@ -10,6 +10,14 @@ type Props = {
   amplitude?: number;
 };
 
+const fillers = [
+  "Hmm...",
+  "Okay...",
+  "Right...",
+  "I see...",
+  "Alright...",
+];
+
 export function AiPanel({
   speaking,
   thinking = false,
@@ -19,6 +27,7 @@ export function AiPanel({
 }: Props) {
 
   const [activeExhibit, setActiveExhibit] = useState<React.ReactNode | null>(null);
+  const [filler, setFiller] = useState("");
 
   // Only show exhibit when NOT speaking, NOT thinking, and exhibit is provided
   useEffect(() => {
@@ -28,6 +37,13 @@ export function AiPanel({
       setActiveExhibit(null);
     }
   }, [exhibit, speaking, thinking]);
+
+  useEffect(() => {
+    if (thinking) {
+      const random = fillers[Math.floor(Math.random() * fillers.length)];
+      setFiller(random);
+    }
+  }, [thinking]);
 
   const audioScale = 1 + amplitude * 0.25;
 
@@ -52,7 +68,7 @@ export function AiPanel({
       <div className="absolute top-4 right-4 text-xs">
         {speaking && <span className="text-emerald-400">Speaking</span>}
         {!speaking && thinking && (
-          <span className="text-yellow-400">Thinking</span>
+          <span className="text-yellow-400">Listening</span>
         )}
       </div>
 
@@ -66,7 +82,6 @@ export function AiPanel({
             <div className="absolute w-64 h-64 rounded-full border border-yellow-400/20 animate-ai-wave-expand delay-1000" />
             <div className="absolute w-64 h-64 rounded-full border border-yellow-400/20 animate-ai-wave-expand delay-2000" />
 
-            {/* floating particles */}
             <div className="absolute w-48 h-48 animate-ai-orbit-slow">
               <div className="absolute w-2 h-2 bg-yellow-400 rounded-full top-0 left-1/2 -translate-x-1/2" />
               <div className="absolute w-2 h-2 bg-yellow-400 rounded-full bottom-0 left-1/2 -translate-x-1/2" />
@@ -137,9 +152,10 @@ export function AiPanel({
           border border-slate-800
           max-h-40 overflow-y-auto"
         >
-          {thinking ? "Hmmm..." : transcript}
+          {thinking ? filler : transcript}
         </div>
       )}
+
     </div>
   );
 }

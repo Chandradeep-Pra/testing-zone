@@ -3,38 +3,34 @@ import { geminiModel } from "@/lib/gemni";
 import { vivaContext } from "@/ai-viva-data/vivaContext";
 import { link } from "fs";
 
+/* -------------------------
+   Stage Detection
+------------------------- */
+
+function detectStage(previousQA: any[]) {
+
+  const q = previousQA.length;
+
+  if (q === 0) return "history";
+  if (q <= 2) return "examination";
+  if (q <= 4) return "investigations";
+  if (q <= 6) return "diagnosis";
+
+  return "treatment";
+}
 
 /* -------------------------
    Exhibit Logic
 ------------------------- */
 
-type ExhibitSelection = {
-  link: string;
-  file: string;
-  description: string;
-  id: string;
-} | null;
+function getExhibit(stage: string) {
 
-function getExhibit(previousQA: any[], shownExhibitIds: string[] = []): ExhibitSelection {
-  if (!vivaContext.exhibits || vivaContext.exhibits.length === 0) {
-    return null;
+  if (stage === "diagnosis") {
+    return vivaContext.exhibits[0] ?? null;
   }
 
-  // Convert shown IDs to a Set for faster lookup
-  const shownSet = new Set(shownExhibitIds.map(id => id.toLowerCase()));
-
-  // Find the first exhibit that hasn't been shown yet
-  const nextExhibit = vivaContext.exhibits.find(
-    (exhibit) => !shownSet.has(exhibit.id.toLowerCase())
-  );
-
-  if (nextExhibit) {
-    return {
-      link: nextExhibit.label,
-      file: nextExhibit.file,
-      description: nextExhibit.description,
-      id: nextExhibit.id,
-    };
+  if (stage === "treatment") {
+    return vivaContext.exhibits[1] ?? null;
   }
 
   // If all exhibits have been shown, return null (never show same image twice)
@@ -123,18 +119,36 @@ Return JSON only.
   const exhibit = getExhibit(previousQA, shownExhibitIds);
 
   const prompt = `
-You are an FRCS viva examiner tasked with generating a single, concise question for the candidate. 
-Your task is to generate a follow up question like a viva examiner.
-This is previous QA: ${JSON.stringify(previousQA)}
+You are a UK FRCS Urology examiner.
 
-${exhibit ? `Use the following image to inform your question:
-Image Label: ${exhibit.link}
-Image Description: ${exhibit.description}
-The image description is only available to you (the examiner) and not to the candidates. 
-You can ask questions based on it, but do not share the description with the candidate.` : "No images available for this question - proceed with follow-up questions based on the candidate's previous answers."}
+Case:
+${vivaContext.case.stem}
 
-Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
-Make sure we stick to case of question while we generate a follow up questions which is -> ${vivaContext.case.stem}
+Stage:
+${stage}
+
+Conversation:
+${history}
+Rules:
+- Ask ONE short viva question only.
+- Maintain formal UK consultant examiner tone.
+- Questions must follow clinical reasoning.
+- Challenge incomplete or unsafe answers.
+- Do not explain the case.
+- Avoid long multi-part questions.
+- Do not exceed 2 questions per stage.
+
+Stage guide:
+history → key symptoms, duration, risk factors
+examination → focused physical examination
+investigations → appropriate tests and rationale
+diagnosis → interpret findings or imaging
+treatment → management plan and options
+
+Exhibit:
+${exhibit ? "Imaging shown to candidate" : "None"}
+
+Ask the next question.
 `;
 
   try {
