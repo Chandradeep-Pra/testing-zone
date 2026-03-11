@@ -45,6 +45,7 @@ export default function VivaVoiceAi() {
 
   const [showChat, setShowChat] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
   const { minutes, seconds } = useCountdown(
@@ -185,11 +186,12 @@ export default function VivaVoiceAi() {
      BEGIN VIVA
   -------------------------------------------------- */
 
-  async function handleBegin() {
+  async function handleBegin(cameraPref = false) {
 
     if (hasStartedRef.current) return;
     hasStartedRef.current = true;
 
+    setCameraEnabled(cameraPref);
     setReadyVisible(false);
     setVivaStarted(true);
     setThinking(true);
@@ -396,7 +398,13 @@ export default function VivaVoiceAi() {
 
         <button
           onClick={() => setCameraOn((v) => !v)}
-          className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800 border border-slate-700 hover:bg-slate-700"
+          disabled={!cameraEnabled}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full border ${
+            cameraEnabled
+              ? "bg-slate-800 border-slate-700 hover:bg-slate-700 cursor-pointer"
+              : "bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed"
+          }`}
+          title={cameraEnabled ? "Toggle camera" : "Camera not enabled in system check"}
         >
           {cameraOn ? <CameraOff size={16} /> : <Camera size={16} />}
           {cameraOn ? "Camera Off" : "Camera On"}

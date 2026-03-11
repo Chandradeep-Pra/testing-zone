@@ -108,14 +108,17 @@ export function useVivaSession() {
     setTranscript(data.question);
     setSpeaking(true);
 
-    if (data.imageUsed && data.imageLink) {
+    // ALWAYS clear exhibit first, then conditionally set if image is provided
+    // This prevents image persistence across questions
+    setExhibit(null);
+
+    // Only show image if API explicitly says to and provides the link
+    if (data.imageUsed === true && data.imageLink) {
       setExhibit({
         type: "image",
         src: data.imageLink,
         description: data.imageDescription ?? undefined,
       });
-    } else {
-      setExhibit(null);
     }
   }
 

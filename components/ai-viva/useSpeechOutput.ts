@@ -7,17 +7,8 @@ export function useSpeechOutput() {
   const [amplitude, setAmplitude] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playingRef = useRef(false);
 
   async function speak(text: string, onEnd?: () => void) {
-
-    // Prevent overlapping audio plays
-    if (playingRef.current) {
-      console.log("⚠️ Audio already playing, skipping");
-      return;
-    }
-
-    playingRef.current = true;
 
     const res = await fetch("/api/viva/tts", {
       method: "POST",
@@ -29,12 +20,6 @@ export function useSpeechOutput() {
 
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-
-    // Stop previous audio if any
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
 
     const audio = new Audio(url);
     audioRef.current = audio;
@@ -69,7 +54,6 @@ export function useSpeechOutput() {
 
     audio.onended = () => {
       setAmplitude(0);
-      playingRef.current = false;
       onEnd?.();
       URL.revokeObjectURL(url);
     };

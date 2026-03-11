@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   ArrowRight
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { vivaContext } from "@/ai-viva-data/vivaContext";
 
 export default function ReadyOverlay({ onBegin }) {
@@ -16,6 +17,7 @@ export default function ReadyOverlay({ onBegin }) {
 
   const [micAllowed, setMicAllowed] = useState(false);
   const [cameraAllowed, setCameraAllowed] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(false);
   const [checking, setChecking] = useState(true);
   const [cameraStream, setCameraStream] = useState(null);
 
@@ -35,7 +37,7 @@ export default function ReadyOverlay({ onBegin }) {
       try {
         const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
         setCameraAllowed(true);
-        setCameraStream(videoStream);
+        // Don't start the camera stream by default - only when user enables it
       } catch {
         setCameraAllowed(false);
       }
@@ -53,14 +55,44 @@ export default function ReadyOverlay({ onBegin }) {
   }, []);
 
   /* ----------------------------------------
+     Handle Camera Toggle
+  ----------------------------------------- */
+  useEffect(() => {
+    async function toggleCamera() {
+      if (cameraEnabled && !cameraStream && cameraAllowed) {
+        try {
+          const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          setCameraStream(videoStream);
+        } catch (err) {
+          console.error("Failed to access camera:", err);
+          setCameraEnabled(false);
+        }
+      } else if (!cameraEnabled && cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        setCameraStream(null);
+      }
+    }
+
+    toggleCamera();
+
+    return () => {
+      if (!cameraEnabled && cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraEnabled, cameraAllowed]);
+
+  /* ----------------------------------------
      Attach stream AFTER video mounts
   ----------------------------------------- */
   useEffect(() => {
-    if (videoRef.current && cameraStream) {
+    if (videoRef.current && cameraStream && cameraEnabled) {
       videoRef.current.srcObject = cameraStream;
       videoRef.current.play().catch(() => {});
+    } else if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
-  }, [cameraStream]);
+  }, [cameraStream, cameraEnabled]);
 
   const canStart = micAllowed;
 
@@ -90,7 +122,7 @@ export default function ReadyOverlay({ onBegin }) {
         </div>
 
         {/* Camera Preview */}
-        {cameraAllowed && (
+        {cameraAllowed && cameraEnabled && (
           <div className="rounded-2xl overflow-hidden border border-emerald-500/20 shadow-lg">
             <video
               ref={videoRef}
@@ -128,10 +160,14 @@ export default function ReadyOverlay({ onBegin }) {
 
             {checking ? (
               <span className="text-slate-400">Checking...</span>
-            ) : cameraAllowed ? (
-              <CheckCircle2 size={18} className="text-emerald-400" />
+            ) : !cameraAllowed ? (
+              <span className="text-slate-400">Not available</span>
             ) : (
-              <span className="text-slate-400">Not enabled</span>
+              <Switch
+                checked={cameraEnabled}
+                onCheckedChange={setCameraEnabled}
+                disabled={!cameraAllowed}
+              />
             )}
           </div>
 
@@ -140,7 +176,7 @@ export default function ReadyOverlay({ onBegin }) {
         {/* Action Button */}
         <button
           disabled={!canStart}
-          onClick={canStart ? onBegin : undefined}
+          onClick={canStart ? () => onBegin(cameraEnabled) : undefined}
           className={`
             w-full py-3 rounded-xl font-medium flex items-center justify-center gap-3 transition-all duration-200
             ${

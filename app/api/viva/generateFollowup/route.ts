@@ -15,29 +15,17 @@ type ExhibitSelection = {
   id: string;
 } | null;
 
-function getExhibit(previousQA: any[]): ExhibitSelection {
+function getExhibit(previousQA: any[], shownExhibitIds: string[] = []): ExhibitSelection {
   if (!vivaContext.exhibits || vivaContext.exhibits.length === 0) {
     return null;
   }
 
-  // Track which exhibits have been shown in the conversation
-  const shownExhibits = new Set<string>();
-  previousQA.forEach((qa) => {
-    // Check if examiner mentioned an exhibit in the conversation
-    const questionText = qa.question?.toLowerCase() || "";
-    vivaContext.exhibits.forEach((exhibit) => {
-      if (
-        questionText.includes(exhibit.label.toLowerCase()) ||
-        questionText.includes(exhibit.id)
-      ) {
-        shownExhibits.add(exhibit.id);
-      }
-    });
-  });
+  // Convert shown IDs to a Set for faster lookup
+  const shownSet = new Set(shownExhibitIds.map(id => id.toLowerCase()));
 
-  // Find the next exhibit that hasn't been shown yet
+  // Find the first exhibit that hasn't been shown yet
   const nextExhibit = vivaContext.exhibits.find(
-    (exhibit) => !shownExhibits.has(exhibit.id)
+    (exhibit) => !shownSet.has(exhibit.id.toLowerCase())
   );
 
   if (nextExhibit) {
@@ -49,7 +37,7 @@ function getExhibit(previousQA: any[]): ExhibitSelection {
     };
   }
 
-  // If all exhibits have been shown, return null (no new exhibit)
+  // If all exhibits have been shown, return null (never show same image twice)
   return null;
 }
 
@@ -71,7 +59,7 @@ function cleanResponse(text: string) {
 ------------------------- */
 
 export async function POST(req: NextRequest) {
-  const { previousQA, exit } = await req.json();
+  const { previousQA, exit, shownExhibitIds = [] } = await req.json();
 
   if (!Array.isArray(previousQA)) {
     return NextResponse.json({ error: "Invalid input." }, { status: 400 });
@@ -132,7 +120,7 @@ Return JSON only.
      Viva Intelligence
   ------------------------- */
 
-  const exhibit = getExhibit(previousQA);
+  const exhibit = getExhibit(previousQA, shownExhibitIds);
 
   const prompt = `
 You are an FRCS viva examiner tasked with generating a single, concise question for the candidate. 
@@ -158,6 +146,7 @@ Generate a single, focused follow-up question. Write only the question without a
       imageUsed: !!exhibit,
       imageLink: exhibit ? `/exhibits/${exhibit.file}` : null,
       imageDescription: exhibit ? exhibit.description : null,
+      imageId: exhibit ? exhibit.id : null,
     });
   } catch (error) {
     console.error("Viva generation error:", error);
