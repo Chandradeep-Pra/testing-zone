@@ -281,23 +281,26 @@ export default function VivaVoiceAi() {
         </div>
       )}
 
-      {/* TOP BAR - MOBILE RESPONSIVE */}
-      <div className="h-14 sm:h-16 px-3 sm:px-6 md:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 bg-slate-900/60 backdrop-blur-xl border-b border-slate-800">
+      {/* TOP BAR - MOBILE OPTIMIZED */}
+      <div className="h-12 sm:h-14 md:h-16 px-2 sm:px-4 md:px-8 flex items-center justify-between bg-slate-900/60 backdrop-blur-xl border-b border-slate-800">
 
-        <div className="flex items-center gap-2 sm:gap-3 order-2 sm:order-1">
-          <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs sm:text-sm uppercase tracking-wide text-slate-400">
+        {/* LEFT: Live Indicator */}
+        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 min-w-0">
+          <div className="h-1 w-1 sm:h-1.5 sm:w-1.5 md:h-2 md:w-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+          <span className="text-xs sm:text-xs md:text-sm uppercase tracking-wide text-slate-400 hidden sm:inline white-space-nowrap">
             Live Viva
           </span>
         </div>
 
-        <div className="text-slate-200 font-medium text-xs sm:text-sm md:text-base order-1 sm:order-2">
+        {/* CENTER: Title (Hidden on mobile) */}
+        <div className="text-slate-200 font-medium text-xs sm:text-sm md:text-base hidden md:block flex-1 text-center px-2">
           Urologics AI Examiner
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-3 px-3 sm:px-5 py-1.5 sm:py-2 rounded-full bg-slate-800/70 border border-emerald-500/20 text-sm sm:text-lg font-semibold text-emerald-400 order-3">
-          <Clock size={14} className="sm:h-[18px] sm:w-[18px]" />
-          <span className="text-xs sm:text-base">{minutes}:{seconds.toString().padStart(2, "0")}</span>
+        {/* RIGHT: Timer (Always visible, most important) */}
+        <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 rounded-full bg-slate-800/70 border border-emerald-500/20 text-xs sm:text-sm md:text-base font-semibold text-emerald-400 flex-shrink-0">
+          <Clock size={12} className="sm:h-4 sm:w-4 md:h-[18px] md:w-[18px]" />
+          <span>{minutes}:{seconds.toString().padStart(2, "0")}</span>
         </div>
 
       </div>
