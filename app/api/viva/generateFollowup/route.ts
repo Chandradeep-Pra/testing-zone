@@ -1,35 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 import { geminiModel } from "@/lib/gemni";
 import { vivaContext } from "@/ai-viva-data/vivaContext";
+import { link } from "fs";
 
-/* -------------------------
-   Stage Detection
-------------------------- */
-
-function detectStage(previousQA: any[]) {
-  const q = previousQA.length;
-
-  if (q === 0) return "assessment";
-  if (q <= 2) return "investigations";
-  if (q <= 4) return "interpretation";
-  if (q <= 6) return "management";
-
-  return "theory";
-}
 
 /* -------------------------
    Exhibit Logic
 ------------------------- */
 
-function getExhibit(stage: string) {
-  if (stage === "interpretation") {
-    return vivaContext.exhibits[0] ?? null;
+type ExhibitSelection = {
+  link: string;
+  file: string;
+  description: string;
+  id: string;
+} | null;
+
+function getExhibit(previousQA: any[]): ExhibitSelection {
+  if (!vivaContext.exhibits || vivaContext.exhibits.length === 0) {
+    return null;
   }
 
-  if (stage === "management") {
-    return vivaContext.exhibits[1] ?? null;
+  // Track which exhibits have been shown in the conversation
+  const shownExhibits = new Set<string>();
+  previousQA.forEach((qa) => {
+    // Check if examiner mentioned an exhibit in the conversation
+    const questionText = qa.question?.toLowerCase() || "";
+    vivaContext.exhibits.forEach((exhibit) => {
+      if (
+        questionText.includes(exhibit.label.toLowerCase()) ||
+        questionText.includes(exhibit.id)
+      ) {
+        shownExhibits.add(exhibit.id);
+      }
+    });
+  });
+
+  // Find the next exhibit that hasn't been shown yet
+  const nextExhibit = vivaContext.exhibits.find(
+    (exhibit) => !shownExhibits.has(exhibit.id)
+  );
+
+  if (nextExhibit) {
+    return {
+      link: nextExhibit.label,
+      file: nextExhibit.file,
+      description: nextExhibit.description,
+      id: nextExhibit.id,
+    };
   }
 
+  // If all exhibits have been shown, return null (no new exhibit)
   return null;
 }
 
@@ -112,43 +132,20 @@ Return JSON only.
      Viva Intelligence
   ------------------------- */
 
-  const stage = detectStage(previousQA);
-  const exhibit = getExhibit(stage);
-
-  const history = previousQA
-    .slice(-4) // keep prompt small for speed
-    .map((q: any) => `Q:${q.question}\nA:${q.answer}`)
-    .join("\n");
+  const exhibit = getExhibit(previousQA);
 
   const prompt = `
-You are a UK FRCS Urology examiner.
+You are an FRCS viva examiner tasked with generating a single, concise question for the candidate. 
+Your task is to generate a follow up question like a viva examiner.
+This is previous QA: ${JSON.stringify(previousQA)}
 
-Case:
-${vivaContext.case.stem}
+${exhibit ? `Use the following image to inform your question:
+Image Label: ${exhibit.link}
+Image Description: ${exhibit.description}
+The image description is only available to you (the examiner) and not to the candidates. 
+You can ask questions based on it, but do not share the description with the candidate.` : "No images available for this question - proceed with follow-up questions based on the candidate's previous answers."}
 
-Stage:
-${stage}
-
-Conversation:
-${history}
-
-Rules:
-- Ask ONE short viva question.
-- Follow logical viva progression.
-- Challenge incomplete answers.
-- Maintain UK consultant tone.
-
-Stage guide:
-assessment → patient evaluation
-investigations → what tests to order
-interpretation → interpret imaging
-management → treatment plan
-theory → guideline or complication question
-
-Exhibit:
-${exhibit ? exhibit.description : "None"}
-
-Ask the next question.
+Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
 `;
 
   try {

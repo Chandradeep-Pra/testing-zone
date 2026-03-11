@@ -132,6 +132,7 @@ export function useSpeechInput(onInterim, onFinal) {
 
   const wsRef = useRef(null);
   const transcriptBuffer = useRef("");
+  const speechEndedFlag = useRef(false);
 
   const audioContextRef = useRef(null);
   const workletRef = useRef(null);
@@ -140,6 +141,9 @@ export function useSpeechInput(onInterim, onFinal) {
   async function start() {
 
     console.log("🎤 Starting speech input");
+
+    // Reset the flag for a new speech turn
+    speechEndedFlag.current = false;
 
     /* -------------------------
        Connect WebSocket once
@@ -199,6 +203,14 @@ export function useSpeechInput(onInterim, onFinal) {
         if (data.speechEnded) {
 
           console.log("🛑 Speech end received");
+
+          // Prevent duplicate calls to onFinal
+          if (speechEndedFlag.current) {
+            console.log("⚠️ Speech end already processed, ignoring duplicate");
+            return;
+          }
+
+          speechEndedFlag.current = true;
 
           const finalText =
             transcriptBuffer.current.trim();
