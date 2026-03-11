@@ -106,8 +106,8 @@ export async function POST(req: Request) {
     },
 
     voice: {
-      languageCode: "en-GB",
-      name: "en-GB-Wavenet-A"
+      languageCode: "en-US",
+      name: "en-US-Aoede",
     },
 
     audioConfig: {
