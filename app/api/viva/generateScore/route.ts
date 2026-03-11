@@ -36,7 +36,7 @@ Also provide:
 
 • strengthsOverall (3–5 bullet points)
 • weaknessesOverall (3–5 bullet points)
-• improvementPlan (3–5 specific learning topics)
+• improvementPlan (3–5 SHORT TOPICS - max 3-4 words each, NOT sentences. Examples: "Renal anatomy basics", "Imaging interpretation", "Infection management")
 
 Transcript:
 ${transcript}

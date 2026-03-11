@@ -29,13 +29,14 @@ export function AiPanel({
   const [activeExhibit, setActiveExhibit] = useState<React.ReactNode | null>(null);
   const [filler, setFiller] = useState("");
 
+  // Only show exhibit when NOT speaking, NOT thinking, and exhibit is provided
   useEffect(() => {
-    if (exhibit) setActiveExhibit(exhibit);
-  }, [exhibit]);
-
-  useEffect(() => {
-    if (speaking || thinking) setActiveExhibit(null);
-  }, [speaking, thinking]);
+    if (!speaking && !thinking && exhibit) {
+      setActiveExhibit(exhibit);
+    } else {
+      setActiveExhibit(null);
+    }
+  }, [exhibit, speaking, thinking]);
 
   useEffect(() => {
     if (thinking) {

@@ -114,26 +114,26 @@ export default function ReviewPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 px-6 py-10">
-      <div className="max-w-5xl mx-auto space-y-10">
+    <main className="min-h-screen bg-slate-950 text-slate-100 px-4 py-6 md:px-6 md:py-10">
+      <div className="w-full max-w-5xl mx-auto space-y-8 md:space-y-10">
 
         {/* HEADER */}
         <section className="border-b border-slate-800 pb-6">
-          <div className="flex items-end justify-between">
-            <div className="flex items-center gap-3">
-              <Trophy className="text-emerald-400" size={22} />
+          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Trophy className="text-emerald-400 flex-shrink-0" size={20} />
               <div>
-                <h1 className="text-xl font-semibold">
+                <h1 className="text-lg md:text-xl font-semibold">
                   Performance Report
                 </h1>
-                <p className="text-slate-400 text-sm">
+                <p className="text-slate-400 text-xs md:text-sm line-clamp-2">
                   {report.caseTitle}
                 </p>
               </div>
             </div>
 
-            <div className="text-right">
-              <div className="text-4xl font-semibold text-emerald-400">
+            <div className="text-right flex-shrink-0">
+              <div className="text-3xl md:text-4xl font-semibold text-emerald-400">
                 {report.overallScore} 
               </div>
               <div className="text-xs text-slate-500">
@@ -145,13 +145,13 @@ export default function ReviewPage() {
 
         {/* STRENGTHS & WEAKNESSES */}
         {(report.strengthsOverall.length > 0 || report.weaknessesOverall.length > 0) && (
-          <section className="grid md:grid-cols-2 gap-8">
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
 
             {report.strengthsOverall.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle2 size={18} className="text-emerald-400" />
-                  <h2 className="text-sm font-medium text-emerald-400">
+                  <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
+                  <h2 className="text-xs md:text-sm font-medium text-emerald-400">
                     Strengths
                   </h2>
                 </div>
@@ -160,7 +160,7 @@ export default function ReviewPage() {
                   {report.strengthsOverall.map((item, i) => (
                     <div
                       key={i}
-                      className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-lg text-sm"
+                      className="bg-emerald-500/10 border border-emerald-500/20 p-2 md:p-3 rounded-lg text-xs md:text-sm"
                     >
                       {item}
                     </div>
@@ -172,8 +172,8 @@ export default function ReviewPage() {
             {report.weaknessesOverall.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <AlertTriangle size={18} className="text-red-400" />
-                  <h2 className="text-sm font-medium text-red-400">
+                  <AlertTriangle size={16} className="text-red-400 flex-shrink-0" />
+                  <h2 className="text-xs md:text-sm font-medium text-red-400">
                     Weaknesses
                   </h2>
                 </div>
@@ -182,7 +182,7 @@ export default function ReviewPage() {
                   {report.weaknessesOverall.map((item, i) => (
                     <div
                       key={i}
-                      className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg text-sm"
+                      className="bg-red-500/10 border border-red-500/20 p-2 md:p-3 rounded-lg text-xs md:text-sm"
                     >
                       {item}
                     </div>
@@ -195,11 +195,11 @@ export default function ReviewPage() {
         )}
 
         {/* DOMAIN PERFORMANCE */}
-        <section className="space-y-6 border-t border-slate-800 pt-6">
+        <section className="space-y-4 md:space-y-6 border-t border-slate-800 pt-6">
 
           <div className="flex items-center gap-2">
-            <Activity size={18} className="text-slate-400" />
-            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
+            <Activity size={16} className="text-slate-400 flex-shrink-0" />
+            <h2 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wide">
               Domain Performance
             </h2>
           </div>
@@ -210,21 +210,21 @@ export default function ReviewPage() {
             return (
               <div
                 key={index}
-                className="border border-slate-800 rounded-lg p-4 space-y-3"
+                className="border border-slate-800 rounded-lg p-3 md:p-4 space-y-3"
               >
-                <div className="flex justify-between items-start gap-6">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-6">
 
-                  <div className="flex-1">
-                    <div className="font-medium text-slate-200">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-slate-200 text-sm md:text-base">
                       {domain.name}
                     </div>
 
-                    <p className="text-sm text-slate-400 mt-1">
+                    <p className="text-xs md:text-sm text-slate-400 mt-1 line-clamp-2">
                       {domain.summary}
                     </p>
                   </div>
 
-                  <div className="text-2xl font-semibold text-slate-300">
+                  <div className="text-2xl md:text-2xl font-semibold text-slate-300 flex-shrink-0">
                     {domain.score}
                   </div>
                 </div>
@@ -232,24 +232,24 @@ export default function ReviewPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="px-0 text-slate-400 hover:text-slate-200"
+                  className="px-0 text-xs md:text-sm text-slate-400 hover:text-slate-200 w-full md:w-auto justify-start md:justify-start"
                   onClick={() =>
                     setExpanded(isOpen ? null : index)
                   }
                 >
                   {isOpen ? (
                     <>
-                      Hide detailed feedback <ChevronUp size={16} />
+                      Hide detailed feedback <ChevronUp size={14} className="ml-1" />
                     </>
                   ) : (
                     <>
-                      View detailed feedback <ChevronDown size={16} />
+                      View detailed feedback <ChevronDown size={14} className="ml-1" />
                     </>
                   )}
                 </Button>
 
                 {isOpen && (
-                  <div className="text-sm text-slate-300 leading-relaxed bg-slate-900/60 p-4 rounded-md border border-slate-800">
+                  <div className="text-xs md:text-sm text-slate-300 leading-relaxed bg-slate-900/60 p-3 md:p-4 rounded-md border border-slate-800">
                     {domain.reasoning}
                   </div>
                 )}
@@ -264,16 +264,16 @@ export default function ReviewPage() {
         {report.improvementPlan.length > 0 && (
           <section className="space-y-4 border-t border-slate-800 pt-6">
 
-            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
+            <h2 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wide">
               Next Focus Areas
             </h2>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2 md:gap-3">
               {report.improvementPlan.map((item, i) => (
                 <Badge
                   key={i}
                   variant="secondary"
-                  className="bg-slate-800 text-slate-200 px-3 py-1 text-sm"
+                  className="bg-slate-800 text-slate-200 px-2 md:px-3 py-1 text-xs md:text-sm"
                 >
                   {item}
                 </Badge>

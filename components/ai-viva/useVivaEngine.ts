@@ -10,12 +10,14 @@ export type VivaApiResponse = {
   imageUsed?: boolean;
   imageLink?: string | null;
   imageDescription?: string | null;
+  imageId?: string | null;
   evaluation?: any;
   exit?: boolean;
 };
 
 export function useVivaEngine() {
   const previousQARef = useRef<QA[]>([]);
+  const shownExhibitIdsRef = useRef<Set<string>>(new Set());
   const router = useRouter();
 
   async function next(userAnswer: string, exit = false): Promise<VivaApiResponse> {
@@ -32,6 +34,7 @@ export function useVivaEngine() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           previousQA: history,
+          shownExhibitIds: Array.from(shownExhibitIdsRef.current),
           exit,
         }),
       });
@@ -41,6 +44,11 @@ export function useVivaEngine() {
       }
 
       const data: VivaApiResponse = await res.json();
+
+      // Track any exhibit that was shown in this response
+      if (data.imageUsed && data.imageId) {
+        shownExhibitIdsRef.current.add(data.imageId);
+      }
 
       // push next question
       if (!exit && data?.question) {

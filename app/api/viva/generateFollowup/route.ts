@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { geminiModel } from "@/lib/gemni";
 import { vivaContext } from "@/ai-viva-data/vivaContext";
+import { link } from "fs";
 
 /* -------------------------
    Stage Detection
@@ -32,6 +33,7 @@ function getExhibit(stage: string) {
     return vivaContext.exhibits[1] ?? null;
   }
 
+  // If all exhibits have been shown, return null (never show same image twice)
   return null;
 }
 
@@ -53,7 +55,7 @@ function cleanResponse(text: string) {
 ------------------------- */
 
 export async function POST(req: NextRequest) {
-  const { previousQA, exit } = await req.json();
+  const { previousQA, exit, shownExhibitIds = [] } = await req.json();
 
   if (!Array.isArray(previousQA)) {
     return NextResponse.json({ error: "Invalid input." }, { status: 400 });
@@ -114,13 +116,7 @@ Return JSON only.
      Viva Intelligence
   ------------------------- */
 
-  const stage = detectStage(previousQA);
-  const exhibit = getExhibit(stage);
-
-  const history = previousQA
-    .slice(-4) // keep prompt small for speed
-    .map((q: any) => `Q:${q.question}\nA:${q.answer}`)
-    .join("\n");
+  const exhibit = getExhibit(previousQA, shownExhibitIds);
 
   const prompt = `
 You are a UK FRCS Urology examiner.
@@ -158,6 +154,8 @@ Ask the next question.
   try {
     const result = await geminiModel.generateContent(prompt);
 
+    console.log("Passed Prompt :", prompt);
+
     const question = cleanResponse(result.response.text());
 
     return NextResponse.json({
@@ -165,6 +163,7 @@ Ask the next question.
       imageUsed: !!exhibit,
       imageLink: exhibit ? `/exhibits/${exhibit.file}` : null,
       imageDescription: exhibit ? exhibit.description : null,
+      imageId: exhibit ? exhibit.id : null,
     });
   } catch (error) {
     console.error("Viva generation error:", error);

@@ -124,6 +124,7 @@
 //   };
 // }
 
+//@ts-nocheck
 "use client";
 
 import { useRef } from "react";

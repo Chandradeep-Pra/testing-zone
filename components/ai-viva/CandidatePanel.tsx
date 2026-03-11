@@ -69,7 +69,7 @@ export function CandidatePanel({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border
+      className={`relative overflow-hidden rounded-lg md:rounded-xl border w-full h-full
       bg-slate-900/80 backdrop-blur-xl
       ${listening
         ? "border-blue-400 shadow-[0_0_20px_rgba(96,165,250,0.35)]"
@@ -99,16 +99,16 @@ export function CandidatePanel({
 
       {/* HEADER */}
 
-      <div className="absolute top-2 left-3 text-xs text-slate-300">
-        Candidate
+      <div className="absolute top-0.5 left-1 md:top-2 md:left-3 text-xs md:text-xs text-slate-300">
+        You
       </div>
 
       {/* MIC STATUS */}
 
       {listening && (
-        <div className="absolute top-2 right-3 flex items-center gap-1 text-blue-400 text-xs">
-          <Mic size={14} />
-          Listening
+        <div className="absolute top-0.5 right-0.5 md:top-2 md:right-3 flex items-center gap-0.5 text-blue-400 text-xs">
+          <Mic size={10} className="md:h-[14px] md:w-[14px]" />
+          <span className="hidden sm:inline">Listening</span>
         </div>
       )}
 
@@ -116,9 +116,9 @@ export function CandidatePanel({
 
       {transcript && (
         <div
-          className="absolute bottom-4 left-1/2 -translate-x-1/2
-          bg-black/70 backdrop-blur px-4 py-2 rounded-lg
-          text-sm text-white max-w-[90%] text-center"
+          className="absolute bottom-1 left-1/2 -translate-x-1/2
+          bg-black/70 backdrop-blur px-2 md:px-4 py-1 md:py-2 rounded-lg
+          text-xs md:text-sm text-white max-w-[95%] md:max-w-[90%] text-center line-clamp-2"
         >
           {transcript}
         </div>

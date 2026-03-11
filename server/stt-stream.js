@@ -67,32 +67,11 @@ wss.on("connection", (ws) => {
           audioChannelCount: 1,
           languageCode: "en-US",
 
-          model: "medical_dictation",
+          model: "default",
           useEnhanced: true,
 
-          enableAutomaticPunctuation: true,
+          enableAutomaticPunctuation: false,
           profanityFilter: false,
-
-          speechContexts: [
-            {
-              phrases: [
-
-                "hematuria",
-                "uroflowmetry",
-                "post void residual",
-                "benign prostatic hyperplasia",
-                "prostate specific antigen",
-                "PSA",
-                "lower urinary tract symptoms",
-                "LUTS",
-                "TURP",
-                "transurethral resection of prostate"
-
-              ],
-              boost: 20
-            }
-          ]
-
         },
 
         interimResults: true
