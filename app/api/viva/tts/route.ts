@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
     voice: {
       languageCode: "en-US",
-      name: "en-US-Chirp3-HD-Charon",
+      name: "en-US-Chirp3-HD-Heidi",
     },
 
     audioConfig: {
