@@ -134,11 +134,12 @@ The image description is only available to you (the examiner) and not to the can
 You can ask questions based on it, but do not share the description with the candidate.` : "No images available for this question - proceed with follow-up questions based on the candidate's previous answers."}
 
 Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
-Make sure we stick to case of question while we generate a follow up questions ${vivaContext.case.stem}
-`;
+Make sure we stick to case of question while we generate a follow up questions which is ${vivaContext.case.stem}`;
 
   try {
     const result = await geminiModel.generateContent(prompt);
+
+    console.log("Passed Prompt :", prompt);
 
     const question = cleanResponse(result.response.text());
 

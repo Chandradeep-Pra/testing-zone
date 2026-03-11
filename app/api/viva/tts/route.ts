@@ -57,6 +57,8 @@
 
 //@ts-nocheck
 
+//@ts-nocheck
+
 import textToSpeech from "@google-cloud/text-to-speech";
 
 const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
@@ -75,18 +77,22 @@ const client = new textToSpeech.TextToSpeechClient({
   projectId: creds.project_id,
 });
 
+/* -------- Human-like variation -------- */
+
+function random(min: number, max: number) {
+  return Math.random() * (max - min) + min;
+}
+
 function vivaSSML(question: string) {
+
+  const rate = random(1.03, 1.10).toFixed(2);
+  const pitch = Math.floor(random(0, 2));
+
   return `
   <speak>
-    <prosody rate="1.05" pitch="+1st">
-      Next viva question.
-    </prosody>
-
-    <break time="300ms"/>
-
-    <emphasis level="moderate">
+    <prosody rate="${rate}" pitch="+${pitch}st">
       ${question}
-    </emphasis>
+    </prosody>
   </speak>
   `;
 }
@@ -100,8 +106,8 @@ export async function POST(req: Request) {
     },
 
     voice: {
-      languageCode: "en-US",
-      name: "en-US-Aoede",
+      languageCode: "en-GB",
+      name: "en-GB-Wavenet-A"
     },
 
     audioConfig: {
