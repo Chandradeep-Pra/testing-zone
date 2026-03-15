@@ -53,6 +53,13 @@ export default function VivaVoiceAi() {
     vivaStarted && !ending
   );
 
+  const fillers = [
+  "Hmm... okay.",
+  "Right, I see.",
+  "Okay, that's a good answer.",
+  "Got it... just thinking.",
+  "Interesting... one moment.",
+];
   /* --------------------------------------------------
      AUTO END WHEN 20 SECONDS LEFT
   -------------------------------------------------- */
@@ -77,6 +84,9 @@ export default function VivaVoiceAi() {
     }
 
   }, [minutes, seconds]);
+
+  const fillerTimeoutRef = useRef<any>(null);
+  const fillerIndexRef = useRef(0);
 
 
   /* --------------------------------------------------
@@ -106,9 +116,23 @@ export default function VivaVoiceAi() {
 
       if (ending || endingRef.current) return;
 
-      stop();
-      setIsListening(false);
-      setThinking(true);
+     stop();
+        setIsListening(false);
+        setThinking(true);
+
+        /* start delayed filler */
+       fillerTimeoutRef.current = setTimeout(() => {
+
+  if (endingRef.current) return;
+
+  const filler =
+    fillers[fillerIndexRef.current % fillers.length];
+
+  fillerIndexRef.current++;
+
+  speak(filler);
+
+}, 1200);
 
       setMessages((msgs) =>
         msgs.map((m) =>
@@ -121,6 +145,10 @@ export default function VivaVoiceAi() {
       try {
 
         const data = await next(finalText);
+        if (fillerTimeoutRef.current) {
+  clearTimeout(fillerTimeoutRef.current);
+  fillerTimeoutRef.current = null;
+}
         if (!data?.question) return;
 
         setMessages((msgs) => [

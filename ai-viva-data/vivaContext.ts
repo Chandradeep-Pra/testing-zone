@@ -12,41 +12,72 @@
 //     ]
 //   },
 
-export const vivaContext = {
+// export const vivaContext = {
+//  case: {
+//     id: "case-hematuria-001",
+//     title: "Painless Hematuria Evaluation",
+//     level: "Intermediate",
+//     stem: "A 56 year gentleman referred to one stop Hematuria clinic for intermittent VH for last 1 month.",
+//     objectives: [
+//       "Formulate evaluation plan for painless hematuria",
+//       "Select and prioritise appropriate investigations",
+//       "Interpret imaging and report findings",
+//       "Demonstrate safe clinical management as per guidelines"
+//     ],
+  // },
+  export const vivaContext = {
  case: {
-    id: "case-hematuria-001",
-    title: "Painless Hematuria Evaluation",
+    id: "case-luts-001",
+    title: "Voiding LUTS Evaluation",
     level: "Intermediate",
-    stem: "A 56 year gentleman referred to one stop Hematuria clinic for intermittent VH for last 1 month.",
+    stem: "A 22 year lady presented with voiding LUTS for 5-6 years with histry of PCOS",
     objectives: [
-      "Formulate evaluation plan for painless hematuria",
+      `Formulate evaluation plan for voiding LUTS`,
       "Select and prioritise appropriate investigations",
       "Interpret imaging and report findings",
       "Demonstrate safe clinical management as per guidelines"
     ]
   },
-  exhibits: [
+  // exhibits: [
+  //   {
+  //     id: "img-ct-001",
+  //     kind: "image",
+  //     label: "CT Urography",
+  //     file: "img-ct-001.png", // File reference unchanged
+  //     // 'description' is now the 'Ground Truth' for the AI to grade against
+  //     description: "CT urography (delayed phase) demonstrates a 2cm filling defect arising from the left posterolateral bladder wall. No evidence of hydroureter or upper tract urothelial tumor (UTUC)."
+  //   },
+  //   {
+  //     id: "rep-urine-001",
+  //     kind: "image",
+  //     label: "Cystoscopy Finding",
+  //     file: "rep-urine-001.jpeg", // File reference unchanged
+  //     description: "Flexible cystoscopy reveals a solitary, pedunculated papillary lesion (approx. 2cm) near the left ureteric orifice. Bladder mucosa otherwise appears healthy."
+  //   }
+  // ],
+
+   exhibits: [
     {
-      id: "img-ct-001",
+      id: "LUTS-01",
       kind: "image",
-      label: "CT Urography",
-      file: "img-ct-001.png", // File reference unchanged
+      label: "Video Urodynamic study",
+      file: "LUTS-01.jpeg", // File reference unchanged
       // 'description' is now the 'Ground Truth' for the AI to grade against
-      description: "CT urography (delayed phase) demonstrates a 2cm filling defect arising from the left posterolateral bladder wall. No evidence of hydroureter or upper tract urothelial tumor (UTUC)."
+      description: "Urodynamic finding graph"
     },
     {
-      id: "rep-urine-001",
+      id: "LUTS-02",
       kind: "image",
       label: "Cystoscopy Finding",
-      file: "rep-urine-001.jpeg", // File reference unchanged
-      description: "Flexible cystoscopy reveals a solitary, pedunculated papillary lesion (approx. 2cm) near the left ureteric orifice. Bladder mucosa otherwise appears healthy."
+      file: "LUTS-02.jpeg", // File reference unchanged
+      description: "The urodynamic finding suggest large capacity hypo contractile bladder suggestive of Fowler’s syndrome"
     }
   ],
 
   // New section to ensure the AI evaluates correctly
   marking_criteria: {
-    must_mention: ["Smoking history", "Renal function/eGFR before CTU", "TURBT", "Single dose post-op Mitomycin C"],
-    critical_fail: ["Failure to investigate upper tracts", "Suggesting major surgery without histology"]
+    must_mention: ["Fowler’s syndrome", "Large capacity hypo contractile bladder"],
+    critical_fail: ["Missed diagnosis of Fowler’s syndrome"],
   },
 
   viva_rules: {
