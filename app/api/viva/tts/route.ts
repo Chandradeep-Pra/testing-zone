@@ -97,6 +97,30 @@ function vivaSSML(question: string) {
   `;
 }
 
+function fillerSSML(text: string) {
+
+  const rate = random(0.88, 0.96).toFixed(2);
+  const pitch = Math.floor(random(-2, 1));
+
+  return `
+  (<speak>
+
+    <break time="${random(200, 450).toFixed(0)}ms"/>
+
+    <prosody rate="${rate}" pitch="${pitch}st">
+
+      <emphasis level="moderate">
+        ${text}
+      </emphasis>
+
+    </prosody>
+
+    <break time="${random(150, 350).toFixed(0)}ms"/>
+
+  </speak>)
+  `;
+}
+
 export async function POST(req: Request) {
   const { text } = await req.json();
 

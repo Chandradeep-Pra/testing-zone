@@ -68,7 +68,7 @@
     {
       id: "LUTS-02",
       kind: "image",
-      label: "Cystoscopy Finding",
+      label: "Video Urodynamic study",
       file: "LUTS-02.jpeg", // File reference unchanged
       description: "The urodynamic finding suggest large capacity hypo contractile bladder suggestive of Fowler’s syndrome"
     }
