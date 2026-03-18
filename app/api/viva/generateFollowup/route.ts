@@ -139,10 +139,27 @@ Make sure we stick to case of question while we generate a follow up questions w
 
   try {
     const result = await geminiModel.generateContent(prompt);
-
     console.log("Passed Prompt :", prompt);
 
-    const question = cleanResponse(result.response.text());
+    let rawText = null;
+    // Try .text() as a function (Promise)
+    if (result.response && typeof result.response.text === 'function') {
+      rawText = await result.response.text();
+    } else if (
+      result.response &&
+      result.response.candidates &&
+      result.response.candidates[0] &&
+      result.response.candidates[0].content &&
+      result.response.candidates[0].content.parts &&
+      result.response.candidates[0].content.parts[0] &&
+      typeof result.response.candidates[0].content.parts[0].text === 'string'
+    ) {
+      rawText = result.response.candidates[0].content.parts[0].text;
+    } else {
+      throw new Error("Unexpected Gemini response structure");
+    }
+
+    const question = cleanResponse(rawText);
 
     return NextResponse.json({
       question,

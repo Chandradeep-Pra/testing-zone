@@ -1,139 +1,65 @@
-// //@ts-nocheck
-
-// import textToSpeech from "@google-cloud/text-to-speech";
-
-// /* ---------------------------
-//    INIT CLIENT ONCE
-// ---------------------------- */
-
-// const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-
-// if (!raw) {
-//   throw new Error("Missing GOOGLE_APPLICATION_CREDENTIALS_JSON");
-// }
-
-// const creds = JSON.parse(raw);
-
-// const client = new textToSpeech.TextToSpeechClient({
-//   credentials: {
-//     client_email: creds.client_email,
-//     private_key: creds.private_key.replace(/\\n/g, "\n"),
-//   },
-//   projectId: creds.project_id,
-// });
-
-// /* ---------------------------
-//    API ROUTE
-// ---------------------------- */
-
-// export async function POST(req: Request) {
-
-//   const { text } = await req.json();
-
-//   const [response] = await client.synthesizeSpeech({
-
-//     input: { text },
-
-//     voice: {
-//       languageCode: "en-US",
-//       name: "en-US-Neural2-C",
-//     },
-
-//     audioConfig: {
-//       audioEncoding: "MP3",
-//     },
-
-//   });
-
-//   return new Response(response.audioContent, {
-//     headers: {
-//       "Content-Type": "audio/mpeg",
-//       "Cache-Control": "no-store",
-//     },
-//   });
-
-// }
-
-
-//@ts-nocheck
-
-//@ts-nocheck
-
+import { VertexAI } from "@google-cloud/vertexai";
 import textToSpeech from "@google-cloud/text-to-speech";
 
 const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-
 if (!raw) {
   throw new Error("Missing GOOGLE_APPLICATION_CREDENTIALS_JSON");
 }
 
 const creds = JSON.parse(raw);
 
-const client = new textToSpeech.TextToSpeechClient({
+const projectId =
+  process.env.GCP_PROJECT_ID || creds.project_id || process.env.GOOGLE_CLOUD_PROJECT;
+if (!projectId) {
+  throw new Error(
+    "Missing GCP project id. Set GCP_PROJECT_ID, GOOGLE_CLOUD_PROJECT, or include project_id in GOOGLE_APPLICATION_CREDENTIALS_JSON"
+  );
+}
+
+const vertexAI = new VertexAI({
+  project: projectId,
+  location: "us-central1",
   credentials: {
     client_email: creds.client_email,
     private_key: creds.private_key.replace(/\\n/g, "\n"),
   },
-  projectId: creds.project_id,
 });
 
-/* -------- Human-like variation -------- */
+const model = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-function random(min: number, max: number) {
-  return Math.random() * (max - min) + min;
-}
+const ttsClient = new textToSpeech.TextToSpeechClient({
+  credentials: {
+    client_email: creds.client_email,
+    private_key: creds.private_key.replace(/\\n/g, "\n"),
+  },
+  projectId,
+});
 
-function vivaSSML(question: string) {
+export async function generateFollowup(req: Request) {
+  const { text } = await req.json();
 
-  const rate = random(1.03, 1.10).toFixed(2);
-  const pitch = Math.floor(random(0, 2));
+  const result = await model.generateContent({
+    contents: [{ role: "user", parts: [{ text }] }],
+  });
 
-  return `
-  <speak>
-    <prosody rate="${rate}" pitch="+${pitch}st">
-      ${question}
-    </prosody>
-  </speak>
-  `;
-}
+  const generatedText = result.response.candidates[0].content.parts[0].text;
 
-function fillerSSML(text: string) {
-
-  const rate = random(0.88, 0.96).toFixed(2);
-  const pitch = Math.floor(random(-2, 1));
-
-  return `
-  (<speak>
-
-    <break time="${random(200, 450).toFixed(0)}ms"/>
-
-    <prosody rate="${rate}" pitch="${pitch}st">
-
-      <emphasis level="moderate">
-        ${text}
-      </emphasis>
-
-    </prosody>
-
-    <break time="${random(150, 350).toFixed(0)}ms"/>
-
-  </speak>)
-  `;
+  return new Response(JSON.stringify({ generatedText }), {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 }
 
 export async function POST(req: Request) {
   const { text } = await req.json();
 
-  const [response] = await client.synthesizeSpeech({
-    input: {
-      ssml: vivaSSML(text),
-    },
-
+  const [response] = await ttsClient.synthesizeSpeech({
+    input: { text },
     voice: {
       languageCode: "en-GB",
-      name: "en-GB-Wavenet-A"
+      name: "en-GB-Neural2-B",
     },
-
     audioConfig: {
       audioEncoding: "MP3",
     },
