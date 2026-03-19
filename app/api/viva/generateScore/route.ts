@@ -75,7 +75,22 @@ Return ONLY JSON in this format:
 
     const result = await geminiModel.generateContent(prompt);
 
-    const raw = result.response.text()
+    let rawText = null;
+    if (
+      result.response &&
+      result.response.candidates &&
+      result.response.candidates[0] &&
+      result.response.candidates[0].content &&
+      result.response.candidates[0].content.parts &&
+      result.response.candidates[0].content.parts[0] &&
+      typeof result.response.candidates[0].content.parts[0].text === 'string'
+    ) {
+      rawText = result.response.candidates[0].content.parts[0].text;
+    } else {
+      throw new Error("Unexpected Gemini response structure");
+    }
+
+    const raw = rawText
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();

@@ -23,7 +23,7 @@ const vertexAI = new VertexAI({
     client_email: creds.client_email,
     private_key: creds.private_key.replace(/\\n/g, "\n"),
   },
-});
+} as any);
 
 const model = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -42,7 +42,20 @@ export async function generateFollowup(req: Request) {
     contents: [{ role: "user", parts: [{ text }] }],
   });
 
-  const generatedText = result.response.candidates[0].content.parts[0].text;
+  let generatedText = "Please continue.";
+  if (
+    result.response &&
+    result.response.candidates &&
+    result.response.candidates[0] &&
+    result.response.candidates[0].content &&
+    result.response.candidates[0].content.parts &&
+    result.response.candidates[0].content.parts[0] &&
+    typeof result.response.candidates[0].content.parts[0].text === 'string'
+  ) {
+    generatedText = result.response.candidates[0].content.parts[0].text;
+  } else {
+    console.warn('Unexpected Gemini response structure in TTS generateFollowup', result);
+  }
 
   return new Response(JSON.stringify({ generatedText }), {
     headers: {
@@ -65,7 +78,12 @@ export async function POST(req: Request) {
     },
   });
 
-  return new Response(response.audioContent, {
+  const audioBody =
+    response.audioContent instanceof Buffer
+      ? response.audioContent
+      : Buffer.from(response.audioContent as any);
+
+  return new Response(audioBody, {
     headers: {
       "Content-Type": "audio/mpeg",
       "Cache-Control": "no-store",

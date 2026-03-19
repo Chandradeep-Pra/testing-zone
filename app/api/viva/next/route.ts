@@ -132,19 +132,31 @@ Ask the next SINGLE viva question.
 
   const result = await geminiModel.generateContent(prompt);
 
-  // console.log("Gemini Raw Response:", await result.response.text());
-  // return normalizeGeminiResponse(result.response.text());
-  const rawText = await result.response.text();
+  // Prefer structured candidates output from Gemini
+  let rawText: string | null = null;
+  if (
+    result.response &&
+    result.response.candidates &&
+    result.response.candidates[0] &&
+    result.response.candidates[0].content &&
+    result.response.candidates[0].content.parts &&
+    result.response.candidates[0].content.parts[0] &&
+    typeof result.response.candidates[0].content.parts[0].text === 'string'
+  ) {
+    rawText = result.response.candidates[0].content.parts[0].text;
+  } else {
+    throw new Error('Unexpected Gemini response structure');
+  }
 
-console.log("Gemini Raw Response:", rawText);
+  console.log("Gemini Raw Response:", rawText);
 
-const cleaned = rawText
-  .replace(/^```json\s*/i, "")
-  .replace(/^```\s*/i, "")
-  .replace(/```$/i, "")
-  .trim();
+  const cleaned = rawText
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
 
-return normalizeGeminiResponse(cleaned);
+  return normalizeGeminiResponse(cleaned);
 
 }
 

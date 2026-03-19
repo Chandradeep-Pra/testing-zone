@@ -91,7 +91,23 @@ Return JSON only.
 `;
 
     const result = await geminiModel.generateContent(prompt);
-    const text = cleanResponse(result.response.text());
+
+    let rawText = null;
+    if (
+      result.response &&
+      result.response.candidates &&
+      result.response.candidates[0] &&
+      result.response.candidates[0].content &&
+      result.response.candidates[0].content.parts &&
+      result.response.candidates[0].content.parts[0] &&
+      typeof result.response.candidates[0].content.parts[0].text === 'string'
+    ) {
+      rawText = result.response.candidates[0].content.parts[0].text;
+    } else {
+      throw new Error("Unexpected Gemini response structure");
+    }
+
+    const text = cleanResponse(rawText);
 
     try {
       const evaluation = JSON.parse(text);
@@ -142,10 +158,7 @@ Make sure we stick to case of question while we generate a follow up questions w
     console.log("Passed Prompt :", prompt);
 
     let rawText = null;
-    // Try .text() as a function (Promise)
-    if (result.response && typeof result.response.text === 'function') {
-      rawText = await result.response.text();
-    } else if (
+    if (
       result.response &&
       result.response.candidates &&
       result.response.candidates[0] &&

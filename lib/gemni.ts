@@ -21,6 +21,6 @@ const vertexAI = new VertexAI({
     client_email: creds.client_email,
     private_key: creds.private_key.replace(/\\n/g, "\n"),
   },
-});
+} as any);
 
 export const geminiModel = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash" });
