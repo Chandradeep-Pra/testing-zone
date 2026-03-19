@@ -19,11 +19,13 @@ if (!projectId) {
 const vertexAI = new VertexAI({
   project: projectId,
   location: "us-central1",
-  credentials: {
-    client_email: creds.client_email,
-    private_key: creds.private_key.replace(/\\n/g, "\n"),
+  googleAuthOptions: {
+    credentials: {
+      client_email: creds.client_email,
+      private_key: creds.private_key.replace(/\\n/g, "\n"),
+    },
   },
-} as any);
+});
 
 const model = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
