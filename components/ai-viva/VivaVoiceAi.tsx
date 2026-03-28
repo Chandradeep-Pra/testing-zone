@@ -8,8 +8,8 @@ import { CandidatePanel } from "./CandidatePanel";
 import { AiPanel } from "./AiPanel";
 import { useVivaSession } from "./useVivaSession";
 import { useSpeechOutput } from "./useSpeechOutput";
-import { useSpeechInput } from "./useSpeechInput";
 import { useVivaEngine } from "./useVivaEngine";
+import { useScribe } from "@elevenlabs/react";
 import ReadyOverlay from "./ReadyOverlay";
 import ChatTimeline from "./ChatTimeline";
 import { useCountdown } from "./useCountdown";
@@ -89,125 +89,126 @@ export default function VivaVoiceAi() {
   const fillerIndexRef = useRef(0);
 
 
-  /* --------------------------------------------------
-     SPEECH INPUT
-  -------------------------------------------------- */
+  // ElevenLabs Scribe v2 integration
+  // --- Auto-submit after 3s pause ---
+  const autoSubmitTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const { start, stop } = useSpeechInput(
-
-    (interim) => {
-
-      if (ending) return;
-
-      setMessages((msgs) => {
-        const exists = msgs.find((m) => m.id === liveCandidateMsgId.current);
-        if (!exists) return msgs;
-
-        return msgs.map((m) =>
-          m.id === liveCandidateMsgId.current
-            ? { ...m, text: interim }
-            : m
-        );
-      });
-
-    },
-
-    async (finalText) => {
-
-      if (ending || endingRef.current) return;
-
-     stop();
-        setIsListening(false);
-        setThinking(true);
-
-        /* start delayed filler */
-       fillerTimeoutRef.current = setTimeout(() => {
-
-  if (endingRef.current) return;
-
-  const filler =
-    fillers[fillerIndexRef.current % fillers.length];
-
-  fillerIndexRef.current++;
-
-  speak(filler);
-
-}, 1200);
-
-      setMessages((msgs) =>
-        msgs.map((m) =>
-          m.id === liveCandidateMsgId.current
-            ? { ...m, text: finalText, live: false }
-            : m
-        )
-      );
-
-      try {
-
-        const data = await next(finalText);
-        if (fillerTimeoutRef.current) {
-  clearTimeout(fillerTimeoutRef.current);
-  fillerTimeoutRef.current = null;
-}
-        if (!data?.question) return;
-
+  // Extracted committed transcript handler for reuse
+  const handleCommittedTranscript = async (text: string) => {
+    console.log('[VIVA] handleCommittedTranscript called with:', text);
+    setIsListening(false);
+    setThinking(true);
+    fillerTimeoutRef.current = setTimeout(() => {
+      if (endingRef.current) return;
+      const filler = fillers[fillerIndexRef.current % fillers.length];
+      fillerIndexRef.current++;
+      speak(filler);
+    }, 1200);
+    setMessages((msgs) =>
+      msgs.map((m) =>
+        m.id === liveCandidateMsgId.current
+          ? { ...m, text, live: false }
+          : m
+      )
+    );
+    try {
+      const result = await next(text);
+      if (fillerTimeoutRef.current) {
+        clearTimeout(fillerTimeoutRef.current);
+        fillerTimeoutRef.current = null;
+      }
+      if (!result?.question) return;
+      setMessages((msgs) => [
+        ...msgs,
+        {
+          id: crypto.randomUUID(),
+          role: "ai",
+          text: result.question,
+        },
+      ]);
+      if (result.imageUsed) {
         setMessages((msgs) => [
           ...msgs,
           {
             id: crypto.randomUUID(),
-            role: "ai",
-            text: data.question,
+            role: "image",
+            src: result.imageLink,
+            description: result.imageDescription,
           },
         ]);
-
-        if (data.imageUsed) {
+      }
+      applyApiResponse(result);
+      speak(result.question, () => {
+        markSpeechEnded();
+        if (!endingRef.current) {
+          const id = crypto.randomUUID();
+          liveCandidateMsgId.current = id;
           setMessages((msgs) => [
             ...msgs,
             {
-              id: crypto.randomUUID(),
-              role: "image",
-              src: data.imageLink,
-              description: data.imageDescription,
+              id,
+              role: "candidate",
+              text: "",
+              live: true,
             },
           ]);
+          setIsListening(true);
+          // Start listening again
+          handleStartScribe();
         }
-
-        applyApiResponse(data);
-
-        speak(data.question, () => {
-
-          markSpeechEnded();
-
-          if (!endingRef.current) {
-
-            const id = crypto.randomUUID();
-            liveCandidateMsgId.current = id;
-
-            setMessages((msgs) => [
-              ...msgs,
-              {
-                id,
-                role: "candidate",
-                text: "",
-                live: true,
-              },
-            ]);
-
-            setIsListening(true);
-            start();
-          }
-
-        });
-
-      } finally {
-
-        setThinking(false);
-
-      }
-
+      });
+    } finally {
+      setThinking(false);
     }
+  };
 
-  );
+  const scribe = useScribe({
+    modelId: "scribe_v2_realtime",
+    onPartialTranscript: (data) => {
+      console.log('[VIVA] onPartialTranscript:', data.text);
+      if (ending) return;
+      setMessages((msgs) => {
+        const exists = msgs.find((m) => m.id === liveCandidateMsgId.current);
+        if (!exists) return msgs;
+        return msgs.map((m) =>
+          m.id === liveCandidateMsgId.current
+            ? { ...m, text: data.text }
+            : m
+        );
+      });
+      // Reset auto-submit timer on every partial
+      if (autoSubmitTimer.current) clearTimeout(autoSubmitTimer.current);
+      console.log('[VIVA] Setting auto-submit timer for 1.5s');
+      autoSubmitTimer.current = setTimeout(() => {
+        console.log('[VIVA] Auto-submit timer fired. Data:', data.text);
+        if (!ending && !endingRef.current && data.text?.trim()) {
+          // Simulate committed transcript after 1.5s pause
+          scribe.disconnect();
+          handleCommittedTranscript(data.text);
+        }
+      }, 1500);
+    },
+    onCommittedTranscript: async (data) => {
+      console.log('[VIVA] onCommittedTranscript:', data.text);
+      if (ending || endingRef.current) return;
+      if (autoSubmitTimer.current) {
+        clearTimeout(autoSubmitTimer.current);
+        autoSubmitTimer.current = null;
+      }
+      await handleCommittedTranscript(data.text);
+    },
+  });
+
+
+  // Helper to fetch token and connect scribe
+  async function handleStartScribe() {
+    const res = await fetch("/api/scribe-token");
+    const { token } = await res.json();
+    await scribe.connect({
+      token,
+      microphone: { echoCancellation: true, noiseSuppression: true },
+    });
+  }
 
 
   /* --------------------------------------------------
@@ -256,8 +257,7 @@ export default function VivaVoiceAi() {
         ]);
 
         setIsListening(true);
-
-        setTimeout(() => start(), 50);
+        handleStartScribe();
 
       });
 

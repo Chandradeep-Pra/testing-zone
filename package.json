@@ -10,6 +10,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.39.0",
+    "@elevenlabs/react": "^0.14.3",
     "@google-cloud/speech": "^7.3.0",
     "@google-cloud/text-to-speech": "^6.4.0",
     "@google-cloud/vertexai": "^1.10.0",
