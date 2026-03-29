@@ -55,6 +55,56 @@ function cleanResponse(text: string) {
 }
 
 /* -------------------------
+   Previous QA Sanitizer
+------------------------- */
+
+function sanitizePreviousQA(previousQA: any[], maxEntries: number = 10, maxChars: number = 3000): string {
+  if (!Array.isArray(previousQA) || previousQA.length === 0) {
+    return "[]";
+  }
+
+  // Limit to most recent entries
+  const limited = previousQA.slice(-maxEntries);
+
+  // Sanitize each entry
+  const sanitized = limited.map(({ question, answer }) => {
+    // Strip non-printable characters and normalize whitespace
+    const cleanText = (text: string): string => {
+      if (typeof text !== 'string') return '';
+      return text
+        .replace(/[\x00-\x1F\x7F-\x9F]/g, '') // Remove control characters
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .replace(/[<>{}]/g, '') // Remove potentially dangerous characters
+        .trim();
+    };
+
+    return {
+      question: cleanText(question),
+      answer: cleanText(answer)
+    };
+  });
+
+  // Convert to JSON and truncate if needed
+  let jsonString = JSON.stringify(sanitized);
+
+  if (jsonString.length > maxChars) {
+    // Truncate entries from the beginning until we're under the limit
+    let truncated = sanitized;
+    while (truncated.length > 1 && JSON.stringify(truncated).length > maxChars) {
+      truncated = truncated.slice(1);
+    }
+    jsonString = JSON.stringify(truncated);
+
+    // If still too long, truncate the string itself
+    if (jsonString.length > maxChars) {
+      jsonString = jsonString.substring(0, maxChars - 3) + '...';
+    }
+  }
+
+  return jsonString;
+}
+
+/* -------------------------
    Main Handler
 ------------------------- */
 
@@ -139,18 +189,15 @@ Return JSON only.
   const exhibit = getExhibit(previousQA, shownExhibitIds);
 
   const prompt = `
-You are a FRCS Urology viva examiner tasked with generation of a follow up question. 
-This is previous QA which has been asked to the student: ${JSON.stringify(previousQA)}
+You are a FRCS Urology viva examiner tasked with generation of a follow up question.
+This is previous QA which has been asked to the student: ${sanitizePreviousQA(previousQA)}
 
 Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
 Make sure we stick to case of question while we generate a follow up questions which is -> ${vivaContext.case.stem}
 
-${exhibit ? `There are few image also available based on the study
+${exhibit ? `There is an image available for the study.
 Image Label: ${exhibit.link}
-Image Description: ${exhibit.description}
-The image description is added in the database so that you can generate a follow up question based on it, 
-but dont specify the description in your question, generate the follow up related to the image only if you feel 
-the  candidate response is going along the similar lines
+You may generate a follow-up question related to the image if you feel the candidate's response is going along similar lines.
 
 ` : ""}
 
