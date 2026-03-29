@@ -25,4 +25,4 @@ const vertexAI = new VertexAI({
   },
 });
 
-export const geminiModel = vertexAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+export const geminiModel = vertexAI.getGenerativeModel({ model: "gemini-2.5-pro" });

@@ -12,9 +12,9 @@ dotenv.config();
 const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
 credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
 
-const client = new speech.SpeechClient({
-  credentials
-});
+// const client = new speech.SpeechClient({
+//   credentials
+// });
 
 /* -------------------------------------------------------
    LOCAL VERSION (COMMENTED)
@@ -22,7 +22,7 @@ const client = new speech.SpeechClient({
 ------------------------------------------------------- */
 
 
-// const client = new speech.SpeechClient();
+const client = new speech.SpeechClient();
 
 const PORT = process.env.PORT || 3002;
 
