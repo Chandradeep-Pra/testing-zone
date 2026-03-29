@@ -139,18 +139,22 @@ Return JSON only.
   const exhibit = getExhibit(previousQA, shownExhibitIds);
 
   const prompt = `
-You are an FRCS viva examiner tasked with generating a single, concise question for the candidate. 
-Your task is to generate a follow up question like a viva examiner.
-This is previous QA: ${JSON.stringify(previousQA)}
-
-${exhibit ? `Use the following image to inform your question:
-Image Label: ${exhibit.link}
-Image Description: ${exhibit.description}
-The image description is only available to you (the examiner) and not to the candidates. 
-You can ask questions based on it, but do not share the description with the candidate.` : "No images available for this question - proceed with follow-up questions based on the candidate's previous answers."}
+You are a FRCS Urology viva examiner tasked with generation of a follow up question. 
+This is previous QA which has been asked to the student: ${JSON.stringify(previousQA)}
 
 Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
 Make sure we stick to case of question while we generate a follow up questions which is -> ${vivaContext.case.stem}
+
+${exhibit ? `There are few image also available based on the study
+Image Label: ${exhibit.link}
+Image Description: ${exhibit.description}
+The image description is added in the database so that you can generate a follow up question based on it, 
+but dont specify the description in your question, generate the follow up related to the image only if you feel 
+the  candidate response is going along the similar lines
+
+` : ""}
+
+
 `;
 
   try {
