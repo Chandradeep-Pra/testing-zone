@@ -17,8 +17,18 @@ import { useCountdown } from "./useCountdown";
 const VIVA_DURATION_SEC = 10 * 60;
 
 export default function VivaVoiceAi() {
-
+  const [candidate, setCandidate] = useState({ name: "", email: "" });
   const { generateScore, next } = useVivaEngine();
+  useEffect(() => {
+    const stored = localStorage.getItem("candidateInfo");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      setCandidate(parsed);
+      if (parsed.conversation) {
+        setMessages(parsed.conversation);
+      }
+    }
+  }, []);
 
   const {
     transcript,
@@ -214,19 +224,10 @@ export default function VivaVoiceAi() {
      BEGIN VIVA
   -------------------------------------------------- */
 
-  async function handleBegin(cameraPref = false) {
-
-    if (hasStartedRef.current) return;
-    hasStartedRef.current = true;
-
-    setCameraEnabled(cameraPref);
-    setReadyVisible(false);
-    setVivaStarted(true);
-    setThinking(true);
-
+  async function startViva() {
     try {
-
       const data = await next("");
+      console.log('Next data received:', data);
 
       setMessages([
         {
@@ -239,7 +240,7 @@ export default function VivaVoiceAi() {
       applyApiResponse(data);
 
       speak(data.question, () => {
-
+        console.log('First question spoken, setting up listening...');
         markSpeechEnded();
 
         const id = crypto.randomUUID();
@@ -256,17 +257,41 @@ export default function VivaVoiceAi() {
         ]);
 
         setIsListening(true);
+        setThinking(false); // Set thinking false here
 
         setTimeout(() => start(), 50);
+      });
+    } catch (error) {
+      console.error('Error starting viva:', error);
+      setThinking(false);
+    }
+  }
 
+  async function handleBegin(cameraPref = false) {
+
+    if (hasStartedRef.current) return;
+    hasStartedRef.current = true;
+
+    setCameraEnabled(cameraPref);
+    setReadyVisible(false);
+    setVivaStarted(true);
+    setThinking(true);
+
+    try {
+      // Greet the user
+      const greeting = `Hello ${candidate.name}, welcome to the Urologics AI Examiner viva. Please wait while we prepare your session.`;
+      speak(greeting, async () => {
+        console.log('Greeting finished, starting viva...');
+
+        await new Promise((res) => setTimeout(res, 2000));
+
+        startViva();
       });
 
-    } finally {
-
+    } catch (error) {
+      console.error('Error in greeting:', error);
       setThinking(false);
-
     }
-
   }
 
 
@@ -279,6 +304,14 @@ export default function VivaVoiceAi() {
     if (ending) return;
 
     setEnding(true);
+
+    // Save conversation to localStorage
+    const stored = localStorage.getItem("candidateInfo");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      parsed.conversation = messages;
+      localStorage.setItem("candidateInfo", JSON.stringify(parsed));
+    }
 
     await generateScore();
 
