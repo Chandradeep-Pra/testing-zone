@@ -1,3 +1,5 @@
+//@ts-nocheck
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -13,9 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+import toast from "react-hot-toast";
 import { vivaContext } from "@/ai-viva-data/vivaContext"; // use for case title
-
-// evaluation object persisted by VivaVoiceAi.endViva
 
 interface EvalDimension {
   score: number;
@@ -49,60 +50,150 @@ interface Report {
 export default function ReviewPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [candidate, setCandidate] = useState({ name: "", email: "", conversation: [], report: null });
+
+  useEffect(() => {
+    const stored = localStorage.getItem("candidateInfo");
+    if (stored) {
+      setCandidate(JSON.parse(stored));
+    }
+  }, []);
 
   // load evaluation from sessionStorage and convert to report structure
-  useEffect(() => {
+
+useEffect(() => {
   const raw = sessionStorage.getItem("viva-final-score");
 
   if (!raw) return;
 
-  try {
-    const evalObj = JSON.parse(raw);
+  async function processAndSend() {
+    try {
+      const evalObj = JSON.parse(raw);
 
-    const domainKeys = [
-      "basic_knowledge",
-      "higher_order_processing",
-      "clinical_skills",
-      "professionalism",
-    ];
+      const domainKeys = [
+        "basic_knowledge",
+        "higher_order_processing",
+        "clinical_skills",
+        "professionalism",
+      ];
 
-    const domains: DomainReport[] = domainKeys.map((key) => {
-      const val = evalObj[key];
+      const domains: DomainReport[] = domainKeys.map((key) => {
+        const val = evalObj[key];
 
-      return {
-        name: key
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (c) => c.toUpperCase()),
+        return {
+          name: key
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase()),
 
-        score: Number(val?.score) || 0,
+          score: Number(val?.score) || 0,
+          summary: val?.summary || "",
+          reasoning: val?.reason || "",
+        };
+      });
 
-        summary: val?.summary || "",
+      const overall = Math.round(
+        domains.reduce((sum, d) => sum + d.score, 0) / domains.length
+      );
 
-        reasoning: val?.reason || "",
+      const finalReport = {
+        caseTitle: vivaContext.case.title,
+        overallScore: overall,
+        strengthsOverall: evalObj.strengthsOverall || [],
+        weaknessesOverall: evalObj.weaknessesOverall || [],
+        improvementPlan: evalObj.improvementPlan || [],
+        domains,
       };
-    });
 
-    const overall = Math.round(
-      domains.reduce((sum, d) => sum + d.score, 0) / domains.length
-    );
+      setReport(finalReport);
 
-    setReport({
-      caseTitle: vivaContext.case.title,
+      /* -----------------------------
+         Save to localStorage
+      ----------------------------- */
+      const stored = localStorage.getItem("candidateInfo");
 
-      overallScore: overall,
+      if (!stored) {
+        toast.error("Candidate info missing");
+        return;
+      }
 
-      strengthsOverall: evalObj.strengthsOverall || [],
+      const parsed = JSON.parse(stored);
+      parsed.report = finalReport;
 
-      weaknessesOverall: evalObj.weaknessesOverall || [],
+      localStorage.setItem("candidateInfo", JSON.stringify(parsed));
 
-      improvementPlan: evalObj.improvementPlan || [],
+      /* -----------------------------
+         🚀 CALL API HERE
+      ----------------------------- */
 
-      domains,
-    });
+      toast.custom(
+  (t) => (
+    <div
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+        t.visible ? "animate-in fade-in slide-in-from-top-2" : "animate-out fade-out"
+      }`}
+      style={{
+        background: "linear-gradient(135deg, #1e293b, #0f172a)",
+        border: "1px solid rgba(148,163,184,0.2)",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+      }}
+    >
+      <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
 
-  } catch (e) {
-    console.error("failed to parse evaluation", e);
+      <div>
+        <p className="text-sm font-medium text-white">Sending your report</p>
+        <p className="text-xs text-slate-400">Preparing PDF & emailing…</p>
+      </div>
+    </div>
+  ),
+  { id: "send-mail" }
+);
+
+      const res = await fetch("/api/send-report", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          candidateInfo: parsed,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to send email");
+      }
+
+      toast.custom(
+  (t) => (
+    <div
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl ${
+        t.visible ? "animate-in fade-in slide-in-from-top-2" : "animate-out fade-out"
+      }`}
+      style={{
+        background: "linear-gradient(135deg, #065f46, #022c22)",
+        border: "1px solid rgba(34,197,94,0.3)",
+      }}
+    >
+      <CheckCircle2 className="text-emerald-400" size={20} />
+
+      <div>
+        <p className="text-sm font-semibold text-white">Report Sent</p>
+        <p className="text-xs text-emerald-300">Check your inbox 📩</p>
+      </div>
+    </div>
+  ),
+  { id: "send-mail" }
+);
+
+    } catch (err) {
+      console.error("Error:", err);
+
+      toast.error("Failed to send report ❌", {
+        id: "send-mail",
+      });
+    }
   }
+
+  processAndSend();
 }, []);
 
   if (!report) {
@@ -282,6 +373,8 @@ export default function ReviewPage() {
 
           </section>
         )}
+
+       
 
       </div>
     </main>
