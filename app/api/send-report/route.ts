@@ -63,46 +63,150 @@ export async function POST(req: Request) {
     ----------------------------- */
 
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 24px; color:#111; max-width:600px; margin:auto;">
-        
-        <h2 style="margin-bottom:16px;">Viva Examination Report</h2>
+  <div style="background:#f1f5f9; padding:30px 0; font-family:Arial, sans-serif;">
+    
+    <table width="100%" cellspacing="0" cellpadding="0">
+      <tr>
+        <td align="center">
 
-        <p>Dear <b>${name}</b>,</p>
+          <!-- CARD -->
+          <table width="600" style="background:#ffffff; border-radius:12px; padding:24px;">
 
-        <p>
-          Thank you for completing your viva examination.
-        </p>
+            <!-- HEADER -->
+            <tr>
+              <td>
+                <h2 style="margin:0; font-size:20px; color:#0f172a;">
+                  Viva Examination Report
+                </h2>
+                <p style="margin:6px 0 0; color:#64748b; font-size:13px;">
+                  ${report.caseTitle}
+                </p>
+              </td>
+            </tr>
 
-        <div style="margin:16px 0; padding:12px; background:#f3f4f6; border-radius:8px;">
-          <b>Overall Score:</b> ${report?.overallScore}/10
-        </div>
+            <!-- SCORE -->
+            <tr>
+              <td style="padding-top:20px;">
+                <div style="
+                  background:#ecfdf5;
+                  border:1px solid #a7f3d0;
+                  border-radius:10px;
+                  padding:16px;
+                  text-align:center;
+                ">
+                  <div style="font-size:28px; font-weight:bold; color:#059669;">
+                    ${report.overallScore}/10
+                  </div>
+                  <div style="font-size:12px; color:#065f46;">
+                    Overall Score
+                  </div>
+                </div>
+              </td>
+            </tr>
 
-        <h3 style="margin-top:20px;">Q&A</h3>
-        ${qaHtml || "<p>No responses recorded.</p>"}
+            <!-- GREETING -->
+            <tr>
+              <td style="padding-top:20px; font-size:14px; color:#111;">
+                Dear <b>${name}</b>,<br/><br/>
+                Thank you for completing your viva examination. Below is your performance summary.
+              </td>
+            </tr>
 
-        <h3 style="margin-top:20px;">Detailed Evaluation</h3>
-        ${domainsHtml || "<p>No evaluation available.</p>"}
+            <!-- Q&A -->
+            <tr>
+              <td style="padding-top:24px;">
+                <h3 style="margin:0 0 10px; font-size:16px; color:#0f172a;">
+                  Q&A
+                </h3>
 
-        ${
-          report?.improvementPlan?.length
-            ? `
-          <h3 style="margin-top:20px;">Next Focus Areas</h3>
-          <ul>
-            ${report.improvementPlan.map((i: string) => `<li>${i}</li>`).join("")}
-          </ul>
-        `
-            : ""
-        }
+                ${conversation.map((m: any) => `
+                  <div style="
+                    margin-bottom:10px;
+                    padding:10px;
+                    background:#f8fafc;
+                    border-radius:8px;
+                    font-size:13px;
+                  ">
+                    <b style="color:#334155;">
+                      ${m.role === "ai" ? "Q:" : "A:"}
+                    </b>
+                    <span style="color:#0f172a;">
+                      ${m.text || "No response"}
+                    </span>
+                  </div>
+                `).join("")}
+              </td>
+            </tr>
 
-        <br/>
+            <!-- DOMAINS -->
+            <tr>
+              <td style="padding-top:24px;">
+                <h3 style="margin:0 0 10px; font-size:16px; color:#0f172a;">
+                  Detailed Evaluation
+                </h3>
 
-        <p>
-          Best regards,<br/>
-          <b>Urologics AI Examiner</b>
-        </p>
+                ${report.domains.map((d: any) => `
+                  <div style="
+                    margin-bottom:14px;
+                    padding:12px;
+                    border:1px solid #e2e8f0;
+                    border-radius:8px;
+                  ">
+                    <div style="font-weight:600; font-size:14px; color:#0f172a;">
+                      ${d.name} (${d.score}/10)
+                    </div>
+                    <div style="font-size:13px; color:#475569; margin-top:4px;">
+                      ${d.summary}
+                    </div>
+                  </div>
+                `).join("")}
+              </td>
+            </tr>
 
-      </div>
-    `;
+            <!-- IMPROVEMENT -->
+            ${
+              report.improvementPlan?.length
+                ? `
+              <tr>
+                <td style="padding-top:24px;">
+                  <h3 style="margin:0 0 10px; font-size:16px; color:#0f172a;">
+                    Next Focus Areas
+                  </h3>
+
+                  ${report.improvementPlan.map((item: string) => `
+                    <div style="
+                      display:inline-block;
+                      background:#e2e8f0;
+                      color:#0f172a;
+                      padding:6px 10px;
+                      border-radius:999px;
+                      font-size:12px;
+                      margin:4px 6px 0 0;
+                    ">
+                      ${item}
+                    </div>
+                  `).join("")}
+                </td>
+              </tr>
+            `
+                : ""
+            }
+
+            <!-- FOOTER -->
+            <tr>
+              <td style="padding-top:30px; font-size:13px; color:#64748b;">
+                Best regards,<br/>
+                <b style="color:#0f172a;">Urologics AI Examiner</b>
+              </td>
+            </tr>
+
+          </table>
+
+        </td>
+      </tr>
+    </table>
+  </div>
+`;
 
     /* -----------------------------
        5. Send Email
