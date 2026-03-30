@@ -2,7 +2,9 @@
 
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
+
 
 export async function POST(req: Request) {
   try {
@@ -20,8 +22,11 @@ export async function POST(req: Request) {
     ----------------------------- */
 
     const browser = await puppeteer.launch({
-      headless: "new",
-    });
+  args: chromium.args,
+  defaultViewport: chromium.defaultViewport,
+  executablePath: await chromium.executablePath(),
+  headless: true,
+});
 
     const page = await browser.newPage();
 
