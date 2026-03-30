@@ -3,6 +3,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+// import html2pdf from "html2pdf.js";
 import {
   Trophy,
   CheckCircle2,
@@ -51,6 +52,80 @@ export default function ReviewPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [candidate, setCandidate] = useState({ name: "", email: "", conversation: [], report: null });
+
+  async function generatePdfBlob() {
+  console.log("🟡 [PDF] Starting...");
+
+  if (typeof window === "undefined") {
+    throw new Error("Not in browser");
+  }
+
+  const html2pdf = (await import("html2pdf.js")).default;
+
+  const original = document.getElementById("pdf-report");
+
+  if (!original) {
+    throw new Error("PDF element not found");
+  }
+
+  console.log("🟢 [PDF] Element found");
+
+  // 🔥 Create isolated container (NOT document.body)
+  const sandbox = document.createElement("div");
+
+  sandbox.style.position = "fixed";
+  sandbox.style.left = "0";
+  sandbox.style.top = "0";
+  sandbox.style.width = "800px";
+  sandbox.style.background = "#ffffff";
+  sandbox.style.color = "#000000";
+  sandbox.style.zIndex = "-9999";
+
+  // 🔥 Clone
+  const clone = original.cloneNode(true) as HTMLElement;
+
+  // 🔥 FORCE CLEAN STYLES
+  const all = [clone, ...clone.querySelectorAll("*")];
+
+  all.forEach((el: any) => {
+    el.style.all = "unset"; // 💥 nuclear reset
+    el.style.boxSizing = "border-box";
+    el.style.fontFamily = "Arial, sans-serif";
+    el.style.color = "#000";
+    el.style.background = "transparent";
+  });
+
+  clone.style.padding = "40px";
+  clone.style.width = "800px";
+  clone.style.background = "#fff";
+
+  sandbox.appendChild(clone);
+  document.body.appendChild(sandbox);
+
+  console.log("🟡 [PDF] Sandbox ready");
+
+  const pdfBlob = await html2pdf()
+    .from(clone)
+    .set({
+      margin: 10,
+      html2canvas: {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        logging: true,
+      },
+      jsPDF: {
+        unit: "mm",
+        format: "a4",
+      },
+    })
+    .outputPdf("blob");
+
+  document.body.removeChild(sandbox);
+
+  console.log("🟢 [PDF] Generated");
+
+  return pdfBlob;
+}
 
   useEffect(() => {
     const stored = localStorage.getItem("candidateInfo");
@@ -148,19 +223,52 @@ useEffect(() => {
   { id: "send-mail" }
 );
 
-      const res = await fetch("/api/send-report", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          candidateInfo: parsed,
-        }),
-      });
+ console.log("🟡 [FLOW] Waiting for DOM...");
 
-      if (!res.ok) {
-        throw new Error("Failed to send email");
-      }
+// 🔥 Fix: wait for DOM render
+await new Promise((r) => setTimeout(r, 500));
+
+console.log("🟡 [FLOW] Generating PDF...");
+
+let pdfBlob;
+
+try {
+  pdfBlob = await generatePdfBlob();
+} catch (e) {
+  console.error("❌ [FLOW] PDF FAILED:", e);
+  throw e;
+}
+
+console.log("🟢 [FLOW] PDF Ready");
+
+const formData = new FormData();
+formData.append("file", pdfBlob, "report.pdf");
+formData.append("email", parsed.email);
+formData.append("name", parsed.name);
+
+console.log("🟡 [FLOW] Calling API...");
+
+let res;
+
+try {
+  res = await fetch("/api/send-report", {
+    method: "POST",
+    body: formData,
+  });
+} catch (e) {
+  console.error("❌ [FLOW] FETCH FAILED:", e);
+  throw e;
+}
+
+console.log("🟢 [FLOW] API Response:", res.status);
+
+if (!res.ok) {
+  const text = await res.text();
+  console.error("❌ [FLOW] API ERROR:", text);
+  throw new Error("Failed to send email");
+}
+
+     
 
       toast.custom(
   (t) => (
@@ -377,6 +485,117 @@ useEffect(() => {
        
 
       </div>
+
+      <div
+  style={{
+    position: "absolute",
+    left: "-9999px",
+    top: 0,
+  }}
+>
+  <div
+    id="pdf-report"
+    style={{
+      backgroundColor: "#ffffff",
+      color: "#000000",
+      padding: "40px",
+      width: "800px",
+      fontFamily: "Arial, sans-serif",
+      lineHeight: "1.5",
+    }}
+  >
+
+    {/* TITLE */}
+    <h1
+      style={{
+        fontSize: "24px",
+        fontWeight: "700",
+        marginBottom: "20px",
+        textAlign: "center",
+      }}
+    >
+      Viva Examination Report
+    </h1>
+
+    {/* BASIC INFO */}
+    <p style={{ marginBottom: "6px" }}>
+      <strong>Candidate:</strong> {candidate.name}
+    </p>
+
+    <p style={{ marginBottom: "16px" }}>
+      <strong>Score:</strong> {report.overallScore}/10
+    </p>
+
+    {/* Q&A */}
+    <h2
+      style={{
+        fontSize: "18px",
+        fontWeight: "600",
+        marginTop: "24px",
+        marginBottom: "10px",
+        borderBottom: "1px solid #ccc",
+        paddingBottom: "4px",
+      }}
+    >
+      Q&A
+    </h2>
+
+    {candidate.conversation?.map((m: any, i: number) => (
+      <div
+        key={i}
+        style={{
+          marginBottom: "8px",
+          fontSize: "14px",
+        }}
+      >
+        <strong>{m.role === "ai" ? "Q:" : "A:"}</strong>{" "}
+        {m.text || "No response"}
+      </div>
+    ))}
+
+    {/* EVALUATION */}
+    <h2
+      style={{
+        fontSize: "18px",
+        fontWeight: "600",
+        marginTop: "24px",
+        marginBottom: "10px",
+        borderBottom: "1px solid #ccc",
+        paddingBottom: "4px",
+      }}
+    >
+      Detailed Evaluation
+    </h2>
+
+    {report.domains.map((d, i) => (
+      <div
+        key={i}
+        style={{
+          marginBottom: "14px",
+        }}
+      >
+        <div
+          style={{
+            fontWeight: "600",
+            marginBottom: "4px",
+          }}
+        >
+          {d.name} ({d.score}/10)
+        </div>
+
+        <div
+          style={{
+            fontSize: "14px",
+            color: "#333",
+          }}
+        >
+          {d.summary}
+        </div>
+      </div>
+    ))}
+
+  </div>
+</div>
     </main>
   );
 }
