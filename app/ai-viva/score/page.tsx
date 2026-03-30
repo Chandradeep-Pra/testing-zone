@@ -3,7 +3,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-// import html2pdf from "html2pdf.js";
 import {
   Trophy,
   CheckCircle2,
@@ -17,20 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import toast from "react-hot-toast";
-import { vivaContext } from "@/ai-viva-data/vivaContext"; // use for case title
-
-interface EvalDimension {
-  score: number;
-  reason: string;
-}
-
-type EvaluationResponse = {
-  basic_knowledge: EvalDimension;
-  higher_order_processing: EvalDimension;
-  clinical_skills: EvalDimension;
-  professionalism: EvalDimension;
-  [key: string]: EvalDimension;
-};
+import { vivaContext } from "@/ai-viva-data/vivaContext";
 
 interface DomainReport {
   name: string;
@@ -53,80 +39,6 @@ export default function ReviewPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [candidate, setCandidate] = useState({ name: "", email: "", conversation: [], report: null });
 
-  async function generatePdfBlob() {
-  console.log("🟡 [PDF] Starting...");
-
-  if (typeof window === "undefined") {
-    throw new Error("Not in browser");
-  }
-
-  const html2pdf = (await import("html2pdf.js")).default;
-
-  const original = document.getElementById("pdf-report");
-
-  if (!original) {
-    throw new Error("PDF element not found");
-  }
-
-  console.log("🟢 [PDF] Element found");
-
-  // 🔥 Create isolated container (NOT document.body)
-  const sandbox = document.createElement("div");
-
-  sandbox.style.position = "fixed";
-  sandbox.style.left = "0";
-  sandbox.style.top = "0";
-  sandbox.style.width = "800px";
-  sandbox.style.background = "#ffffff";
-  sandbox.style.color = "#000000";
-  sandbox.style.zIndex = "-9999";
-
-  // 🔥 Clone
-  const clone = original.cloneNode(true) as HTMLElement;
-
-  // 🔥 FORCE CLEAN STYLES
-  const all = [clone, ...clone.querySelectorAll("*")];
-
-  all.forEach((el: any) => {
-    el.style.all = "unset"; // 💥 nuclear reset
-    el.style.boxSizing = "border-box";
-    el.style.fontFamily = "Arial, sans-serif";
-    el.style.color = "#000";
-    el.style.background = "transparent";
-  });
-
-  clone.style.padding = "40px";
-  clone.style.width = "800px";
-  clone.style.background = "#fff";
-
-  sandbox.appendChild(clone);
-  document.body.appendChild(sandbox);
-
-  console.log("🟡 [PDF] Sandbox ready");
-
-  const pdfBlob = await html2pdf()
-    .from(clone)
-    .set({
-      margin: 10,
-      html2canvas: {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        logging: true,
-      },
-      jsPDF: {
-        unit: "mm",
-        format: "a4",
-      },
-    })
-    .outputPdf("blob");
-
-  document.body.removeChild(sandbox);
-
-  console.log("🟢 [PDF] Generated");
-
-  return pdfBlob;
-}
-
   useEffect(() => {
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {
@@ -134,175 +46,136 @@ export default function ReviewPage() {
     }
   }, []);
 
-  // load evaluation from sessionStorage and convert to report structure
+  useEffect(() => {
+    const raw = sessionStorage.getItem("viva-final-score");
+    if (!raw) return;
 
-useEffect(() => {
-  const raw = sessionStorage.getItem("viva-final-score");
+    async function processAndSend() {
+      try {
+        const evalObj = JSON.parse(raw);
 
-  if (!raw) return;
+        const domainKeys = [
+          "basic_knowledge",
+          "higher_order_processing",
+          "clinical_skills",
+          "professionalism",
+        ];
 
-  async function processAndSend() {
-    try {
-      const evalObj = JSON.parse(raw);
+        const domains: DomainReport[] = domainKeys.map((key) => {
+          const val = evalObj[key];
 
-      const domainKeys = [
-        "basic_knowledge",
-        "higher_order_processing",
-        "clinical_skills",
-        "professionalism",
-      ];
+          return {
+            name: key
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase()),
+            score: Number(val?.score) || 0,
+            summary: val?.summary || "",
+            reasoning: val?.reason || "",
+          };
+        });
 
-      const domains: DomainReport[] = domainKeys.map((key) => {
-        const val = evalObj[key];
+        const overall = Math.round(
+          domains.reduce((sum, d) => sum + d.score, 0) / domains.length
+        );
 
-        return {
-          name: key
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase()),
-
-          score: Number(val?.score) || 0,
-          summary: val?.summary || "",
-          reasoning: val?.reason || "",
+        const finalReport = {
+          caseTitle: vivaContext.case.title,
+          overallScore: overall,
+          strengthsOverall: evalObj.strengthsOverall || [],
+          weaknessesOverall: evalObj.weaknessesOverall || [],
+          improvementPlan: evalObj.improvementPlan || [],
+          domains,
         };
-      });
 
-      const overall = Math.round(
-        domains.reduce((sum, d) => sum + d.score, 0) / domains.length
-      );
+        setReport(finalReport);
 
-      const finalReport = {
-        caseTitle: vivaContext.case.title,
-        overallScore: overall,
-        strengthsOverall: evalObj.strengthsOverall || [],
-        weaknessesOverall: evalObj.weaknessesOverall || [],
-        improvementPlan: evalObj.improvementPlan || [],
-        domains,
-      };
+        const stored = localStorage.getItem("candidateInfo");
+        if (!stored) {
+          toast.error("Candidate info missing");
+          return;
+        }
 
-      setReport(finalReport);
+        const parsed = JSON.parse(stored);
+        parsed.report = finalReport;
 
-      /* -----------------------------
-         Save to localStorage
-      ----------------------------- */
-      const stored = localStorage.getItem("candidateInfo");
+        localStorage.setItem("candidateInfo", JSON.stringify(parsed));
 
-      if (!stored) {
-        toast.error("Candidate info missing");
-        return;
+        /* -----------------------------
+           🚀 SINGLE API CALL
+        ----------------------------- */
+
+        toast.custom(
+          (t) => (
+            <div
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl ${
+                t.visible ? "animate-in fade-in slide-in-from-top-2" : "animate-out fade-out"
+              }`}
+              style={{
+                background: "linear-gradient(135deg, #1e293b, #0f172a)",
+                border: "1px solid rgba(148,163,184,0.2)",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+              }}
+            >
+              <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+
+              <div>
+                <p className="text-sm font-medium text-white">Sending your report</p>
+                <p className="text-xs text-slate-400">Emailing your results…</p>
+              </div>
+            </div>
+          ),
+          { id: "send-mail" }
+        );
+
+        console.log("🟡 [FLOW] Calling API...");
+
+        const res = await fetch("/api/send-report", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            candidateInfo: parsed,
+          }),
+        });
+
+        console.log("🟢 [FLOW] API Response:", res.status);
+
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("❌ API ERROR:", text);
+          throw new Error("Failed to send email");
+        }
+
+        toast.custom(
+          (t) => (
+            <div
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl ${
+                t.visible ? "animate-in fade-in slide-in-from-top-2" : "animate-out fade-out"
+              }`}
+              style={{
+                background: "linear-gradient(135deg, #065f46, #022c22)",
+                border: "1px solid rgba(34,197,94,0.3)",
+              }}
+            >
+              <CheckCircle2 className="text-emerald-400" size={20} />
+              <div>
+                <p className="text-sm font-semibold text-white">Report Sent</p>
+                <p className="text-xs text-emerald-300">Check your inbox 📩</p>
+              </div>
+            </div>
+          ),
+          { id: "send-mail" }
+        );
+
+      } catch (err) {
+        console.error("Error:", err);
+        toast.error("Failed to send report ❌", { id: "send-mail" });
       }
-
-      const parsed = JSON.parse(stored);
-      parsed.report = finalReport;
-
-      localStorage.setItem("candidateInfo", JSON.stringify(parsed));
-
-      /* -----------------------------
-         🚀 CALL API HERE
-      ----------------------------- */
-
-      toast.custom(
-  (t) => (
-    <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-        t.visible ? "animate-in fade-in slide-in-from-top-2" : "animate-out fade-out"
-      }`}
-      style={{
-        background: "linear-gradient(135deg, #1e293b, #0f172a)",
-        border: "1px solid rgba(148,163,184,0.2)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
-      }}
-    >
-      <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-
-      <div>
-        <p className="text-sm font-medium text-white">Sending your report</p>
-        <p className="text-xs text-slate-400">Preparing PDF & emailing…</p>
-      </div>
-    </div>
-  ),
-  { id: "send-mail" }
-);
-
- console.log("🟡 [FLOW] Waiting for DOM...");
-
-// 🔥 Fix: wait for DOM render
-await new Promise((r) => setTimeout(r, 500));
-
-console.log("🟡 [FLOW] Generating PDF...");
-
-let pdfBlob;
-
-try {
-  pdfBlob = await generatePdfBlob();
-} catch (e) {
-  console.error("❌ [FLOW] PDF FAILED:", e);
-  throw e;
-}
-
-console.log("🟢 [FLOW] PDF Ready");
-
-const formData = new FormData();
-formData.append("file", pdfBlob, "report.pdf");
-formData.append("email", parsed.email);
-formData.append("name", parsed.name);
-
-console.log("🟡 [FLOW] Calling API...");
-
-let res;
-
-try {
-  res = await fetch("/api/send-report", {
-    method: "POST",
-    body: formData,
-  });
-} catch (e) {
-  console.error("❌ [FLOW] FETCH FAILED:", e);
-  throw e;
-}
-
-console.log("🟢 [FLOW] API Response:", res.status);
-
-if (!res.ok) {
-  const text = await res.text();
-  console.error("❌ [FLOW] API ERROR:", text);
-  throw new Error("Failed to send email");
-}
-
-     
-
-      toast.custom(
-  (t) => (
-    <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl ${
-        t.visible ? "animate-in fade-in slide-in-from-top-2" : "animate-out fade-out"
-      }`}
-      style={{
-        background: "linear-gradient(135deg, #065f46, #022c22)",
-        border: "1px solid rgba(34,197,94,0.3)",
-      }}
-    >
-      <CheckCircle2 className="text-emerald-400" size={20} />
-
-      <div>
-        <p className="text-sm font-semibold text-white">Report Sent</p>
-        <p className="text-xs text-emerald-300">Check your inbox 📩</p>
-      </div>
-    </div>
-  ),
-  { id: "send-mail" }
-);
-
-    } catch (err) {
-      console.error("Error:", err);
-
-      toast.error("Failed to send report ❌", {
-        id: "send-mail",
-      });
     }
-  }
 
-  processAndSend();
-}, []);
+    processAndSend();
+  }, []);
 
   if (!report) {
     return (
@@ -485,117 +358,6 @@ if (!res.ok) {
        
 
       </div>
-
-      <div
-  style={{
-    position: "absolute",
-    left: "-9999px",
-    top: 0,
-  }}
->
-  <div
-    id="pdf-report"
-    style={{
-      backgroundColor: "#ffffff",
-      color: "#000000",
-      padding: "40px",
-      width: "800px",
-      fontFamily: "Arial, sans-serif",
-      lineHeight: "1.5",
-    }}
-  >
-
-    {/* TITLE */}
-    <h1
-      style={{
-        fontSize: "24px",
-        fontWeight: "700",
-        marginBottom: "20px",
-        textAlign: "center",
-      }}
-    >
-      Viva Examination Report
-    </h1>
-
-    {/* BASIC INFO */}
-    <p style={{ marginBottom: "6px" }}>
-      <strong>Candidate:</strong> {candidate.name}
-    </p>
-
-    <p style={{ marginBottom: "16px" }}>
-      <strong>Score:</strong> {report.overallScore}/10
-    </p>
-
-    {/* Q&A */}
-    <h2
-      style={{
-        fontSize: "18px",
-        fontWeight: "600",
-        marginTop: "24px",
-        marginBottom: "10px",
-        borderBottom: "1px solid #ccc",
-        paddingBottom: "4px",
-      }}
-    >
-      Q&A
-    </h2>
-
-    {candidate.conversation?.map((m: any, i: number) => (
-      <div
-        key={i}
-        style={{
-          marginBottom: "8px",
-          fontSize: "14px",
-        }}
-      >
-        <strong>{m.role === "ai" ? "Q:" : "A:"}</strong>{" "}
-        {m.text || "No response"}
-      </div>
-    ))}
-
-    {/* EVALUATION */}
-    <h2
-      style={{
-        fontSize: "18px",
-        fontWeight: "600",
-        marginTop: "24px",
-        marginBottom: "10px",
-        borderBottom: "1px solid #ccc",
-        paddingBottom: "4px",
-      }}
-    >
-      Detailed Evaluation
-    </h2>
-
-    {report.domains.map((d, i) => (
-      <div
-        key={i}
-        style={{
-          marginBottom: "14px",
-        }}
-      >
-        <div
-          style={{
-            fontWeight: "600",
-            marginBottom: "4px",
-          }}
-        >
-          {d.name} ({d.score}/10)
-        </div>
-
-        <div
-          style={{
-            fontSize: "14px",
-            color: "#333",
-          }}
-        >
-          {d.summary}
-        </div>
-      </div>
-    ))}
-
-  </div>
-</div>
     </main>
   );
 }
