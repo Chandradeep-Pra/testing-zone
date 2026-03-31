@@ -14,11 +14,11 @@ import ReadyOverlay from "./ReadyOverlay";
 import ChatTimeline from "./ChatTimeline";
 import { useCountdown } from "./useCountdown";
 
-const VIVA_DURATION_SEC = 10 * 60;
+import type { VivaCaseRecord } from "@/lib/viva-case";
 
-export default function VivaVoiceAi() {
+export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) {
   const [candidate, setCandidate] = useState({ name: "", email: "" });
-  const { generateScore, next } = useVivaEngine();
+  const { generateScore, next } = useVivaEngine(vivaCase);
   useEffect(() => {
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {
@@ -58,8 +58,10 @@ export default function VivaVoiceAi() {
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
+  const vivaDurationSec = vivaCase.viva_rules.max_duration_minutes * 60;
+
   const { minutes, seconds } = useCountdown(
-    VIVA_DURATION_SEC,
+    vivaDurationSec,
     vivaStarted && !ending
   );
 
@@ -126,23 +128,20 @@ export default function VivaVoiceAi() {
 
       if (ending || endingRef.current) return;
 
-     stop();
-        setIsListening(false);
-        setThinking(true);
+      stop();
+      setIsListening(false);
+      setThinking(true);
 
-        /* start delayed filler */
-       fillerTimeoutRef.current = setTimeout(() => {
+      fillerTimeoutRef.current = setTimeout(() => {
+        if (endingRef.current) return;
 
-  if (endingRef.current) return;
+        const filler =
+          fillers[fillerIndexRef.current % fillers.length];
 
-  const filler =
-    fillers[fillerIndexRef.current % fillers.length];
+        fillerIndexRef.current++;
 
-  fillerIndexRef.current++;
-
-  speak(filler);
-
-}, 1200);
+        speak(filler);
+      }, 1200);
 
       setMessages((msgs) =>
         msgs.map((m) =>
@@ -240,6 +239,7 @@ export default function VivaVoiceAi() {
       applyApiResponse(data);
 
       speak(data.question, () => {
+
         console.log('First question spoken, setting up listening...');
         markSpeechEnded();
 
@@ -281,6 +281,7 @@ export default function VivaVoiceAi() {
       // Greet the user
       const greeting = `Hello ${candidate.name}, welcome to the Urologics AI Examiner viva. Please wait while we prepare your session.`;
       speak(greeting, async () => {
+
         console.log('Greeting finished, starting viva...');
 
         await new Promise((res) => setTimeout(res, 2000));
@@ -310,6 +311,9 @@ export default function VivaVoiceAi() {
     if (stored) {
       const parsed = JSON.parse(stored);
       parsed.conversation = messages;
+      parsed.selectedCaseId = vivaCase.id;
+      parsed.selectedCaseTitle = vivaCase.case.title;
+      parsed.selectedCase = vivaCase;
       localStorage.setItem("candidateInfo", JSON.stringify(parsed));
     }
 

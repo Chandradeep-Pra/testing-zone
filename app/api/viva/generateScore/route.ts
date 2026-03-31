@@ -1,22 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { geminiModel } from "@/lib/gemni";
+import { getDefaultVivaCase, normalizeVivaCase, type VivaCaseRecord } from "@/lib/viva-case";
+
+type ScoreRequest = {
+  previousQA: Array<{ question: string; answer: string }>;
+  vivaCase?: VivaCaseRecord;
+};
 
 export async function POST(req: NextRequest) {
-
-  const { previousQA } = await req.json();
+  const { previousQA, vivaCase: rawVivaCase } = (await req.json()) as ScoreRequest;
+  const vivaCase = rawVivaCase ? normalizeVivaCase(rawVivaCase) : getDefaultVivaCase();
 
   if (!Array.isArray(previousQA)) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
   const transcript = previousQA
-    .map((q: any) => `Q: ${q.question}\nA: ${q.answer}`)
+    .map((q) => `Q: ${q.question}\nA: ${q.answer}`)
     .join("\n\n");
 
   const prompt = `
 You are an FRCS Urology examiner.
 
 Evaluate the candidate performance in this viva.
+
+Case Title: ${vivaCase.case.title}
+Case Stem: ${vivaCase.case.stem}
+Objectives: ${vivaCase.case.objectives.join("; ")}
+Must mention: ${vivaCase.marking_criteria.must_mention.join("; ")}
+Critical fail: ${vivaCase.marking_criteria.critical_fail.join("; ")}
 
 Score each domain from 4–8.
 
@@ -28,15 +41,15 @@ Domains:
 
 Provide:
 
-• score (4-8)
-• short summary
-• detailed reasoning
+- score (4-8)
+- short summary
+- detailed reasoning
 
 Also provide:
 
-• strengthsOverall (3–5 bullet points)
-• weaknessesOverall (3–5 bullet points)
-• improvementPlan (3–5 SHORT TOPICS - max 3-4 words each, NOT sentences. Examples: "Renal anatomy basics", "Imaging interpretation", "Infection management")
+- strengthsOverall (3-5 bullet points)
+- weaknessesOverall (3-5 bullet points)
+- improvementPlan (3-5 SHORT TOPICS - max 3-4 words each, NOT sentences. Examples: "Renal anatomy basics", "Imaging interpretation", "Infection management")
 
 Transcript:
 ${transcript}
@@ -64,7 +77,6 @@ Return ONLY JSON in this format:
     "summary": "",
     "reason": ""
   },
-
   "strengthsOverall": [],
   "weaknessesOverall": [],
   "improvementPlan": []
@@ -72,35 +84,22 @@ Return ONLY JSON in this format:
 `;
 
   try {
-
     const result = await geminiModel.generateContent(prompt);
+    const rawText = result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    let rawText = null;
-    if (
-      result.response &&
-      result.response.candidates &&
-      result.response.candidates[0] &&
-      result.response.candidates[0].content &&
-      result.response.candidates[0].content.parts &&
-      result.response.candidates[0].content.parts[0] &&
-      typeof result.response.candidates[0].content.parts[0].text === 'string'
-    ) {
-      rawText = result.response.candidates[0].content.parts[0].text;
-    } else {
+    if (typeof rawText !== "string") {
       throw new Error("Unexpected Gemini response structure");
     }
 
-    const raw = rawText
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
+    const evaluation = JSON.parse(
+      rawText.replace(/```json/g, "").replace(/```/g, "").trim()
+    );
 
-    const evaluation = JSON.parse(raw);
-
-    return NextResponse.json(evaluation);
-
+    return NextResponse.json({
+      caseTitle: vivaCase.case.title,
+      ...evaluation,
+    });
   } catch (err) {
-
     console.error("Score generation failed:", err);
 
     return NextResponse.json(

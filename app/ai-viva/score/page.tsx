@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import toast from "react-hot-toast";
-import { vivaContext } from "@/ai-viva-data/vivaContext";
 
 interface DomainReport {
   name: string;
@@ -37,14 +36,6 @@ interface Report {
 export default function ReviewPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [report, setReport] = useState<Report | null>(null);
-  const [candidate, setCandidate] = useState({ name: "", email: "", conversation: [], report: null });
-
-  useEffect(() => {
-    const stored = localStorage.getItem("candidateInfo");
-    if (stored) {
-      setCandidate(JSON.parse(stored));
-    }
-  }, []);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("viva-final-score");
@@ -53,6 +44,8 @@ export default function ReviewPage() {
     async function processAndSend() {
       try {
         const evalObj = JSON.parse(raw);
+        const storedCandidate = localStorage.getItem("candidateInfo");
+        const parsedCandidate = storedCandidate ? JSON.parse(storedCandidate) : null;
 
         const domainKeys = [
           "basic_knowledge",
@@ -79,7 +72,11 @@ export default function ReviewPage() {
         );
 
         const finalReport = {
-          caseTitle: vivaContext.case.title,
+          caseTitle:
+            evalObj.caseTitle ||
+            parsedCandidate?.selectedCaseTitle ||
+            parsedCandidate?.selectedCase?.case?.title ||
+            "AI Viva Case",
           overallScore: overall,
           strengthsOverall: evalObj.strengthsOverall || [],
           weaknessesOverall: evalObj.weaknessesOverall || [],
@@ -89,13 +86,12 @@ export default function ReviewPage() {
 
         setReport(finalReport);
 
-        const stored = localStorage.getItem("candidateInfo");
-        if (!stored) {
+        if (!storedCandidate) {
           toast.error("Candidate info missing");
           return;
         }
 
-        const parsed = JSON.parse(stored);
+        const parsed = JSON.parse(storedCandidate);
         parsed.report = finalReport;
 
         localStorage.setItem("candidateInfo", JSON.stringify(parsed));

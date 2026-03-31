@@ -5,7 +5,7 @@ export const vivaContext = {
     id: "case-hematuria-001",
     title: "Painless Hematuria Evaluation",
     level: "Intermediate",
-    stem: "A 56 year gentleman referred to one stop Hematuria clinic for intermittent VH for last 1 month.",
+    stem: "A 66 year gentleman referred to one stop Hematuria clinic for intermittent VH for last 1 month.",
     objectives: [
       "Formulate evaluation plan for painless hematuria",
       "Select and prioritise appropriate investigations",

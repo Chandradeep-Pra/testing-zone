@@ -108,10 +108,10 @@ export default function VivaIntroPage() {
             <Button
               size="lg"
               className="w-full gap-2 bg-emerald-600 hover:bg-emerald-500 text-white"
-              onClick={() => router.push("/ai-viva/session")}
+              onClick={() => router.push("/ai-viva/cases")}
             >
               <PlayCircle size={18} />
-              Start Viva
+              Browse Cases
             </Button>
           </CardFooter>
         </Card>

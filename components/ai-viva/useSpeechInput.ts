@@ -139,7 +139,6 @@ export function useSpeechInput(onInterim, onFinal) {
   const sourceRef = useRef(null);
 
   async function start() {
-
     console.log("🎤 Starting speech input");
 
     /* -------------------------

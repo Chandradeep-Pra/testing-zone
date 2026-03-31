@@ -1,49 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { geminiModel } from "@/lib/gemni";
-import { vivaContext } from "@/ai-viva-data/vivaContext";
-import { link } from "fs";
+import { getDefaultVivaCase, normalizeVivaCase, type VivaCaseRecord } from "@/lib/viva-case";
 
-
-/* -------------------------
-   Exhibit Logic
-------------------------- */
+type FollowupRequest = {
+  previousQA: Array<{ question: string; answer: string }>;
+  exit?: boolean;
+  shownExhibitIds?: string[];
+  vivaCase?: VivaCaseRecord;
+};
 
 type ExhibitSelection = {
   link: string;
   file: string;
+  url?: string;
   description: string;
   id: string;
 } | null;
 
-function getExhibit(previousQA: any[], shownExhibitIds: string[] = []): ExhibitSelection {
-  if (!vivaContext.exhibits || vivaContext.exhibits.length === 0) {
+function getExhibit(vivaCase: VivaCaseRecord, shownExhibitIds: string[] = []): ExhibitSelection {
+  if (!vivaCase.exhibits.length) {
     return null;
   }
 
-  // Convert shown IDs to a Set for faster lookup
-  const shownSet = new Set(shownExhibitIds.map(id => id.toLowerCase()));
-
-  // Find the first exhibit that hasn't been shown yet
-  const nextExhibit = vivaContext.exhibits.find(
+  const shownSet = new Set(shownExhibitIds.map((id) => id.toLowerCase()));
+  const nextExhibit = vivaCase.exhibits.find(
     (exhibit) => !shownSet.has(exhibit.id.toLowerCase())
   );
 
-  if (nextExhibit) {
-    return {
-      link: nextExhibit.label,
-      file: nextExhibit.file,
-      description: nextExhibit.description,
-      id: nextExhibit.id,
-    };
+  if (!nextExhibit) {
+    return null;
   }
 
-  // If all exhibits have been shown, return null (never show same image twice)
-  return null;
+  return {
+    link: nextExhibit.label,
+    file: nextExhibit.file || "",
+    url: nextExhibit.url,
+    description: nextExhibit.description,
+    id: nextExhibit.id,
+  };
 }
-
-/* -------------------------
-   Gemini Response Cleaner
-------------------------- */
 
 function cleanResponse(text: string) {
   if (!text) return "Please continue.";
@@ -54,20 +50,31 @@ function cleanResponse(text: string) {
     .trim();
 }
 
-/* -------------------------
-   Main Handler
-------------------------- */
+function getImageLink(exhibit: ExhibitSelection) {
+  if (!exhibit) {
+    return null;
+  }
+
+  if (exhibit.url) {
+    return exhibit.url;
+  }
+
+  return exhibit.file ? `/exhibits/${exhibit.file}` : null;
+}
 
 export async function POST(req: NextRequest) {
-  const { previousQA, exit, shownExhibitIds = [] } = await req.json();
+  const {
+    previousQA,
+    exit,
+    shownExhibitIds = [],
+    vivaCase: rawVivaCase,
+  } = (await req.json()) as FollowupRequest;
+
+  const vivaCase = rawVivaCase ? normalizeVivaCase(rawVivaCase) : getDefaultVivaCase();
 
   if (!Array.isArray(previousQA)) {
     return NextResponse.json({ error: "Invalid input." }, { status: 400 });
   }
-
-  /* -------------------------
-     Exit Mode (Evaluation)
-  ------------------------- */
 
   if (exit) {
     const combinedQA = previousQA
@@ -76,6 +83,9 @@ export async function POST(req: NextRequest) {
 
     const prompt = `
 You are an FRCS examiner.
+
+Case Title: ${vivaCase.case.title}
+Case Stem: ${vivaCase.case.stem}
 
 Evaluate the candidate across:
 
@@ -91,19 +101,9 @@ Return JSON only.
 `;
 
     const result = await geminiModel.generateContent(prompt);
+    const rawText = result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    let rawText = null;
-    if (
-      result.response &&
-      result.response.candidates &&
-      result.response.candidates[0] &&
-      result.response.candidates[0].content &&
-      result.response.candidates[0].content.parts &&
-      result.response.candidates[0].content.parts[0] &&
-      typeof result.response.candidates[0].content.parts[0].text === 'string'
-    ) {
-      rawText = result.response.candidates[0].content.parts[0].text;
-    } else {
+    if (typeof rawText !== "string") {
       throw new Error("Unexpected Gemini response structure");
     }
 
@@ -117,73 +117,49 @@ Return JSON only.
     }
   }
 
-  /* -------------------------
-     First Question
-  ------------------------- */
-
   if (previousQA.length === 0) {
-    const question = `${vivaContext.case.stem} How would you evaluate this patient?`;
-
     return NextResponse.json({
-      question,
+      question: `${vivaCase.case.stem} How would you evaluate this patient?`,
       imageUsed: false,
       imageLink: null,
       imageDescription: null,
     });
   }
 
-  /* -------------------------
-     Viva Intelligence
-  ------------------------- */
-
-  const exhibit = getExhibit(previousQA, shownExhibitIds);
+  const exhibit = getExhibit(vivaCase, shownExhibitIds);
 
   const prompt = `
-You are a FRCS Urology viva examiner tasked with generation of a follow up question. 
+You are a FRCS Urology viva examiner tasked with generation of a follow up question.
 This is previous QA which has been asked to the student: ${JSON.stringify(previousQA)}
 
+Case title: ${vivaCase.case.title}
+Case stem: ${vivaCase.case.stem}
+Case objectives: ${vivaCase.case.objectives.join("; ")}
+Must mention: ${vivaCase.marking_criteria.must_mention.join("; ")}
+Critical fail: ${vivaCase.marking_criteria.critical_fail.join("; ")}
+
 Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
-Make sure we stick to case of question while we generate a follow up questions which is -> ${vivaContext.case.stem}
 
-${exhibit ? `There are few image also available based on the study
-Image Label: ${exhibit.link}
-Image Description: ${exhibit.description}
-The image description is added in the database so that you can generate a follow up question based on it, 
-but dont specify the description in your question, generate the follow up related to the image only if you feel 
-the  candidate response is going along the similar lines
-
-` : ""}
-
-
+${exhibit ? `There is an exhibit available for this case.
+Image label: ${exhibit.link}
+Image description: ${exhibit.description}
+Use it only if it naturally advances the viva.` : ""}
 `;
 
   try {
     const result = await geminiModel.generateContent(prompt);
-    console.log("Passed Prompt :", prompt);
+    const rawText = result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    let rawText = null;
-    if (
-      result.response &&
-      result.response.candidates &&
-      result.response.candidates[0] &&
-      result.response.candidates[0].content &&
-      result.response.candidates[0].content.parts &&
-      result.response.candidates[0].content.parts[0] &&
-      typeof result.response.candidates[0].content.parts[0].text === 'string'
-    ) {
-      rawText = result.response.candidates[0].content.parts[0].text;
-    } else {
+    if (typeof rawText !== "string") {
       throw new Error("Unexpected Gemini response structure");
     }
 
-    const question = cleanResponse(rawText);
-
     return NextResponse.json({
-      question,
-      imageUsed: !!exhibit,
-      imageLink: exhibit ? `/exhibits/${exhibit.file}` : null,
-      imageDescription: exhibit ? exhibit.description : null,
-      imageId: exhibit ? exhibit.id : null,
+      question: cleanResponse(rawText),
+      imageUsed: Boolean(exhibit),
+      imageLink: getImageLink(exhibit),
+      imageDescription: exhibit?.description || null,
+      imageId: exhibit?.id || null,
     });
   } catch (error) {
     console.error("Viva generation error:", error);

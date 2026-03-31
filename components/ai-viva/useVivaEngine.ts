@@ -3,6 +3,8 @@
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
 
+import type { VivaCaseRecord } from "@/lib/viva-case";
+
 type QA = { question: string; answer: string };
 
 export type VivaApiResponse = {
@@ -11,11 +13,11 @@ export type VivaApiResponse = {
   imageLink?: string | null;
   imageDescription?: string | null;
   imageId?: string | null;
-  evaluation?: any;
+  evaluation?: unknown;
   exit?: boolean;
 };
 
-export function useVivaEngine() {
+export function useVivaEngine(vivaCase: VivaCaseRecord) {
   const previousQARef = useRef<QA[]>([]);
   const shownExhibitIdsRef = useRef<Set<string>>(new Set());
   const router = useRouter();
@@ -35,6 +37,7 @@ export function useVivaEngine() {
         body: JSON.stringify({
           previousQA: history,
           shownExhibitIds: Array.from(shownExhibitIdsRef.current),
+          vivaCase,
           exit,
         }),
       });
@@ -80,6 +83,7 @@ export function useVivaEngine() {
         },
         body: JSON.stringify({
           previousQA: history,
+          vivaCase,
         }),
       });
 
@@ -88,6 +92,10 @@ export function useVivaEngine() {
       }
 
       const data = await res.json();
+
+      if (!data.caseTitle) {
+        data.caseTitle = vivaCase.case.title;
+      }
 
       // store for ReviewPage
       sessionStorage.setItem(

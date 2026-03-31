@@ -69,7 +69,6 @@
 import { useRef, useState } from "react";
 
 export function useSpeechOutput() {
-
 const [amplitude, setAmplitude] = useState(0);
 
 const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -156,5 +155,4 @@ try {
 }
 
 return { speak, amplitude };
-
 }
