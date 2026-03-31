@@ -17,6 +17,8 @@ import { useCountdown } from "./useCountdown";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 
 export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) {
+  const warmupPrompt = "Before we begin, please say your full name and tell me in one short sentence how you are feeling today. This is only an audio check and will not be scored.";
+  const warmupDurationMs = 5000;
   const [candidate, setCandidate] = useState({ name: "", email: "" });
   const { generateScore, next } = useVivaEngine(vivaCase);
   useEffect(() => {
@@ -45,6 +47,8 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
 
   const hasStartedRef = useRef(false);
   const endingRef = useRef(false);
+  const warmupPendingRef = useRef(false);
+  const warmupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [readyVisible, setReadyVisible] = useState(true);
   const [ending, setEnding] = useState(false);
@@ -130,6 +134,11 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
 
       stop();
       setIsListening(false);
+
+      if (warmupPendingRef.current) {
+        return;
+      }
+
       setThinking(true);
 
       fillerTimeoutRef.current = setTimeout(() => {
@@ -267,6 +276,38 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
     }
   }
 
+  function startWarmup() {
+    warmupPendingRef.current = true;
+    setThinking(false);
+
+    if (warmupTimeoutRef.current) {
+      clearTimeout(warmupTimeoutRef.current);
+      warmupTimeoutRef.current = null;
+    }
+
+    speak(warmupPrompt, () => {
+
+      console.log("Warm-up prompt spoken, starting STT warm-up capture...");
+      markSpeechEnded();
+      setIsListening(true);
+      start();
+
+      warmupTimeoutRef.current = setTimeout(() => {
+        warmupPendingRef.current = false;
+        warmupTimeoutRef.current = null;
+        stop();
+        setIsListening(false);
+        setThinking(true);
+
+        speak("Thank you. Audio is ready. Starting the viva now.", async () => {
+          await new Promise((res) => setTimeout(res, 400));
+          startViva();
+        });
+      }, warmupDurationMs);
+
+    });
+  }
+
   async function handleBegin(cameraPref = false) {
 
     if (hasStartedRef.current) return;
@@ -282,11 +323,11 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
       const greeting = `Hello ${candidate.name}, welcome to the Urologics AI Examiner viva. Please wait while we prepare your session.`;
       speak(greeting, async () => {
 
-        console.log('Greeting finished, starting viva...');
+        console.log('Greeting finished, starting audio check...');
 
         await new Promise((res) => setTimeout(res, 2000));
 
-        startViva();
+        startWarmup();
       });
 
     } catch (error) {
@@ -305,6 +346,11 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
     if (ending) return;
 
     setEnding(true);
+
+    if (warmupTimeoutRef.current) {
+      clearTimeout(warmupTimeoutRef.current);
+      warmupTimeoutRef.current = null;
+    }
 
     // Save conversation to localStorage
     const stored = localStorage.getItem("candidateInfo");

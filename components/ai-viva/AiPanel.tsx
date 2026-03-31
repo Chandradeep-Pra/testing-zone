@@ -12,7 +12,7 @@ amplitude?: number;
 
 const fillers = [
 "Hmm... okay.",
-"Alright, that's a good answer.",
+// "Alright, that's a good answer.",
 "Okay... I got that.",
 "Right, I see what you're saying.",
 "Interesting... go on.",
