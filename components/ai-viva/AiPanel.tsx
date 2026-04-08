@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import VivaAvatar from "./VivaAvatar";
 
 type Props = {
 speaking: boolean;
@@ -102,8 +103,12 @@ className={`relative h-full w-full rounded-xl border overflow-hidden bg-slate-95
   {/* CENTER */}
   <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
 
+
+    <div className="absolute inset-0">
+    <VivaAvatar />
+  </div>
     {/* THINKING NEURAL WAVES */}
-    {thinking && (
+    {/* {thinking && (
       <>
         <div className="absolute w-64 h-64 rounded-full border border-yellow-400/20 animate-ai-wave-expand" />
         <div className="absolute w-64 h-64 rounded-full border border-yellow-400/20 animate-ai-wave-expand delay-1000" />
@@ -116,10 +121,10 @@ className={`relative h-full w-full rounded-xl border overflow-hidden bg-slate-95
           <div className="absolute w-2 h-2 bg-yellow-400 rounded-full right-0 top-1/2 -translate-y-1/2" />
         </div>
       </>
-    )}
+    )} */}
 
     {/* AI CORE */}
-    <div
+    {/* <div
       style={{
         transform: `scale(${audioScale})`,
       }}
@@ -136,10 +141,10 @@ className={`relative h-full w-full rounded-xl border overflow-hidden bg-slate-95
       }`}
     >
       AI
-    </div>
+    </div> */}
 
     {/* SPEAKING WAVE */}
-    {speaking && (
+    {/* {speaking && (
       <div className="absolute bottom-32 flex items-end space-x-1">
         {[0,1,2,3,4,5,6].map((i) => {
 
@@ -157,7 +162,7 @@ className={`relative h-full w-full rounded-xl border overflow-hidden bg-slate-95
           );
         })}
       </div>
-    )}
+    )} */}
 
   </div>
 
