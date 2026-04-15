@@ -69,12 +69,19 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
     vivaStarted && !ending
   );
 
-  const fillers = [
-  "Hmm... okay.",
+const fillers = [
+  "Alright, let me consider that.",
+  "Okay, I understand.",
+  "Hmm, let me think about that.",
+  "Got it, one moment.",
   "Right, I see.",
-  "Okay, that's a good answer.",
-  "Got it... just thinking.",
-  "Interesting... one moment.",
+  "Okay, processing your response.",
+  "I understand what you're saying.",
+  "Alright, just a second.",
+  "Let me go through that.",
+  "Okay, thinking it through.",
+  "Right, let me consider your answer.",
+  "Understood, give me a moment.",
 ];
   /* --------------------------------------------------
      AUTO END WHEN 20 SECONDS LEFT
