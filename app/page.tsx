@@ -6,106 +6,125 @@ export default function Home() {
   const router = useRouter();
 
   return (
-    <main className="
-      min-h-screen
-      flex gap-4
-      bg-[color:var(--color-background)] p-4
-    ">
-      <div
-        onClick={() => router.push("/beat-analyzer")}
-        className="
-          w-56 h-56
-          rounded-3xl
-          bg-[color:var(--color-surface)]
-          border border-[color:var(--color-border)]
-          flex flex-col items-center justify-center
-          cursor-pointer
-          transition-all duration-300 ease-out
-          hover:scale-[1.02]
-          hover:border-[color:var(--color-accent)]
-          hover:shadow-lg
-        "
-      >
-        {/* Icon */}
-        <div className="
-          w-14 h-14
-          rounded-2xl
-          bg-[color:var(--color-accent-soft)]
-          flex items-center justify-center
-          mb-4
-        ">
-          <span className="text-[color:var(--color-accent)] text-2xl">
-            🎵
+    <main className="min-h-screen bg-black text-white">
+
+      {/* HERO */}
+      <section className="px-6 pt-28 pb-20 max-w-6xl mx-auto text-center">
+        <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">
+          Realistic FRCS Viva Simulation
+          <span className="block text-emerald-400 mt-2">
+            Powered by Adaptive AI
           </span>
-        </div>
-
-        
-
-        {/* Title */}
-        <h1 className="text-lg font-semibold">
-          Beat Analyzer
         </h1>
 
-        {/* Subtitle */}
-        <p className="text-sm text-[color:var(--color-muted)] mt-1">
-          Analyze rhythm & counts
+        <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-10">
+          Practice like you're in the real exam. Face a dynamic examiner,
+          interpret clinical scenarios, and receive structured feedback —
+          all in one seamless viva experience.
         </p>
-      </div>
 
-      <div
-        onClick={() => router.push("/ai-viva")}
-        className="
-          w-56 h-56
-          rounded-3xl
-          bg-[color:var(--color-surface)]
-          border border-[color:var(--color-border)]
-          flex flex-col items-center justify-center
-          cursor-pointer
-          transition-all duration-300 ease-out
-          hover:scale-[1.02]
-          hover:border-[color:var(--color-accent)]
-          hover:shadow-lg
-        "
-      >
-        {/* Icon */}
-        <div className="
-          w-14 h-14
-          rounded-2xl
-          bg-[color:var(--color-accent-soft)]
-          flex items-center justify-center
-          mb-4
-        ">
-          <span className="text-[color:var(--color-accent)] text-2xl">
-            🎓
-          </span>
+        <button
+          onClick={() => router.push("/ai-viva/cases")}
+          className="bg-emerald-600 hover:bg-emerald-500 px-8 py-4 rounded-xl text-lg font-semibold transition shadow-lg hover:shadow-xl"
+        >
+          Start Viva Practice
+        </button>
+      </section>
+
+      {/* BENTO GRID */}
+      <section className="px-6 pb-24 max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-5">
+
+        {/* BIG CARD */}
+        <div className="md:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h2 className="text-2xl font-semibold mb-3">
+            What This Platform Does
+          </h2>
+          <p className="text-gray-400 text-sm leading-relaxed">
+            This system simulates a real FRCS-style viva examination where an AI examiner
+            interacts with you dynamically. Questions evolve based on your answers,
+            covering clinical reasoning, investigations, interpretation, and management.
+            The goal is to replicate real exam pressure and thinking patterns.
+          </p>
         </div>
 
-        
+        {/* SIDE CARD */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 className="font-semibold mb-2">🎯 Outcome Focused</h3>
+          <p className="text-gray-400 text-sm">
+            Not just practice — targeted questioning ensures all key objectives are covered.
+          </p>
+        </div>
 
-        {/* Title */}
-        <h1 className="text-lg font-semibold">
-          AI Viva
-        </h1>
+        {/* HOW IT WORKS */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 className="font-semibold mb-3">⚙️ How It Works</h3>
+          <ul className="text-gray-400 text-sm space-y-2">
+            <li>• Choose a clinical case</li>
+            <li>• Answer adaptive viva questions</li>
+            <li>• Interpret images when required</li>
+            <li>• Progress through exam stages</li>
+          </ul>
+        </div>
 
-        {/* Subtitle */}
-        <p className="text-sm text-[color:var(--color-muted)] mt-1">
-          Take my viva
+        {/* VIVA RULES */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 className="font-semibold mb-3">📋 Viva Rules</h3>
+          <ul className="text-gray-400 text-sm space-y-2">
+            <li>• Single question at a time</li>
+            <li>• Progressive difficulty</li>
+            <li>• No hints from examiner</li>
+            <li>• Real exam tone & structure</li>
+          </ul>
+        </div>
+
+        {/* PROFESSIONALISM */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 className="font-semibold mb-3">🩺 Professional Standards</h3>
+          <p className="text-gray-400 text-sm">
+            Designed to assess not only knowledge but also clinical judgement,
+            structured thinking, and professional communication.
+          </p>
+        </div>
+
+        {/* IMAGE + INTERPRETATION */}
+        <div className="md:col-span-2 bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 className="font-semibold mb-3">🖼️ Image-Based Discussion</h3>
+          <p className="text-gray-400 text-sm">
+            When appropriate, you’ll be presented with clinical images such as CT scans
+            or cystoscopy findings. You are expected to interpret them — just like in
+            the real viva. The system never reveals answers upfront.
+          </p>
+        </div>
+
+        {/* REPORT */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+          <h3 className="font-semibold mb-3">📧 Detailed Report</h3>
+          <p className="text-gray-400 text-sm">
+            After completion, a structured performance report is generated and
+            sent to your email, highlighting strengths and areas to improve.
+          </p>
+        </div>
+
+      </section>
+
+      {/* FINAL CTA */}
+      <section className="px-6 pb-28 text-center">
+        <h2 className="text-3xl font-bold mb-6">
+          Experience a Real Viva — Before the Real One
+        </h2>
+
+        <p className="text-gray-400 mb-8">
+          Prepare with confidence through realistic, adaptive practice.
         </p>
-      </div>
-      {/* <div className="w-full h-56
-          rounded-3xl
-          bg-[color:var(--color-surface)]
-          border border-[color:var(--color-border)]
-          flex flex-col items-center justify-center
-          cursor-pointer
-          transition-all duration-300 ease-out
-          hover:scale-[1.02]
-          hover:border-[color:var(--color-accent)]
-          hover:shadow-lg"
-          onClick={() => router.push("/udemy")}
-          >
-        <span className="text-2xl text-white">Component Based Patter</span>
-      </div> */}
+
+        <button
+          onClick={() => router.push("/ai-viva/cases")}
+          className="bg-emerald-600 hover:bg-emerald-500 px-8 py-4 rounded-xl text-lg font-semibold transition shadow-lg hover:shadow-xl"
+        >
+          Go to Cases
+        </button>
+      </section>
+
     </main>
   );
 }

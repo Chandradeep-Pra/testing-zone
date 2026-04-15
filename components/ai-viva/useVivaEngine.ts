@@ -42,6 +42,8 @@ export function useVivaEngine(vivaCase: VivaCaseRecord) {
         }),
       });
 
+      console.log("Api response to be spoken by AI : ")
+
       if (!res.ok) {
         throw new Error("API error");
       }

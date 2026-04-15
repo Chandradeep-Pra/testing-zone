@@ -30,6 +30,7 @@ interface VivaCase {
     critical_fail: string[];
   };
   attemptsCount?: number;
+  allowedUsers: string[];
 }
 
 const VivaCasesPage: React.FC = () => {
@@ -163,6 +164,8 @@ const VivaCasesPage: React.FC = () => {
                       <Button
                         className="w-full gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-semibold py-2 rounded-xl"
                         onClick={e => {
+                          console.log(localStorage.getItem("candidateInfo"))
+                          localStorage.removeItem("candidateInfo")
                           e.stopPropagation();
                           router.push(`/ai-viva/session/${viva.id}`);
                         }}

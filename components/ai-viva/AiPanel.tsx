@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import SiriWaveFrom from "./SiriWaveForm";
+import SiriWaveComponent from "./SiriWaveForm";
 
 type Props = {
 speaking: boolean;
@@ -106,64 +108,27 @@ className={`relative h-full w-full rounded-xl border overflow-hidden bg-slate-95
   {/* CENTER */}
   <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
 
-    {/* THINKING NEURAL WAVES */}
-    {thinking && (
-      <>
-        <div className="absolute w-64 h-64 rounded-full border border-yellow-400/20 animate-ai-wave-expand" />
-        <div className="absolute w-64 h-64 rounded-full border border-yellow-400/20 animate-ai-wave-expand delay-1000" />
-        <div className="absolute w-64 h-64 rounded-full border border-yellow-400/20 animate-ai-wave-expand delay-2000" />
+  {/* SIRI WAVE FOR ALL STATES */}
+  <div className="flex items-center justify-center scale-110">
 
-        <div className="absolute w-48 h-48 animate-ai-orbit-slow">
-          <div className="absolute w-2 h-2 bg-yellow-400 rounded-full top-0 left-1/2 -translate-x-1/2" />
-          <div className="absolute w-2 h-2 bg-yellow-400 rounded-full bottom-0 left-1/2 -translate-x-1/2" />
-          <div className="absolute w-2 h-2 bg-yellow-400 rounded-full left-0 top-1/2 -translate-y-1/2" />
-          <div className="absolute w-2 h-2 bg-yellow-400 rounded-full right-0 top-1/2 -translate-y-1/2" />
-        </div>
-      </>
+    {/* THINKING → slow + subtle */}
+    {thinking && (
+      <SiriWaveComponent amplitude={0.2} speed={0.02} />
     )}
 
-    {/* AI CORE */}
-    <div
-      style={{
-        transform: `scale(${audioScale})`,
-      }}
-      className={`relative w-28 h-28 rounded-full flex items-center justify-center
-      text-2xl font-semibold
-      bg-gradient-to-br from-slate-700 to-slate-900
-      transition-all duration-150
-      ${
-        speaking
-          ? "shadow-[0_0_40px_rgba(16,185,129,0.6)]"
-          : thinking
-          ? "shadow-[0_0_35px_rgba(234,179,8,0.4)]"
-          : "animate-ai-breath"
-      }`}
-    >
-      AI
-    </div>
-
-    {/* SPEAKING WAVE */}
+    {/* SPEAKING → reactive */}
     {speaking && (
-      <div className="absolute bottom-32 flex items-end space-x-1">
-        {[0,1,2,3,4,5,6].map((i) => {
+      <SiriWaveComponent amplitude={amplitude} speed={0.08} />
+    )}
 
-          const height =
-            10 +
-            amplitude * 45 +
-            Math.random() * 6;
-
-          return (
-            <div
-              key={i}
-              className="w-2 bg-emerald-400 rounded transition-all duration-75"
-              style={{ height }}
-            />
-          );
-        })}
-      </div>
+    {/* IDLE / LISTENING → soft breathing */}
+    {!thinking && !speaking && (
+      <SiriWaveComponent amplitude={0.1} speed={0.03} />
     )}
 
   </div>
+
+</div>
 
   {/* Exhibit */}
   {activeExhibit && (

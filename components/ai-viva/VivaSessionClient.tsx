@@ -6,6 +6,7 @@ import VivaVoiceAi from "@/components/ai-viva/VivaVoiceAi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { VivaCaseRecord } from "@/lib/viva-case";
+import toast from "react-hot-toast";
 
 type CandidateInfo = {
   name: string;
@@ -62,26 +63,56 @@ export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseReco
   const [candidate, setCandidate] = useState<CandidateInfo>(initialState.candidate);
   const [submitted, setSubmitted] = useState(initialState.submitted);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (!candidate.name.trim() || !candidate.email.trim()) {
-      return;
-    }
+  const name = candidate.name.trim();
+  const email = candidate.email.trim().toLowerCase();
 
-    const storedValue: StoredCandidateInfo = {
-      name: candidate.name.trim(),
-      email: candidate.email.trim(),
-      selectedCaseId: vivaCase.id,
-      selectedCaseTitle: vivaCase.case.title,
-      selectedCase: vivaCase,
-      conversation: [],
-      report: null,
-    };
+  if (!name || !email) {
+    toast.error("Please fill all fields");
+    return;
+  }
 
-    window.localStorage.setItem("candidateInfo", JSON.stringify(storedValue));
-    setSubmitted(true);
-  };
+  // 🔄 LOADING TOAST (promise style)
+  const checkAccess = new Promise<boolean>((resolve) => {
+    setTimeout(() => {
+      const isAllowed =
+        Array.isArray(vivaCase.allowedUser) &&
+        vivaCase.allowedUser.includes(email);
+        console.log("Current Viva Case is :", vivaCase)
+
+      resolve(isAllowed);
+    }, 3000); // ⏳ 3 sec delay
+  });
+
+  toast.promise(checkAccess, {
+    loading: "Checking access...",
+    success: (isAllowed) => {
+      if (!isAllowed) {
+        throw new Error("Not allowed");
+      }
+
+      // ✅ STORE DATA
+      const storedValue: StoredCandidateInfo = {
+        name,
+        email,
+        selectedCaseId: vivaCase.id,
+        selectedCaseTitle: vivaCase.case.title,
+        selectedCase: vivaCase,
+        conversation: [],
+        report: null,
+      };
+
+      window.localStorage.setItem("candidateInfo", JSON.stringify(storedValue));
+
+      setSubmitted(true);
+
+      return "Access granted! Starting viva 🚀";
+    },
+    error: "You are not allowed to access this viva ❌",
+  });
+};
 
   if (submitted) {
     return (

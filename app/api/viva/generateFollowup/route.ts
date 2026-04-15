@@ -126,7 +126,11 @@ Return JSON only.
     });
   }
 
-  const exhibit = getExhibit(vivaCase, shownExhibitIds);
+    const availableExhibits = vivaCase.exhibits.map(e => ({
+    id: e.id,
+    label: e.label,
+    description: e.description
+  }));
 
   const prompt = `
 You are an expert FRCS Urology viva examiner. Your task is to generate a high-quality follow-up question for a candidate based on the previous interaction.
@@ -166,18 +170,47 @@ INSTRUCTIONS
    - The scenario must remain realistic and within the scope of the original case.
 
 5. EXHIBIT USAGE (STRICT RULES):
-   ${exhibit ? `
-   - An exhibit is available:
-     • Label: ${exhibit.link}
-     • Description: ${exhibit.description}
-   - ONLY reference or use the exhibit IF the follow-up question explicitly requires image interpretation.
-   - Do NOT mention the exhibit unless it is clearly necessary and directly relevant.
-   ` : `- No exhibit should be referenced.`}
+
+Available exhibits:
+${JSON.stringify(availableExhibits, null, 2)}
+
+CRITICAL RULES (MUST FOLLOW):
+
+- You may choose to use an exhibit ONLY if clinically necessary.
+
+- If using an exhibit:
+  • Set "imageUsed": true
+  • Provide "exhibitId"
+  • The question MUST ask the candidate to interpret the image
+
+- ABSOLUTE PROHIBITION:
+  ❌ DO NOT reveal, describe, hint, or summarise ANY findings from the exhibit
+  ❌ DO NOT use the exhibit description in the question
+  ❌ DO NOT include diagnoses, measurements, or locations from the exhibit
+
+- REQUIRED STYLE when image is used:
+  ✔ Ask open-ended interpretation questions such as:
+    • "What do you see in this image?"
+    • "Please describe the findings."
+    • "How would you interpret this imaging?"
+    • "What are the key abnormalities?"
+
+- The examiner DOES NOT know the answer in the question.
+  The candidate must derive everything from the image.
+
+- If not using an exhibit:
+  • Set "imageUsed": false
+  • "exhibitId": null
 
 6. OUTPUT FORMAT:
    - Return ONLY the follow-up question.
    - Do NOT include explanations, answers, or commentary.
    - Keep wording concise, natural, and examiner-like.
+   {
+        "question": "string",
+        "imageUsed": true/false,
+        "exhibitId": "string | null"
+      }
 
 ----------------------
 GOAL
@@ -199,13 +232,31 @@ console.log(prompt)
       throw new Error("Unexpected Gemini response structure");
     }
 
-    return NextResponse.json({
-      question: cleanResponse(rawText),
-      imageUsed: Boolean(exhibit),
-      imageLink: getImageLink(exhibit),
-      imageDescription: exhibit?.description || null,
-      imageId: exhibit?.id || null,
-    });
+    const parsed = JSON.parse(cleanResponse(rawText));
+
+    let selectedExhibit = null;
+
+if (parsed.imageUsed && parsed.exhibitId) {
+  selectedExhibit = vivaCase.exhibits.find(
+    e => e.id.toLowerCase() === parsed.exhibitId.toLowerCase()
+  );
+}
+
+return NextResponse.json({
+  question: parsed.question,
+  imageUsed: Boolean(selectedExhibit),
+  imageLink: getImageLink(selectedExhibit),
+  imageDescription: selectedExhibit?.description || null,
+  imageId: selectedExhibit?.id || null,
+});
+
+    // return NextResponse.json({
+    //   question: cleanResponse(rawText),
+    //   imageUsed: Boolean(exhibit),
+    //   imageLink: getImageLink(exhibit),
+    //   imageDescription: exhibit?.description || null,
+    //   imageId: exhibit?.id || null,
+    // });
   } catch (error) {
     console.error("Viva generation error:", error);
 

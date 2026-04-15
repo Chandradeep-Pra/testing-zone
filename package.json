@@ -31,6 +31,7 @@
     "react-dom": "19.2.3",
     "react-hook-speech-to-text": "^0.8.0",
     "react-hot-toast": "^2.6.0",
+    "siriwave": "^2.4.0",
     "tailwind-merge": "^3.5.0",
     "ws": "^8.19.0"
   },

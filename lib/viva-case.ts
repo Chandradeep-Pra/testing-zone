@@ -42,6 +42,7 @@ export type VivaCaseRecord = {
   };
   attemptsCount?: number;
   attempts?: VivaCaseAttempt[];
+  allowedUser?: string[];
 };
 
 function toSlug(value: string) {
@@ -119,6 +120,7 @@ export function normalizeVivaCase(payload: any): VivaCaseRecord {
     },
     attemptsCount: source.attemptsCount,
     attempts: source.attempts,
+    allowedUser: source.allowedUser,
   };
 }
 

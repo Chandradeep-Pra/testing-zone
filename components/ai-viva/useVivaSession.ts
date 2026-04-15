@@ -103,6 +103,8 @@ export function useVivaSession() {
   const [exhibit, setExhibit] = useState<VivaExhibit>(null);
 
   function applyApiResponse(data: VivaApiResponse) {
+    console.log("To use image:", data.imageUsed)
+    // console.log("To use exhibit:", data.exhibit)
     if (!data?.question) return;
 
     setTranscript(data.question);
