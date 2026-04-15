@@ -473,46 +473,14 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
 
   </div>
 
-  {showChat && (
-    <>
-      {/* ================================
-          CHAT HISTORY PANEL (25%)
-      ================================= */}
-      {/* <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden"> */}
-      <div className="bg-slate-950 border border-slate-800 rounded-lg md:rounded-xl flex flex-col overflow-hidden min-h-0 max-h-[40vh] md:max-h-none md:flex-1">
-
-        {/* Header */}
-        <div className="px-3 md:px-4 py-2 md:py-3 border-b border-slate-800 text-xs md:text-sm text-slate-400 flex items-center justify-between flex-shrink-0">
-          <span>Conversation History</span>
-          <button
-            onClick={() => setShowChat(false)}
-            className="text-xs text-slate-400 hover:text-slate-200 md:hidden"
-          >
-            Close
-          </button>
-        </div>
-
-        {/* Messages */}
-        <ChatTimeline messages={messages} />
-
-      </div>
-    </>
-  )}
+ 
 
 </div>
 
       {/* BOTTOM BAR - MOBILE RESPONSIVE */}
       <div className="h-12 sm:h-14 md:h-16 flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:gap-6 px-2 sm:px-3 md:px-4 py-1 sm:py-2 bg-slate-900/60 backdrop-blur-xl border-t border-slate-800 overflow-x-auto">
 
-        <button
-          onClick={() => setShowChat((v) => !v)}
-          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
-          title="Toggle history"
-        >
-          <MessageSquare size={14} className="sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">{showChat ? "Hide" : "Show"} History</span>
-          <span className="inline sm:hidden">{showChat ? "Hide" : "Show"}</span>
-        </button>
+       
 
         <button
           onClick={() => setCameraOn((v) => !v)}
