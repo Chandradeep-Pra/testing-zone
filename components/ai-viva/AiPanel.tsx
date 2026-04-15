@@ -11,14 +11,18 @@ amplitude?: number;
 };
 
 const fillers = [
-"Hmm... okay.",
-// "Alright, that's a good answer.",
-"Okay... I got that.",
-"Right, I see what you're saying.",
-"Interesting... go on.",
-"Got it... thinking.",
-"Okay... just a moment.",
-"Hmm... let me think.",
+  "Alright, let me consider that.",
+  "Okay, I understand.",
+  "Hmm, let me think about that.",
+  "Got it, one moment.",
+  "Right, I see.",
+  "Okay, processing your response.",
+  "I understand what you're saying.",
+  "Alright, just a second.",
+  "Let me go through that.",
+  "Okay, thinking it through.",
+  "Right, let me consider your answer.",
+  "Understood, give me a moment.",
 ];
 
 export function AiPanel({
