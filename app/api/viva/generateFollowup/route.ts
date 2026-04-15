@@ -129,22 +129,67 @@ Return JSON only.
   const exhibit = getExhibit(vivaCase, shownExhibitIds);
 
   const prompt = `
-You are a FRCS Urology viva examiner tasked with generation of a follow up question.
-This is previous QA which has been asked to the student: ${JSON.stringify(previousQA)}
+You are an expert FRCS Urology viva examiner. Your task is to generate a high-quality follow-up question for a candidate based on the previous interaction.
 
-Case title: ${vivaCase.case.title}
-Case stem: ${vivaCase.case.stem}
-Case objectives: ${vivaCase.case.objectives.join("; ")}
-Must mention: ${vivaCase.marking_criteria.must_mention.join("; ")}
-Critical fail: ${vivaCase.marking_criteria.critical_fail.join("; ")}
+----------------------
+PREVIOUS INTERACTION
+----------------------
+${JSON.stringify(previousQA)}
 
-Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
+----------------------
+CASE DETAILS
+----------------------
+Case Title: ${vivaCase.case.title}
+Case Stem: ${vivaCase.case.stem}
 
-${exhibit ? `There is an exhibit available for this case.
-Image label: ${exhibit.link}
-Image description: ${exhibit.description}
-Use it only if it naturally advances the viva.` : ""}
+Case Objectives:
+${vivaCase.case.objectives.join("; ")}
+
+----------------------
+INSTRUCTIONS
+----------------------
+1. Generate ONE focused follow-up viva question.
+
+2. The question MUST:
+   - Be clinically relevant and aligned with the case title, stem, and objectives.
+   - Progress naturally from the previous question and answer.
+   - Test deeper reasoning (not simple recall).
+   - Be at FRCS level difficulty.
+
+3. OBJECTIVE COVERAGE (MANDATORY):
+   - Ensure that ALL case objectives are tested across the conversation.
+   - If any objective has not yet been addressed in the previous QA, PRIORITIZE generating a question that assesses it.
+   - You may directly ask about an objective at any point if it has not yet been covered.
+
+4. CLINICAL SCENARIO GENERATION:
+   - You MAY introduce a new but relevant clinical situation related to the case to advance the viva.
+   - The scenario must remain realistic and within the scope of the original case.
+
+5. EXHIBIT USAGE (STRICT RULES):
+   ${exhibit ? `
+   - An exhibit is available:
+     • Label: ${exhibit.link}
+     • Description: ${exhibit.description}
+   - ONLY reference or use the exhibit IF the follow-up question explicitly requires image interpretation.
+   - Do NOT mention the exhibit unless it is clearly necessary and directly relevant.
+   ` : `- No exhibit should be referenced.`}
+
+6. OUTPUT FORMAT:
+   - Return ONLY the follow-up question.
+   - Do NOT include explanations, answers, or commentary.
+   - Keep wording concise, natural, and examiner-like.
+
+----------------------
+GOAL
+----------------------
+The goal is to simulate a real FRCS viva where the examiner:
+- Adapts dynamically to candidate responses
+- Covers all key objectives
+- Escalates complexity appropriately
+- Introduces realistic variations when needed
 `;
+
+console.log(prompt)
 
   try {
     const result = await geminiModel.generateContent(prompt);
