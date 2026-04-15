@@ -16,7 +16,7 @@ if (!projectId) {
 
 const vertexAI = new VertexAI({
   project: projectId,
-  location: "us-central1",
+  location: "asia-south1",
   googleAuthOptions: {
     credentials: {
       client_email: creds.client_email,
