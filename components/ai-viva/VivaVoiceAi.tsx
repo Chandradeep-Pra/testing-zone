@@ -242,6 +242,7 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
 
   async function startViva() {
     try {
+      // setVivaStarted(true)
       const data = await next("");
       console.log('Next data received:', data);
 
@@ -256,7 +257,7 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
       applyApiResponse(data);
 
       speak(data.question, () => {
-
+        setVivaStarted(true)
         console.log('First question spoken, setting up listening...');
         markSpeechEnded();
 
@@ -323,7 +324,7 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
 
     setCameraEnabled(cameraPref);
     setReadyVisible(false);
-    setVivaStarted(true);
+    // setVivaStarted(true);
     setThinking(true);
 
     try {
