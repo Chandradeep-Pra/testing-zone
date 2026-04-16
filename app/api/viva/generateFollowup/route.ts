@@ -144,6 +144,16 @@ If a candidate is not sure of a particular topic, we can skip that question and 
 
 Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
 Make sure we stick to case of question while we generate a follow up questions which is -> ${vivaCase.case.stem}
+
+We have few exhibits related to the case present ${vivaCase.case.exhibits} , if the question asked seems to be from the exhibits description mentioned we can
+show the exhibit and sent the image used as true. For image question just ask to explain the findings of image which you can verify by description.
+(Deacription should not be visible or mentioned to user it is for you to verify)
+
+Output Format Should be.
+
+  question,
+  imageUsed: true/false,
+  imageLink: applicable link/null
 `;
 
 console.log(prompt)
