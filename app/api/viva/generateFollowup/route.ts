@@ -216,36 +216,19 @@ type FollowupRequest = {
   vivaCase?: VivaCaseRecord;
 };
 
-type ExhibitSelection = {
-  link: string;
-  file: string;
-  url?: string;
-  description: string;
-  id: string;
-} | null;
-
-function getExhibit(vivaCase: VivaCaseRecord, shownExhibitIds: string[] = []): ExhibitSelection {
-  if (!vivaCase.exhibits.length) {
-    return null;
-  }
-
-  const shownSet = new Set(shownExhibitIds.map((id) => id.toLowerCase()));
-  const nextExhibit = vivaCase.exhibits.find(
-    (exhibit) => !shownSet.has(exhibit.id.toLowerCase())
-  );
-
-  if (!nextExhibit) {
-    return null;
-  }
-
-  return {
-    link: nextExhibit.label,
-    file: nextExhibit.file || "",
-    url: nextExhibit.url,
-    description: nextExhibit.description,
-    id: nextExhibit.id,
-  };
-}
+const FOLLOWUP_SYSTEM_INSTRUCTION = `
+You are an FRCS viva examiner.
+Ask exactly one short, focused follow-up question at a time.
+Stay within the provided case context.
+Use only the recent conversation and available exhibits provided in the user message.
+If the candidate seems unsure, move to the next clinically relevant topic.
+If an exhibit is needed, choose one available exhibit and return its exact link.
+Never greet, explain, teach, or add extra commentary.
+Return only:
+question: <question>
+imageUsed: true or false
+imageLink: <url or /path or null>
+`.trim();
 
 function cleanResponse(text: string) {
   if (!text) return "Please continue.";
@@ -256,16 +239,73 @@ function cleanResponse(text: string) {
     .trim();
 }
 
-function getImageLink(exhibit: ExhibitSelection) {
-  if (!exhibit) {
+function extractGeminiText(result: any) {
+  const response = result?.response;
+
+  if (!response?.candidates?.length) {
     return null;
   }
 
-  if (exhibit.url) {
-    return exhibit.url;
-  }
+  const text = response.candidates
+    .flatMap((candidate: any) => candidate?.content?.parts || [])
+    .map((part: any) => part?.text)
+    .filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0)
+    .join("\n")
+    .trim();
 
-  return exhibit.file ? `/exhibits/${exhibit.file}` : null;
+  return text || null;
+}
+
+function formatRecentQA(previousQA: Array<{ question: string; answer: string }>) {
+  return previousQA
+    .slice(-2)
+    .map(
+      ({ question, answer }, index) =>
+        `Q${index + 1}: ${question}\nA${index + 1}: ${answer || "[no answer yet]"}`
+    )
+    .join("\n\n");
+}
+
+function formatAvailableExhibits(vivaCase: VivaCaseRecord, shownExhibitIds: string[] = []) {
+  const shownSet = new Set(shownExhibitIds.map((id) => id.toLowerCase()));
+
+  return vivaCase.exhibits
+    .filter((exhibit) => !shownSet.has(exhibit.id.toLowerCase()))
+    .map((exhibit) => {
+      const link = exhibit.url || (exhibit.file ? `/exhibits/${exhibit.file}` : null);
+      return `- ${exhibit.id}: ${exhibit.label}${link ? ` (${link})` : ""}\n  Description: ${exhibit.description}`;
+    })
+    .join("\n");
+}
+
+function buildFollowupUserPrompt({
+  vivaCase,
+  previousQA,
+  shownExhibitIds,
+}: {
+  vivaCase: VivaCaseRecord;
+  previousQA: Array<{ question: string; answer: string }>;
+  shownExhibitIds: string[];
+}) {
+  const recentQA = formatRecentQA(previousQA);
+  const availableExhibits = formatAvailableExhibits(vivaCase, shownExhibitIds);
+
+  return `
+Case title: ${vivaCase.case.title}
+Case stem: ${vivaCase.case.stem}
+
+Recent conversation:
+${recentQA}
+
+Available exhibits:
+${availableExhibits || "- none remaining"}
+
+Output rules:
+- Ask one clinically relevant next question
+- Keep it concise and natural for spoken viva use
+- If no exhibit is needed return imageUsed: false and imageLink: null
+- If an exhibit is needed return imageUsed: true and the exact exhibit link
+`.trim();
 }
 
 export async function POST(req: NextRequest) {
@@ -307,9 +347,10 @@ Return JSON only.
 `;
 
     const result = await geminiModel.generateContent(prompt);
-    const rawText = result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const rawText = extractGeminiText(result);
 
-    if (typeof rawText !== "string") {
+    if (!rawText) {
+      console.error("Unexpected Gemini exit response structure:", JSON.stringify(result?.response));
       throw new Error("Unexpected Gemini response structure");
     }
 
@@ -332,51 +373,38 @@ Return JSON only.
     });
   }
 
-  const prompt = `
-You are an FRCS viva examiner tasked with generating a single, concise question for the candidate. 
-Your task is to generate a follow up question like a viva examiner.
-This is previous QA: ${JSON.stringify(previousQA)}
-
-Begin with basic diagnosis and move to higher levels, you can also make sub clinical cases of your own too.
-
-If a candidate is not sure of a particular topic, we can skip that question and start a new topic.
-
-Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
-Make sure we stick to case of question while we generate a follow up questions which is -> ${vivaCase.case.stem}
-
-We have few exhibits related to the case present ${JSON.stringify(vivaCase.exhibits)} , if the question asked seems to be from the exhibits description mentioned we can
-show the exhibit and sent the image used as true. For image question just ask to explain the findings of image which you can verify by description.
-(Description should not be visible or mentioned to user it is for you to verify)
-
-You MUST follow this exact output format.
-
-Return ONLY plain text (NOT JSON, NOT markdown).
-
-Format exactly like this:
-
-question: <your question here>
-imageUsed: true or false
-imageLink: <full url or null>
-
-Rules:
-- Do NOT add commas
-- Do NOT add quotes
-- Do NOT add braces {}
-- Do NOT add extra text before or after
-- Each field must be on a new line
-- If no image is needed, write:
-  imageUsed: false
-  imageLink: null
-`;
-
-  console.log("Prompt to Gen: ", prompt);
+  const userPrompt = buildFollowupUserPrompt({
+    vivaCase,
+    previousQA,
+    shownExhibitIds,
+  });
 
   try {
-    const result = await geminiModel.generateContent(prompt);
-    const rawText = result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const result = await geminiModel.generateContent({
+      systemInstruction: FOLLOWUP_SYSTEM_INSTRUCTION,
+      generationConfig: {
+        temperature: 0.2,
+        topP: 0.8,
+        maxOutputTokens: 120,
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: userPrompt }],
+        },
+      ],
+    });
+    const rawText = extractGeminiText(result);
 
-    if (typeof rawText !== "string") {
-      throw new Error("Unexpected Gemini response structure");
+    if (!rawText) {
+      console.error("Unexpected Gemini followup response structure:", JSON.stringify(result?.response));
+      return NextResponse.json({
+        question: "What would you do next?",
+        imageUsed: false,
+        imageLink: null,
+        imageDescription: null,
+        imageId: null,
+      });
     }
 
     const text = cleanResponse(rawText);
