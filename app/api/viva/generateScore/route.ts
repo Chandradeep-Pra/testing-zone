@@ -54,6 +54,8 @@ Also provide:
 Transcript:
 ${transcript}
 
+we are using google speech to text so there are chances that it can misheard some spelling so dont consider it in scoring and try to analyse what can be the word that user spoke and give user the marks
+
 Return ONLY JSON in this format:
 
 {
