@@ -25,6 +25,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord) {
   async function next(userAnswer: string, exit = false): Promise<VivaApiResponse> {
     try {
       const history = previousQARef.current;
+      const recentHistory = exit ? history : history.slice(-2);
 
       // attach answer to last question
       if (history.length > 0 && userAnswer) {
@@ -35,7 +36,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          previousQA: history,
+          previousQA: recentHistory,
           shownExhibitIds: Array.from(shownExhibitIdsRef.current),
           vivaCase,
           exit,
