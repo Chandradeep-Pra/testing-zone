@@ -1,6 +1,7 @@
 import { VertexAI } from "@google-cloud/vertexai";
 import textToSpeech from "@google-cloud/text-to-speech";
-
+//Be a calm and composed examiner . 
+//Progress the viva fluently and professionally towards the management of the case .
 const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
 if (!raw) {
   throw new Error("Missing GOOGLE_APPLICATION_CREDENTIALS_JSON");

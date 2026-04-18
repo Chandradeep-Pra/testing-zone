@@ -146,9 +146,10 @@ Generate the next follow-up question like a viva examiner.
 Recent conversation:
 ${recentQA}
 
-Begin with basic diagnosis and move to higher levels, you can also make sub clinical cases of your own too.
+If a candidate cannot completely answer a question on a particular topic , please move on to the next question from a different topic related to the case
 
-If a candidate is not sure of a particular topic, we can skip that question and start a new topic.
+If a candidate is requesting or enquiring about any investigation , provide the report findings most suitable to the case stem . 
+The objective of the viva is to start from basic questions in management , discuss alternative treatment options , complications of the treatment.
 
 Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
 Make sure we stick to case of question while we generate a follow up questions which is -> ${vivaCase.case.stem}
