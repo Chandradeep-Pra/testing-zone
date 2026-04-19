@@ -23,12 +23,34 @@ export default function Home() {
           all in one seamless viva experience.
         </p>
 
-        <button
-          onClick={() => router.push("/ai-viva/cases")}
-          className="bg-emerald-600 hover:bg-emerald-500 px-8 py-4 rounded-xl text-lg font-semibold transition shadow-lg hover:shadow-xl"
-        >
-          Start Viva Practice
-        </button>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
+
+  {/* MOCK LIVE BUTTON */}
+  <button
+    onClick={() => router.push("/mocks")}
+    className="cursor-pointer relative px-8 py-4 rounded-xl text-lg font-semibold 
+               bg-gray-900 border border-emerald-500/40 
+               hover:bg-gray-800 transition-all duration-200 
+               shadow-lg hover:shadow-emerald-500/20"
+  >
+    {/* 🔴 Pulse Dot */}
+    <span className="absolute -top-2 -right-2 flex h-4 w-4">
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+      <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+    </span>
+
+    Mock Test Live
+  </button>
+
+  {/* VIVA BUTTON */}
+  <button
+    onClick={() => router.push("/ai-viva/cases")}
+    className="bg-emerald-600 hover:bg-emerald-500 px-8 py-4 rounded-xl text-lg font-semibold transition shadow-lg hover:shadow-xl"
+  >
+    Start Viva Practice
+  </button>
+
+</div>
       </section>
 
       {/* BENTO GRID */}
