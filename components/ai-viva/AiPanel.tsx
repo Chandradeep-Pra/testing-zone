@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import SiriWaveFrom from "./SiriWaveForm";
 import SiriWaveComponent from "./SiriWaveForm";
+import AvatarViewer from "./AvatarViewer";
 
 type Props = {
 speaking: boolean;
@@ -111,20 +112,7 @@ className={`relative h-full w-full rounded-xl border overflow-hidden bg-slate-95
   {/* SIRI WAVE FOR ALL STATES */}
   <div className="flex items-center justify-center scale-110">
 
-    {/* THINKING → slow + subtle */}
-    {thinking && (
-      <SiriWaveComponent amplitude={0.2} speed={0.02} />
-    )}
-
-    {/* SPEAKING → reactive */}
-    {speaking && (
-      <SiriWaveComponent amplitude={amplitude} speed={0.08} />
-    )}
-
-    {/* IDLE / LISTENING → soft breathing */}
-    {!thinking && !speaking && (
-      <SiriWaveComponent amplitude={0.1} speed={0.03} />
-    )}
+    <AvatarViewer />
 
   </div>
 
