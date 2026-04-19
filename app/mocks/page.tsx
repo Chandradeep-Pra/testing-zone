@@ -57,7 +57,7 @@ const isTodayMock = (mock: Mock) => {
 
 const isLiveOrUpcoming = (mock: Mock) => {
   const start = getStart(mock.startTime);
-  const end = start + mock.durationMinutes * 60 * 1000;
+  const end = start + 7 * 24 * 60 * 60 * 1000;
   const now = Date.now();
 
   return now <= end; // 🔥 includes LIVE + FUTURE
@@ -139,8 +139,11 @@ const filtered = (data.mocks || []).filter(
                 <div className="text-sm text-gray-400 mb-6 space-y-1">
                   <p>⏱ {mock.durationMinutes} mins</p>
                   <p>
-                    🕒 {new Date(getStart(mock.startTime)).toLocaleTimeString()}
-                  </p>
+  🕒 Available Till:{" "}
+  {new Date(
+    getStart(mock.startTime) + 7 * 24 * 60 * 60 * 1000
+  ).toLocaleString()}
+</p>
                 </div>
 
                 <button
