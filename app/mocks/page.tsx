@@ -50,8 +50,22 @@ export default function TodayMocksPage() {
       try {
         const res = await fetch("/api/mocks");
         const data = await res.json();
+const isTodayMock = (mock: Mock) => {
+  const start = getStart(mock.startTime);
+  return start && isToday(start);
+};
 
-        const filtered = (data.mocks || []).filter(isScheduledToday);
+const isLiveOrUpcoming = (mock: Mock) => {
+  const start = getStart(mock.startTime);
+  const end = start + mock.durationMinutes * 60 * 1000;
+  const now = Date.now();
+
+  return now <= end; // 🔥 includes LIVE + FUTURE
+};
+
+const filtered = (data.mocks || []).filter(
+  (m: Mock) => isTodayMock(m) && isLiveOrUpcoming(m)
+);
         setMocks(filtered);
 
         // 🔥 preload saved user
@@ -115,7 +129,7 @@ export default function TodayMocksPage() {
                 className="bg-gray-900 border border-gray-800 rounded-2xl p-6"
               >
                 <span className="text-xs px-3 py-1 rounded-full bg-blue-500 text-white mb-4 inline-block">
-                  Scheduled
+                  Live
                 </span>
 
                 <h2 className="text-xl font-semibold mb-2">
