@@ -14,6 +14,7 @@ import ReadyOverlay from "./ReadyOverlay";
 import { useCountdown } from "./useCountdown";
 
 import type { VivaCaseRecord } from "@/lib/viva-case";
+import ChatTimeline from "./ChatTimeline";
 
 type VivaMode = "calm" | "fast";
 
@@ -464,6 +465,7 @@ export default function VivaVoiceAi({
             />
           </div>
         </div>
+        <ChatTimeline />
       </div>
 
       <div className="h-12 sm:h-14 md:h-16 flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:gap-6 px-2 sm:px-3 md:px-4 py-1 sm:py-2 bg-slate-900/60 backdrop-blur-xl border-t border-slate-800 overflow-x-auto">
