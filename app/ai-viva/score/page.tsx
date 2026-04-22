@@ -33,9 +33,40 @@ interface Report {
   improvementPlan: string[];
 }
 
+type ConversationMessage = {
+  id?: string;
+  role: "ai" | "candidate";
+  text: string;
+};
+
+function buildConversationFromQaHistory(history = []) {
+  return history.flatMap((item: any) => {
+    const entries = [];
+
+    if (item.question?.trim()) {
+      entries.push({
+        id: crypto.randomUUID(),
+        role: "ai",
+        text: item.question.trim(),
+      });
+    }
+
+    if (item.answer?.trim()) {
+      entries.push({
+        id: crypto.randomUUID(),
+        role: "candidate",
+        text: item.answer.trim(),
+      });
+    }
+
+    return entries;
+  });
+}
+
 export default function ReviewPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("viva-final-score");
@@ -92,7 +123,12 @@ export default function ReviewPage() {
         }
 
         const parsed = JSON.parse(storedCandidate);
+        const qaHistory = Array.isArray(parsed.qaHistory) ? parsed.qaHistory : [];
         parsed.report = finalReport;
+        if (!Array.isArray(parsed.conversation) || parsed.conversation.length === 0) {
+          parsed.conversation = buildConversationFromQaHistory(qaHistory);
+        }
+        setConversation(parsed.conversation);
 
         localStorage.setItem("candidateInfo", JSON.stringify(parsed));
 
@@ -348,6 +384,34 @@ export default function ReviewPage() {
               ))}
             </div>
 
+          </section>
+        )}
+
+        {conversation.length > 0 && (
+          <section className="space-y-4 border-t border-slate-800 pt-6">
+            <h2 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wide">
+              Q&amp;A
+            </h2>
+
+            <div className="space-y-3">
+              {conversation.map((message, index) => (
+                <div
+                  key={message.id || `${message.role}-${index}`}
+                  className={`rounded-lg border p-3 md:p-4 text-xs md:text-sm ${
+                    message.role === "ai"
+                      ? "border-emerald-500/20 bg-emerald-500/10 text-slate-100"
+                      : "border-blue-500/20 bg-blue-500/10 text-slate-100"
+                  }`}
+                >
+                  <div className="mb-1 text-[11px] md:text-xs font-medium uppercase tracking-wide text-slate-400">
+                    {message.role === "ai" ? "Question" : "Answer"}
+                  </div>
+                  <div className="leading-relaxed text-slate-200">
+                    {message.text || "No response"}
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 

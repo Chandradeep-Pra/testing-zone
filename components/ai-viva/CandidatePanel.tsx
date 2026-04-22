@@ -114,7 +114,7 @@ export function CandidatePanel({
 
       {/* LIVE TRANSCRIPT */}
 
-      {transcript && (
+      {/* {transcript && (
         <div
           className="absolute bottom-1 left-1/2 -translate-x-1/2
           bg-black/70 backdrop-blur px-2 md:px-4 py-1 md:py-2 rounded-lg
@@ -122,7 +122,7 @@ export function CandidatePanel({
         >
           {transcript}
         </div>
-      )}
+      )} */}
 
     </div>
   );

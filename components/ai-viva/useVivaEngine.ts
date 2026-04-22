@@ -22,6 +22,29 @@ function normalizeKeyword(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+function getMatchedKeywords(answer: string, keywords: string[]) {
+  const normalizedAnswer = normalizeKeyword(answer);
+
+  if (!normalizedAnswer) {
+    return [];
+  }
+
+  return keywords.filter((keyword, index) => {
+    const normalizedKeyword = normalizeKeyword(keyword);
+
+    if (!normalizedKeyword) {
+      return false;
+    }
+
+    return (
+      normalizedAnswer.includes(normalizedKeyword) &&
+      keywords.findIndex(
+        (candidate) => normalizeKeyword(candidate) === normalizedKeyword
+      ) === index
+    );
+  });
+}
+
 function getFastModeQuestions(vivaCase: VivaCaseRecord): VivaModeQuestion[] {
   return vivaCase.modes?.fastAndFurious?.questions || [];
 }
@@ -50,25 +73,42 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     return getFastModeQuestions(vivaCase)[fastQuestionIndexRef.current] || null;
   }
 
-  function doesAnswerMatchCurrentFastQuestion(answer: string) {
+  function getCurrentFastQuestionKeywordProgress(answer: string) {
     if (selectedMode !== "fast") {
-      return false;
+      return {
+        matchedKeywords: [],
+        totalKeywords: 0,
+        allMatched: false,
+      };
     }
 
     const currentQuestion = getCurrentFastQuestion();
     if (!currentQuestion) {
-      return false;
+      return {
+        matchedKeywords: [],
+        totalKeywords: 0,
+        allMatched: false,
+      };
     }
 
-    const normalizedAnswer = normalizeKeyword(answer);
-    if (!normalizedAnswer) {
-      return false;
-    }
+    const matchedKeywords = getMatchedKeywords(answer, currentQuestion.answerKeywords);
+    const totalKeywords = currentQuestion.answerKeywords.filter(
+      (keyword, index, allKeywords) =>
+        normalizeKeyword(keyword) &&
+        allKeywords.findIndex(
+          (candidate) => normalizeKeyword(candidate) === normalizeKeyword(keyword)
+        ) === index
+    ).length;
 
-    return currentQuestion.answerKeywords.some((keyword) => {
-      const normalizedKeyword = normalizeKeyword(keyword);
-      return normalizedKeyword && normalizedAnswer.includes(normalizedKeyword);
-    });
+    return {
+      matchedKeywords,
+      totalKeywords,
+      allMatched: totalKeywords > 0 && matchedKeywords.length === totalKeywords,
+    };
+  }
+
+  function doesAnswerMatchCurrentFastQuestion(answer: string) {
+    return getCurrentFastQuestionKeywordProgress(answer).allMatched;
   }
 
   async function nextFast(userAnswer: string, exit = false): Promise<VivaApiResponse> {
@@ -219,6 +259,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     getHistory,
     getCurrentFastQuestionIndex,
     getCurrentFastQuestion,
+    getCurrentFastQuestionKeywordProgress,
     doesAnswerMatchCurrentFastQuestion,
   };
 }

@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing data" }, { status: 400 });
     }
 
-    const { name, email, conversation, report } = candidateInfo;
+    const { name, email, conversation, report, qaHistory } = candidateInfo;
 
     if (!email) {
       return NextResponse.json({ error: "Missing email" }, { status: 400 });
@@ -26,7 +26,26 @@ export async function POST(req: Request) {
        2. Format Q&A
     ----------------------------- */
 
-    const qaHtml = (conversation || [])
+    const normalizedConversation =
+      Array.isArray(conversation) && conversation.length > 0
+        ? conversation
+        : Array.isArray(qaHistory)
+        ? qaHistory.flatMap((item: any) => {
+            const entries = [];
+
+            if (item?.question) {
+              entries.push({ role: "ai", text: item.question });
+            }
+
+            if (item?.answer) {
+              entries.push({ role: "candidate", text: item.answer });
+            }
+
+            return entries;
+          })
+        : [];
+
+    const qaHtml = normalizedConversation
       .map(
         (m: any) => `
           <div style="margin-bottom:10px;">
@@ -119,7 +138,7 @@ export async function POST(req: Request) {
                   Q&A
                 </h3>
 
-                ${conversation.map((m: any) => `
+                ${normalizedConversation.map((m: any) => `
                   <div style="
                     margin-bottom:10px;
                     padding:10px;

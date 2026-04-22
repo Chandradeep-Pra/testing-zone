@@ -12,11 +12,36 @@ import { useSpeechInput } from "./useSpeechInput";
 import { useVivaEngine } from "./useVivaEngine";
 import ReadyOverlay from "./ReadyOverlay";
 import { useCountdown } from "./useCountdown";
-
-import type { VivaCaseRecord } from "@/lib/viva-case";
 import ChatTimeline from "./ChatTimeline";
 
+import type { VivaCaseRecord } from "@/lib/viva-case";
+
 type VivaMode = "calm" | "fast";
+
+function buildConversationFromQaHistory(history) {
+  return history.flatMap((item) => {
+    const entries = [];
+
+    if (item.question?.trim()) {
+      entries.push({
+        id: crypto.randomUUID(),
+        role: "ai",
+        text: item.question.trim(),
+      });
+    }
+
+    if (item.answer?.trim()) {
+      entries.push({
+        id: crypto.randomUUID(),
+        role: "candidate",
+        text: item.answer.trim(),
+        live: false,
+      });
+    }
+
+    return entries;
+  });
+}
 
 export default function VivaVoiceAi({
   vivaCase,
@@ -36,6 +61,8 @@ export default function VivaVoiceAi({
     generateScore,
     next,
     doesAnswerMatchCurrentFastQuestion,
+    getCurrentFastQuestionKeywordProgress,
+    getHistory,
   } = useVivaEngine(vivaCase, selectedMode);
 
   useEffect(() => {
@@ -70,6 +97,8 @@ export default function VivaVoiceAi({
   const fillerIndexRef = useRef(0);
   const liveCandidateMsgId = useRef<string | null>(null);
   const advanceLockRef = useRef(false);
+  const keywordFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messagesRef = useRef([]);
 
   const [readyVisible, setReadyVisible] = useState(true);
   const [ending, setEnding] = useState(false);
@@ -79,6 +108,8 @@ export default function VivaVoiceAi({
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [questionTurn, setQuestionTurn] = useState(0);
+  const [keywordDetected, setKeywordDetected] = useState(false);
+  const [candidateTranscript, setCandidateTranscript] = useState("");
 
   const vivaDurationSec = vivaCase.viva_rules.max_duration_minutes * 60;
   const countdownRunning = vivaStarted && !ending && (isFastMode ? isListening : true);
@@ -109,6 +140,23 @@ export default function VivaVoiceAi({
     "",
   ];
 
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  function flashKeywordDetected() {
+    setKeywordDetected(true);
+
+    if (keywordFlashTimeoutRef.current) {
+      clearTimeout(keywordFlashTimeoutRef.current);
+    }
+
+    keywordFlashTimeoutRef.current = setTimeout(() => {
+      setKeywordDetected(false);
+      keywordFlashTimeoutRef.current = null;
+    }, 700);
+  }
+
   const {
     start,
     stop,
@@ -118,6 +166,8 @@ export default function VivaVoiceAi({
   } = useSpeechInput(
     (interim) => {
       if (ending) return;
+
+      setCandidateTranscript(interim);
 
       setMessages((msgs) =>
         msgs.map((m) =>
@@ -129,8 +179,9 @@ export default function VivaVoiceAi({
         isFastMode &&
         vivaStarted &&
         !advanceLockRef.current &&
-        doesAnswerMatchCurrentFastQuestion(interim)
+        getCurrentFastQuestionKeywordProgress(interim).allMatched
       ) {
+        flashKeywordDetected();
         void submitCurrentAnswer(interim);
       }
     },
@@ -140,6 +191,16 @@ export default function VivaVoiceAi({
 
       if (warmupPendingRef.current) {
         return;
+      }
+
+      setCandidateTranscript(finalText);
+
+      if (
+        isFastMode &&
+        vivaStarted &&
+        getCurrentFastQuestionKeywordProgress(finalText).allMatched
+      ) {
+        flashKeywordDetected();
       }
 
       await submitCurrentAnswer(finalText);
@@ -170,6 +231,9 @@ export default function VivaVoiceAi({
       }
       if (fillerTimeoutRef.current) {
         clearTimeout(fillerTimeoutRef.current);
+      }
+      if (keywordFlashTimeoutRef.current) {
+        clearTimeout(keywordFlashTimeoutRef.current);
       }
       closeSocket();
       stop();
@@ -208,6 +272,7 @@ export default function VivaVoiceAi({
 
     resetTranscriptBuffer();
     advanceLockRef.current = false;
+    setCandidateTranscript("");
     setIsListening(true);
     void start();
   }
@@ -261,6 +326,7 @@ export default function VivaVoiceAi({
 
     const finalAnswer = (answerText || getTranscriptBuffer() || "").trim();
     resetTranscriptBuffer();
+    setCandidateTranscript(finalAnswer);
     syncCandidateMessage(finalAnswer, false);
 
     if (!isFastMode) {
@@ -385,10 +451,20 @@ export default function VivaVoiceAi({
       fillerTimeoutRef.current = null;
     }
 
+    if (keywordFlashTimeoutRef.current) {
+      clearTimeout(keywordFlashTimeoutRef.current);
+      keywordFlashTimeoutRef.current = null;
+    }
+
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {
       const parsed = JSON.parse(stored);
-      parsed.conversation = messages;
+      const qaHistory = getHistory();
+      parsed.qaHistory = qaHistory;
+      parsed.conversation =
+        messagesRef.current.length > 0
+          ? messagesRef.current
+          : buildConversationFromQaHistory(qaHistory);
       parsed.selectedCaseId = vivaCase.id;
       parsed.selectedCaseTitle = vivaCase.case.title;
       parsed.selectedCase = vivaCase;
@@ -431,12 +507,14 @@ export default function VivaVoiceAi({
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col md:grid gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4 h-full min-h-0 md:grid-cols-1">
-        <div className="relative bg-slate-950 border border-slate-800 rounded-lg md:rounded-xl overflow-hidden flex-1 md:flex-none min-h-0">
+      <div className="flex-1 flex flex-col gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4 h-full min-h-0">
+        <div className="relative bg-slate-950 border border-slate-800 rounded-lg md:rounded-xl overflow-hidden flex-1 min-h-0">
           <AiPanel
             amplitude={amplitude}
             speaking={speaking}
             thinking={thinking}
+            transcript={transcript}
+            keywordDetected={keywordDetected}
             exhibit={
               exhibit?.type === "image" ? (
                 <div className="relative max-w-full md:max-w-3xl mx-auto h-full flex items-center justify-center">
@@ -461,11 +539,14 @@ export default function VivaVoiceAi({
             <CandidatePanel
               cameraOn={cameraOn}
               listening={isListening}
-              transcript={transcript}
+              transcript={candidateTranscript}
             />
           </div>
         </div>
-        <ChatTimeline />
+
+        {/* <div className="h-40 md:h-56 rounded-lg md:rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
+          <ChatTimeline messages={messages} />
+        </div> */}
       </div>
 
       <div className="h-12 sm:h-14 md:h-16 flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:gap-6 px-2 sm:px-3 md:px-4 py-1 sm:py-2 bg-slate-900/60 backdrop-blur-xl border-t border-slate-800 overflow-x-auto">
