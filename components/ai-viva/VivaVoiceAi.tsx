@@ -242,6 +242,9 @@ export default function VivaVoiceAi({
 
     speak(data.question, () => {
       markSpeechEnded();
+      if (isFastMode && data.imageUsed) {
+        clearExhibit();
+      }
       beginListeningForAnswer();
     });
   }

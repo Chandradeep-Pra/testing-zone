@@ -33,13 +33,6 @@ function getFastModeExhibit(vivaCase: VivaCaseRecord, question: VivaModeQuestion
     return vivaCase.exhibits.find((exhibit) => exhibit.id === linkedExhibitId) || null;
   }
 
-  if (
-    vivaCase.exhibits.length === 1 &&
-    /\bimage\b|\bshown\b|\bpicture\b|\bprocedure\b/i.test(question.question)
-  ) {
-    return vivaCase.exhibits[0];
-  }
-
   return null;
 }
 
