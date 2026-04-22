@@ -12,6 +12,24 @@ export type VivaCaseAttempt = {
   };
 };
 
+export type VivaModeQuestion = {
+  id: string;
+  question: string;
+  answerKeywords: string[];
+  linkedExhibitIds: string[];
+};
+
+export type VivaCaseModes = {
+  calmAndComposed?: {
+    enabled?: boolean;
+  };
+  fastAndFurious?: {
+    enabled?: boolean;
+    questionCount?: number;
+    questions?: VivaModeQuestion[];
+  };
+};
+
 export type VivaCaseRecord = {
   id: string;
   case: {
@@ -43,6 +61,7 @@ export type VivaCaseRecord = {
   attemptsCount?: number;
   attempts?: VivaCaseAttempt[];
   allowedUser?: string[];
+  modes?: VivaCaseModes;
 };
 
 function toSlug(value: string) {
@@ -64,6 +83,43 @@ function normalizeExhibit(exhibit: any, index: number) {
     url,
     file,
     description: exhibit?.description || "",
+  };
+}
+
+function normalizeModeQuestion(question: any, index: number): VivaModeQuestion {
+  return {
+    id: question?.id || `question-${index + 1}`,
+    question: question?.question || "",
+    answerKeywords: Array.isArray(question?.answerKeywords) ? question.answerKeywords : [],
+    linkedExhibitIds: Array.isArray(question?.linkedExhibitIds) ? question.linkedExhibitIds : [],
+  };
+}
+
+function normalizeModes(modes: any): VivaCaseModes | undefined {
+  if (!modes || typeof modes !== "object") {
+    return undefined;
+  }
+
+  return {
+    calmAndComposed: modes.calmAndComposed
+      ? {
+          enabled: Boolean(modes.calmAndComposed.enabled),
+        }
+      : undefined,
+    fastAndFurious: modes.fastAndFurious
+      ? {
+          enabled: Boolean(modes.fastAndFurious.enabled),
+          questionCount:
+            typeof modes.fastAndFurious.questionCount === "number"
+              ? modes.fastAndFurious.questionCount
+              : undefined,
+          questions: Array.isArray(modes.fastAndFurious.questions)
+            ? modes.fastAndFurious.questions.map((question: any, index: number) =>
+                normalizeModeQuestion(question, index)
+              )
+            : [],
+        }
+      : undefined,
   };
 }
 
@@ -121,6 +177,7 @@ export function normalizeVivaCase(payload: any): VivaCaseRecord {
     attemptsCount: source.attemptsCount,
     attempts: source.attempts,
     allowedUser: source.allowedUser,
+    modes: normalizeModes(source.modes),
   };
 }
 

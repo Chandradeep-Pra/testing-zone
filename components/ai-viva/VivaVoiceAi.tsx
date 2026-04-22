@@ -1,7 +1,7 @@
 //@ts-nocheck
 "use client";
 
-import { Clock, PhoneOff, Camera, CameraOff, MessageSquare, Plug } from "lucide-react";
+import { Clock, PhoneOff, Camera, CameraOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CandidatePanel } from "./CandidatePanel";
@@ -11,16 +11,32 @@ import { useSpeechOutput } from "./useSpeechOutput";
 import { useSpeechInput } from "./useSpeechInput";
 import { useVivaEngine } from "./useVivaEngine";
 import ReadyOverlay from "./ReadyOverlay";
-import ChatTimeline from "./ChatTimeline";
 import { useCountdown } from "./useCountdown";
 
 import type { VivaCaseRecord } from "@/lib/viva-case";
 
-export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) {
-  const warmupPrompt = "Before we begin, please say your full name and tell me in one short sentence how you are feeling today. This is only an audio check and will not be scored.";
+type VivaMode = "calm" | "fast";
+
+export default function VivaVoiceAi({
+  vivaCase,
+  selectedMode = "calm",
+}: {
+  vivaCase: VivaCaseRecord;
+  selectedMode?: VivaMode;
+}) {
+  const warmupPrompt =
+    "Before we begin, please say your full name and tell me in one short sentence how you are feeling today. This is only an audio check and will not be scored.";
   const warmupDurationMs = 5000;
+  const fastAnswerWindowSec = 10;
+  const isFastMode = selectedMode === "fast";
+
   const [candidate, setCandidate] = useState({ name: "", email: "" });
-  const { generateScore, next } = useVivaEngine(vivaCase);
+  const {
+    generateScore,
+    next,
+    doesAnswerMatchCurrentFastQuestion,
+  } = useVivaEngine(vivaCase, selectedMode);
+
   useEffect(() => {
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {
@@ -49,46 +65,92 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
   const endingRef = useRef(false);
   const warmupPendingRef = useRef(false);
   const warmupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fillerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fillerIndexRef = useRef(0);
+  const liveCandidateMsgId = useRef<string | null>(null);
+  const advanceLockRef = useRef(false);
 
   const [readyVisible, setReadyVisible] = useState(true);
   const [ending, setEnding] = useState(false);
   const [vivaStarted, setVivaStarted] = useState(false);
-
   const [messages, setMessages] = useState([]);
-  const liveCandidateMsgId = useRef(null);
-
-  const [showChat, setShowChat] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [questionTurn, setQuestionTurn] = useState(0);
 
   const vivaDurationSec = vivaCase.viva_rules.max_duration_minutes * 60;
+  const countdownRunning = vivaStarted && !ending && (isFastMode ? isListening : true);
+  const countdownTotal = isFastMode ? fastAnswerWindowSec : vivaDurationSec;
 
   const { minutes, seconds } = useCountdown(
-    vivaDurationSec,
-    vivaStarted && !ending
+    countdownTotal,
+    countdownRunning,
+    () => {
+      if (
+        isFastMode &&
+        !endingRef.current &&
+        !advanceLockRef.current &&
+        vivaStarted &&
+        isListening
+      ) {
+        void submitCurrentAnswer(getTranscriptBuffer());
+      }
+    },
+    isFastMode ? questionTurn : vivaDurationSec
   );
 
- const fillers = [
-  "Okay , let’s move on to the next question ",
-  "Okay, let us continue further",
-  "okay fine, let’s proceed“",
-  "Let’s continue further with the same case",
-  "That’s alright , lets continue",
-  ""
-];
-  /* --------------------------------------------------
-     AUTO END WHEN 20 SECONDS LEFT
-  -------------------------------------------------- */
+  const fillers = [
+    "Okay, let us continue further",
+    "Let us move on to the next question",
+    "Let us continue further with the same case",
+    "That is alright, let us continue",
+    "",
+  ];
+
+  const {
+    start,
+    stop,
+    closeSocket,
+    getTranscriptBuffer,
+    resetTranscriptBuffer,
+  } = useSpeechInput(
+    (interim) => {
+      if (ending) return;
+
+      setMessages((msgs) =>
+        msgs.map((m) =>
+          m.id === liveCandidateMsgId.current ? { ...m, text: interim } : m
+        )
+      );
+
+      if (
+        isFastMode &&
+        vivaStarted &&
+        !advanceLockRef.current &&
+        doesAnswerMatchCurrentFastQuestion(interim)
+      ) {
+        void submitCurrentAnswer(interim);
+      }
+    },
+
+    async (finalText) => {
+      if (ending || endingRef.current || advanceLockRef.current) return;
+
+      if (warmupPendingRef.current) {
+        return;
+      }
+
+      await submitCurrentAnswer(finalText);
+    }
+  );
 
   useEffect(() => {
-
-    if (!vivaStarted || ending) return;
+    if (isFastMode || !vivaStarted || ending) return;
 
     const remaining = minutes * 60 + seconds;
 
     if (remaining === 20 && !endingRef.current) {
-
       endingRef.current = true;
 
       speak(
@@ -97,148 +159,134 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
           await endViva();
         }
       );
+    }
+  }, [isFastMode, minutes, seconds, vivaStarted, ending]);
 
+  useEffect(() => {
+    return () => {
+      if (warmupTimeoutRef.current) {
+        clearTimeout(warmupTimeoutRef.current);
+      }
+      if (fillerTimeoutRef.current) {
+        clearTimeout(fillerTimeoutRef.current);
+      }
+      closeSocket();
+      stop();
+    };
+  }, []);
+
+  function syncCandidateMessage(text: string, live = false) {
+    if (!liveCandidateMsgId.current) {
+      return;
     }
 
-  }, [minutes, seconds]);
+    setMessages((msgs) =>
+      msgs.map((m) =>
+        m.id === liveCandidateMsgId.current ? { ...m, text, live } : m
+      )
+    );
+  }
 
-  const fillerTimeoutRef = useRef<any>(null);
-  const fillerIndexRef = useRef(0);
+  function beginListeningForAnswer() {
+    if (endingRef.current) {
+      return;
+    }
 
+    const id = crypto.randomUUID();
+    liveCandidateMsgId.current = id;
 
-  /* --------------------------------------------------
-     SPEECH INPUT
-  -------------------------------------------------- */
+    setMessages((msgs) => [
+      ...msgs,
+      {
+        id,
+        role: "candidate",
+        text: "",
+        live: true,
+      },
+    ]);
 
-  const { start, stop } = useSpeechInput(
+    resetTranscriptBuffer();
+    advanceLockRef.current = false;
+    setIsListening(true);
+    void start();
+  }
 
-    (interim) => {
+  async function askNextQuestion(userAnswer: string) {
+    const data = await next(userAnswer);
 
-      if (ending) return;
+    if (fillerTimeoutRef.current) {
+      clearTimeout(fillerTimeoutRef.current);
+      fillerTimeoutRef.current = null;
+    }
 
-      setMessages((msgs) => {
-        const exists = msgs.find((m) => m.id === liveCandidateMsgId.current);
-        if (!exists) return msgs;
+    if (data?.exit) {
+      await endViva();
+      return;
+    }
 
-        return msgs.map((m) =>
-          m.id === liveCandidateMsgId.current
-            ? { ...m, text: interim }
-            : m
-        );
-      });
+    if (!data?.question) {
+      return;
+    }
 
-    },
+    setMessages((msgs) => [
+      ...msgs,
+      {
+        id: crypto.randomUUID(),
+        role: "ai",
+        text: data.question,
+      },
+    ]);
 
-    async (finalText) => {
+    applyApiResponse(data);
+    setQuestionTurn((turn) => turn + 1);
 
-      if (ending || endingRef.current) return;
+    speak(data.question, () => {
+      markSpeechEnded();
+      beginListeningForAnswer();
+    });
+  }
 
-      stop();
-      setIsListening(false);
+  async function submitCurrentAnswer(answerText: string) {
+    if (ending || endingRef.current || advanceLockRef.current) {
+      return;
+    }
 
-      if (warmupPendingRef.current) {
-        return;
-      }
+    advanceLockRef.current = true;
+    stop();
+    setIsListening(false);
 
+    const finalAnswer = (answerText || getTranscriptBuffer() || "").trim();
+    resetTranscriptBuffer();
+    syncCandidateMessage(finalAnswer, false);
+
+    if (!isFastMode) {
       setThinking(true);
 
       fillerTimeoutRef.current = setTimeout(() => {
         if (endingRef.current) return;
-
-        const filler =
-          fillers[fillerIndexRef.current % fillers.length];
-
-        fillerIndexRef.current++;
-
+        const filler = fillers[fillerIndexRef.current % fillers.length];
+        fillerIndexRef.current += 1;
         speak(filler);
       }, 1200);
-
-      setMessages((msgs) =>
-        msgs.map((m) =>
-          m.id === liveCandidateMsgId.current
-            ? { ...m, text: finalText, live: false }
-            : m
-        )
-      );
-
-      try {
-
-        const data = await next(finalText);
-        console.log("Data for AI : ", data)
-        if (fillerTimeoutRef.current) {
-  clearTimeout(fillerTimeoutRef.current);
-  fillerTimeoutRef.current = null;
-}
-        if (!data?.question) return;
-
-        setMessages((msgs) => [
-          ...msgs,
-          {
-            id: crypto.randomUUID(),
-            role: "ai",
-            text: data.question,
-          },
-        ]);
-
-        if (data.imageUsed) {
-          setMessages((msgs) => [
-            ...msgs,
-            {
-              id: crypto.randomUUID(),
-              role: "image",
-              src: data.imageLink,
-              description: data.imageDescription,
-            },
-          ]);
-        }
-
-        applyApiResponse(data);
-
-        speak(data.question, () => {
-
-          markSpeechEnded();
-
-          if (!endingRef.current) {
-
-            const id = crypto.randomUUID();
-            liveCandidateMsgId.current = id;
-
-            setMessages((msgs) => [
-              ...msgs,
-              {
-                id,
-                role: "candidate",
-                text: "",
-                live: true,
-              },
-            ]);
-
-            setIsListening(true);
-            start();
-          }
-
-        });
-
-      } finally {
-
-        setThinking(false);
-
-      }
-
+    } else {
+      setThinking(true);
     }
 
-  );
-
-
-  /* --------------------------------------------------
-     BEGIN VIVA
-  -------------------------------------------------- */
+    try {
+      await askNextQuestion(finalAnswer);
+    } finally {
+      setThinking(false);
+      advanceLockRef.current = false;
+    }
+  }
 
   async function startViva() {
     try {
-      // setVivaStarted(true)
       const data = await next("");
-      console.log('Next data received:', data);
+
+      if (!data?.question) {
+        return;
+      }
 
       setMessages([
         {
@@ -249,32 +297,16 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
       ]);
 
       applyApiResponse(data);
+      setQuestionTurn(1);
 
       speak(data.question, () => {
-        setVivaStarted(true)
-        console.log('First question spoken, setting up listening...');
+        setVivaStarted(true);
         markSpeechEnded();
-
-        const id = crypto.randomUUID();
-        liveCandidateMsgId.current = id;
-
-        setMessages((msgs) => [
-          ...msgs,
-          {
-            id,
-            role: "candidate",
-            text: "",
-            live: true,
-          },
-        ]);
-
-        setIsListening(true);
-        setThinking(false); // Set thinking false here
-
-        setTimeout(() => start(), 50);
+        setThinking(false);
+        beginListeningForAnswer();
       });
     } catch (error) {
-      console.error('Error starting viva:', error);
+      console.error("Error starting viva:", error);
       setThinking(false);
     }
   }
@@ -289,73 +321,66 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
     }
 
     speak(warmupPrompt, () => {
-
-      console.log("Warm-up prompt spoken, starting STT warm-up capture...");
       markSpeechEnded();
       setIsListening(true);
-      start();
+      void start();
 
       warmupTimeoutRef.current = setTimeout(() => {
         warmupPendingRef.current = false;
         warmupTimeoutRef.current = null;
         stop();
+        resetTranscriptBuffer();
         setIsListening(false);
         setThinking(true);
 
         speak("Thank you. Audio is ready. Starting the viva now.", async () => {
           await new Promise((res) => setTimeout(res, 400));
-          startViva();
+          await startViva();
         });
       }, warmupDurationMs);
-
     });
   }
 
   async function handleBegin(cameraPref = false) {
-
     if (hasStartedRef.current) return;
-    hasStartedRef.current = true;
 
+    hasStartedRef.current = true;
     setCameraEnabled(cameraPref);
     setReadyVisible(false);
-    // setVivaStarted(true);
     setThinking(true);
 
     try {
-      // Greet the user
       const greeting = `Hello ${candidate.name}, welcome to the Urologics AI Examiner viva. Please wait while we prepare your session.`;
       speak(greeting, async () => {
-
-        console.log('Greeting finished, starting audio check...');
-
         await new Promise((res) => setTimeout(res, 2000));
-
         startWarmup();
       });
-
     } catch (error) {
-      console.error('Error in greeting:', error);
+      console.error("Error in greeting:", error);
       setThinking(false);
     }
   }
 
-
-  /* --------------------------------------------------
-     END VIVA
-  -------------------------------------------------- */
-
   async function endViva() {
-
     if (ending) return;
 
+    endingRef.current = true;
+    advanceLockRef.current = true;
     setEnding(true);
+    setIsListening(false);
+    stop();
+    closeSocket();
 
     if (warmupTimeoutRef.current) {
       clearTimeout(warmupTimeoutRef.current);
       warmupTimeoutRef.current = null;
     }
 
-    // Save conversation to localStorage
+    if (fillerTimeoutRef.current) {
+      clearTimeout(fillerTimeoutRef.current);
+      fillerTimeoutRef.current = null;
+    }
+
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {
       const parsed = JSON.parse(stored);
@@ -363,120 +388,82 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
       parsed.selectedCaseId = vivaCase.id;
       parsed.selectedCaseTitle = vivaCase.case.title;
       parsed.selectedCase = vivaCase;
+      parsed.selectedMode = selectedMode;
       localStorage.setItem("candidateInfo", JSON.stringify(parsed));
     }
 
     await generateScore();
-
   }
-  /* ----------------------------------------
-     UI
-  ----------------------------------------- */
+
   return (
-    <main className="h-screen  bg-slate-950 text-slate-100 flex flex-col w-full relative">
+    <main className="h-screen bg-slate-950 text-slate-100 flex flex-col w-full relative">
+      {readyVisible && <ReadyOverlay onBegin={handleBegin} />}
 
-      {/* READY OVERLAY */}
-      {readyVisible && (
-        <ReadyOverlay onBegin={handleBegin} />
-      )}
-
-      {/* ENDING OVERLAY */}
       {ending && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm">
           <div className="text-center space-y-3">
             <div className="h-10 w-10 rounded-full border-4 border-white border-t-transparent animate-spin mx-auto" />
-            <p className="text-lg font-medium">
-              Generating Final Score…
-            </p>
-            <p className="text-sm text-slate-400">
-              Please wait while evaluation completes
-            </p>
+            <p className="text-lg font-medium">Generating Final Score...</p>
+            <p className="text-sm text-slate-400">Please wait while evaluation completes</p>
           </div>
         </div>
       )}
 
-      {/* TOP BAR - MOBILE OPTIMIZED */}
       <div className="h-12 sm:h-14 md:h-16 px-2 sm:px-4 md:px-8 flex items-center justify-between bg-slate-900/60 backdrop-blur-xl border-b border-slate-800">
-
-        {/* LEFT: Live Indicator */}
         <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 min-w-0">
           <div className="h-1 w-1 sm:h-1.5 sm:w-1.5 md:h-2 md:w-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-          <span className="text-xs sm:text-xs md:text-sm uppercase tracking-wide text-slate-400 hidden sm:inline white-space-nowrap">
-            Live Viva
+          <span className="text-xs md:text-sm uppercase tracking-wide text-slate-400 hidden sm:inline white-space-nowrap">
+            {isFastMode ? "Fast and Furious" : "Live Viva"}
           </span>
         </div>
 
-        {/* CENTER: Title (Hidden on mobile) */}
         <div className="text-slate-200 font-medium text-xs sm:text-sm md:text-base hidden md:block flex-1 text-center px-2">
           Urologics AI Examiner
         </div>
 
-        {/* RIGHT: Timer (Always visible, most important) */}
         <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 rounded-full bg-slate-800/70 border border-emerald-500/20 text-xs sm:text-sm md:text-base font-semibold text-emerald-400 flex-shrink-0">
           <Clock size={12} className="sm:h-4 sm:w-4 md:h-[18px] md:w-[18px]" />
           <span>{minutes}:{seconds.toString().padStart(2, "0")}</span>
         </div>
-
       </div>
-      <div className={`flex-1 flex flex-col md:grid gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4 h-full min-h-0 ${showChat ? "md:grid-cols-[3fr_1fr]" : "md:grid-cols-1"}`}>
 
-  {/* ================================
-      AI AREA - MOBILE RESPONSIVE
-  ================================= */}
-  <div className="relative bg-slate-950 border border-slate-800 rounded-lg md:rounded-xl overflow-hidden flex-1 md:flex-none min-h-0">
+      <div className="flex-1 flex flex-col md:grid gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4 h-full min-h-0 md:grid-cols-1">
+        <div className="relative bg-slate-950 border border-slate-800 rounded-lg md:rounded-xl overflow-hidden flex-1 md:flex-none min-h-0">
+          <AiPanel
+            amplitude={amplitude}
+            speaking={speaking}
+            thinking={thinking}
+            exhibit={
+              exhibit?.type === "image" ? (
+                <div className="relative max-w-full md:max-w-3xl mx-auto h-full flex items-center justify-center">
+                  <img
+                    src={exhibit.src}
+                    alt="Viva exhibit"
+                    className="rounded-lg md:rounded-xl shadow-xl max-h-[60vh] md:max-h-[70vh] w-auto"
+                  />
 
-    <AiPanel
-      amplitude={amplitude}
-      speaking={speaking}
-      thinking={thinking}
-      exhibit={
-        exhibit?.type === "image" ? (
-          <div className="relative max-w-full md:max-w-3xl mx-auto h-full flex items-center justify-center">
-            <img
-              src={exhibit.src}
-              alt="Viva exhibit"
-              className="rounded-lg md:rounded-xl shadow-xl max-h-[60vh] md:max-h-[70vh] w-auto"
+                  <button
+                    onClick={clearExhibit}
+                    className="absolute top-2 right-2 md:top-3 md:right-3 bg-black/70 hover:bg-black/90 text-white text-xs px-2 md:px-3 py-1 rounded-full transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : null
+            }
+          />
+
+          <div className="absolute top-1.5 right-1.5 md:top-4 md:right-4 w-20 md:w-[260px] h-24 md:h-auto aspect-video md:aspect-auto">
+            <CandidatePanel
+              cameraOn={cameraOn}
+              listening={isListening}
+              transcript={transcript}
             />
-
-            <button
-              onClick={clearExhibit}
-              className="absolute top-2 right-2 md:top-3 md:right-3 bg-black/70 hover:bg-black/90 text-white text-xs px-2 md:px-3 py-1 rounded-full transition-colors"
-            >
-              Close
-            </button>
           </div>
-        ) : null
-      }
-    />
+        </div>
+      </div>
 
-    {/* Candidate Overlay - MOBILE RESPONSIVE */}
-    <div className="absolute top-1.5 right-1.5 md:top-4 md:right-4 w-20 md:w-[260px] h-24 md:h-auto aspect-video md:aspect-auto">
-      <CandidatePanel
-        cameraOn={cameraOn}
-        listening={isListening}
-        onStartTalk={() => {
-          if (speaking || ending) return;
-          setIsListening(true);
-          start();
-        }}
-        onStopTalk={() => {
-          setIsListening(false);
-          stop();
-        }}
-      />
-    </div>
-
-  </div>
-
- 
-
-</div>
-
-      {/* BOTTOM BAR - MOBILE RESPONSIVE */}
       <div className="h-12 sm:h-14 md:h-16 flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:gap-6 px-2 sm:px-3 md:px-4 py-1 sm:py-2 bg-slate-900/60 backdrop-blur-xl border-t border-slate-800 overflow-x-auto">
-
-       
-
         <button
           onClick={() => setCameraOn((v) => !v)}
           disabled={!cameraEnabled}
@@ -510,7 +497,6 @@ export default function VivaVoiceAi({ vivaCase }: { vivaCase: VivaCaseRecord }) 
           <span className="hidden sm:inline">End Viva</span>
           <span className="inline sm:hidden">End</span>
         </button>
-
       </div>
     </main>
   );

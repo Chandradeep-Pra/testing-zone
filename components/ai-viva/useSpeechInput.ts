@@ -292,10 +292,20 @@ export function useSpeechInput(onInterim, onFinal) {
 
   }
 
+  function getTranscriptBuffer() {
+    return transcriptBuffer.current.trim();
+  }
+
+  function resetTranscriptBuffer() {
+    transcriptBuffer.current = "";
+  }
+
   return {
     start,
     stop,
-    closeSocket
+    closeSocket,
+    getTranscriptBuffer,
+    resetTranscriptBuffer
   };
 
 }

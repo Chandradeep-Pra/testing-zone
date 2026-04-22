@@ -3,13 +3,14 @@ import { useEffect, useState } from "react";
 export function useCountdown(
   initialSeconds: number,
   running: boolean,
-  onComplete?: () => void
+  onComplete?: () => void,
+  resetKey?: string | number
 ) {
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
 
   useEffect(() => {
     setSecondsLeft(initialSeconds);
-  }, [initialSeconds]);
+  }, [initialSeconds, resetKey]);
 
   useEffect(() => {
     if (!running) return;

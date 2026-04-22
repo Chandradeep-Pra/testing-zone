@@ -11,34 +11,18 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import type { VivaCaseRecord } from "@/lib/viva-case";
 
-interface VivaCase {
-  id: string;
-  case: {
-    title: string;
-    level: string;
-    stem: string;
-    objectives: string[];
-  };
-  exhibits: {
-    label: string;
-    url: string;
-    description: string;
-  }[];
-  marking_criteria: {
-    must_mention: string[];
-    critical_fail: string[];
-  };
-  attemptsCount?: number;
-  allowedUsers: string[];
-}
+type VivaMode = "calm" | "fast";
 
 const VivaCasesPage: React.FC = () => {
-  const [cases, setCases] = useState<VivaCase[]>([]);
+  const [cases, setCases] = useState<VivaCaseRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<string>("all");
+  const [selectedModes, setSelectedModes] = useState<Record<string, VivaMode>>({});
   const router = useRouter();
 
   useEffect(() => {
@@ -56,6 +40,23 @@ const VivaCasesPage: React.FC = () => {
     };
     fetchCases();
   }, []);
+
+  function getSelectedMode(viva: VivaCaseRecord): VivaMode {
+    return selectedModes[viva.id] || "calm";
+  }
+
+  function handleModeChange(viva: VivaCaseRecord, checked: boolean) {
+    const nextMode: VivaMode = checked ? "fast" : "calm";
+    setSelectedModes((current) => ({
+      ...current,
+      [viva.id]: nextMode,
+    }));
+  }
+
+  function openCase(viva: VivaCaseRecord) {
+    const selectedMode = getSelectedMode(viva);
+    router.push(`/ai-viva/session/${viva.id}?mode=${selectedMode}`);
+  }
 
   // Get unique levels for filter dropdown
   const levels = Array.from(new Set(cases.map((c) => c.case.level)));
@@ -120,12 +121,12 @@ const VivaCasesPage: React.FC = () => {
                   <Card
                     key={viva.id}
                     className="bg-slate-900 border-slate-800 shadow-xl rounded-2xl flex flex-col justify-between hover:scale-[1.02] hover:shadow-2xl transition-transform cursor-pointer group"
-                    onClick={() => router.push(`/ai-viva/session/${viva.id}`)}
+                    onClick={() => openCase(viva)}
                     tabIndex={0}
                     aria-label={`Open viva case: ${viva.case.title}`}
                     onKeyDown={e => {
                       if (e.key === 'Enter' || e.key === ' ') {
-                        router.push(`/ai-viva/session/${viva.id}`);
+                        openCase(viva);
                       }
                     }}
                   >
@@ -148,6 +149,30 @@ const VivaCasesPage: React.FC = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      <div
+                        className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-slate-200">
+                            {getSelectedMode(viva) === "fast"
+                              ? "Fast and Furious"
+                              : "Calm and Composed"}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            Toggle to use preset rapid-fire questions.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400">Calm</span>
+                          <Switch
+                            checked={getSelectedMode(viva) === "fast"}
+                            onCheckedChange={(checked) => handleModeChange(viva, checked)}
+                            disabled={!viva.modes?.fastAndFurious?.enabled}
+                          />
+                          <span className="text-xs text-slate-400">Fast</span>
+                        </div>
+                      </div>
                       <div>
                         <h3 className="text-sm font-semibold text-slate-200 mb-2">Objectives</h3>
                         <ul className="space-y-2 text-sm text-slate-400">
@@ -167,7 +192,7 @@ const VivaCasesPage: React.FC = () => {
                           console.log(localStorage.getItem("candidateInfo"))
                           localStorage.removeItem("candidateInfo")
                           e.stopPropagation();
-                          router.push(`/ai-viva/session/${viva.id}`);
+                          openCase(viva);
                         }}
                       >
                         Start Viva

@@ -1,22 +1,26 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import toast from "react-hot-toast";
 
 import VivaVoiceAi from "@/components/ai-viva/VivaVoiceAi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { VivaCaseRecord } from "@/lib/viva-case";
-import toast from "react-hot-toast";
 
 type CandidateInfo = {
   name: string;
   email: string;
 };
 
+type VivaMode = "calm" | "fast";
+
 type StoredCandidateInfo = CandidateInfo & {
   selectedCaseId?: string;
   selectedCaseTitle?: string;
   selectedCase?: VivaCaseRecord;
+  selectedMode?: VivaMode;
   conversation?: unknown[];
   report?: unknown;
 };
@@ -24,11 +28,13 @@ type StoredCandidateInfo = CandidateInfo & {
 function getStoredCandidate(vivaCase: VivaCaseRecord): {
   candidate: CandidateInfo;
   submitted: boolean;
+  selectedMode: VivaMode;
 } {
   if (typeof window === "undefined") {
     return {
       candidate: { name: "", email: "" },
       submitted: false,
+      selectedMode: "calm",
     };
   }
 
@@ -38,6 +44,7 @@ function getStoredCandidate(vivaCase: VivaCaseRecord): {
       return {
         candidate: { name: "", email: "" },
         submitted: false,
+        selectedMode: "calm",
       };
     }
 
@@ -49,75 +56,79 @@ function getStoredCandidate(vivaCase: VivaCaseRecord): {
       },
       submitted:
         Boolean(parsed.name && parsed.email) && parsed.selectedCaseId === vivaCase.id,
+      selectedMode: parsed.selectedMode || "calm",
     };
   } catch {
     return {
       candidate: { name: "", email: "" },
       submitted: false,
+      selectedMode: "calm",
     };
   }
 }
 
 export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseRecord }) {
+  const searchParams = useSearchParams();
+  const selectedModeFromUrl: VivaMode = searchParams.get("mode") === "fast" ? "fast" : "calm";
   const initialState = getStoredCandidate(vivaCase);
   const [candidate, setCandidate] = useState<CandidateInfo>(initialState.candidate);
-  const [submitted, setSubmitted] = useState(initialState.submitted);
+  const [submitted, setSubmitted] = useState(
+    initialState.submitted && initialState.selectedMode === selectedModeFromUrl
+  );
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  const name = candidate.name.trim();
-  const email = candidate.email.trim().toLowerCase();
+    const name = candidate.name.trim();
+    const email = candidate.email.trim().toLowerCase();
 
-  if (!name || !email) {
-    toast.error("Please fill all fields");
-    return;
-  }
+    if (!name || !email) {
+      toast.error("Please fill all fields");
+      return;
+    }
 
-  // 🔄 LOADING TOAST (promise style)
-  const checkAccess = new Promise<boolean>((resolve) => {
-    setTimeout(() => {
-      const isAllowed =
-        Array.isArray(vivaCase.allowedUser) &&
-        vivaCase.allowedUser.includes(email);
-        console.log("Current Viva Case is :", vivaCase)
+    const checkAccess = new Promise<boolean>((resolve) => {
+      setTimeout(() => {
+        const isAllowed =
+          !Array.isArray(vivaCase.allowedUser) ||
+          vivaCase.allowedUser.length === 0 ||
+          vivaCase.allowedUser.includes(email);
 
-      resolve(isAllowed);
-    }, 3000); // ⏳ 3 sec delay
-  });
+        resolve(isAllowed);
+      }, 3000);
+    });
 
-  toast.promise(checkAccess, {
-    loading: "Checking access...",
-    success: (isAllowed) => {
-      if (!isAllowed) {
-        throw new Error("Not allowed");
-      }
+    toast.promise(checkAccess, {
+      loading: "Checking access...",
+      success: (isAllowed) => {
+        if (!isAllowed) {
+          throw new Error("Not allowed");
+        }
 
-      // ✅ STORE DATA
-      const storedValue: StoredCandidateInfo = {
-        name,
-        email,
-        selectedCaseId: vivaCase.id,
-        selectedCaseTitle: vivaCase.case.title,
-        selectedCase: vivaCase,
-        conversation: [],
-        report: null,
-      };
+        const storedValue: StoredCandidateInfo = {
+          name,
+          email,
+          selectedCaseId: vivaCase.id,
+          selectedCaseTitle: vivaCase.case.title,
+          selectedCase: vivaCase,
+          selectedMode: selectedModeFromUrl,
+          conversation: [],
+          report: null,
+        };
 
-      window.localStorage.setItem("candidateInfo", JSON.stringify(storedValue));
+        window.localStorage.setItem("candidateInfo", JSON.stringify(storedValue));
+        setSubmitted(true);
 
-      setSubmitted(true);
-
-      return "Access granted! Starting viva 🚀";
-    },
-    error: "You are not allowed to access this viva ❌",
-  });
-};
+        return "Access granted! Starting viva";
+      },
+      error: "You are not allowed to access this viva",
+    });
+  };
 
   if (submitted) {
     return (
       <main className="min-h-screen bg-neutral-950 text-neutral-100">
-        <VivaVoiceAi vivaCase={vivaCase} />
+        <VivaVoiceAi vivaCase={vivaCase} selectedMode={selectedModeFromUrl} />
       </main>
     );
   }
@@ -128,6 +139,9 @@ const handleSubmit = async (e: React.FormEvent) => {
         <CardHeader>
           <CardTitle className="text-center text-slate-100">Candidate Information</CardTitle>
           <p className="text-center text-sm text-slate-400">{vivaCase.case.title}</p>
+          <p className="text-center text-xs uppercase tracking-wide text-emerald-400">
+            {selectedModeFromUrl === "fast" ? "Fast and Furious" : "Calm and Composed"}
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
