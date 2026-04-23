@@ -12,6 +12,7 @@ import { useVivaEngine } from "./useVivaEngine";
 import ReadyOverlay from "./ReadyOverlay";
 import { useCountdown } from "./useCountdown";
 import ChatTimeline from "./ChatTimeline";
+import { useLiveAvatar } from "./useLiveAvatar";
 
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
@@ -117,6 +118,8 @@ export default function VivaVoiceAi({
   } = useVivaSession();
 
   const { speak, amplitude } = useSpeechOutput();
+  const liveAvatar = useLiveAvatar();
+  const examinerSpeaking = speaking || liveAvatar.isSpeaking;
 
   const hasStartedRef = useRef(false);
   const endingRef = useRef(false);
@@ -154,7 +157,16 @@ export default function VivaVoiceAi({
     };
   }
 
-  function speakAsExaminer(text: string, onEnd?: () => void) {
+  async function speakAsExaminer(text: string, onEnd?: () => void) {
+    if (liveAvatar.isReady) {
+      try {
+        await liveAvatar.speakText(text, onEnd);
+        return;
+      } catch (err) {
+        console.error("LiveAvatar speak failed, falling back to TTS:", err);
+      }
+    }
+
     return speak(text, onEnd, getExaminerSpeechOptions());
   }
 
@@ -646,12 +658,10 @@ export default function VivaVoiceAi({
         parsed.selectedExaminerId = examinerChoice.id;
         localStorage.setItem("candidateInfo", JSON.stringify(parsed));
       }
-      speak(greeting, async () => {
+      await liveAvatar.startSession();
+      await speakAsExaminer(greeting, async () => {
         await new Promise((res) => setTimeout(res, 2000));
         startWarmup();
-      }, {
-        voiceName: examinerChoice.voiceName,
-        languageCode: examinerChoice.languageCode,
       });
     } catch (error) {
       console.error("Error in greeting:", error);
@@ -668,6 +678,7 @@ export default function VivaVoiceAi({
     setIsListening(false);
     stop();
     closeSocket();
+    await liveAvatar.stopSession();
 
     if (warmupTimeoutRef.current) {
       clearTimeout(warmupTimeoutRef.current);
@@ -764,13 +775,32 @@ export default function VivaVoiceAi({
       <div className="flex-1 p-3 sm:p-4 md:p-5 min-h-0">
         <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[1.35fr_0.65fr]">
           <div className="relative min-h-[380px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
-            <AiPanel
-              amplitude={amplitude}
-              speaking={speaking}
-              thinking={thinking}
-              transcript={transcript}
-              keywordDetected={keywordDetected}
-              exhibit={
+          <AiPanel
+            amplitude={amplitude}
+            speaking={examinerSpeaking}
+            thinking={thinking}
+            transcript={transcript}
+            keywordDetected={keywordDetected}
+            avatarVideo={
+              liveAvatar.isReady ? (
+                <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.28),_rgba(2,6,23,0.96))]">
+                  <video
+                    ref={liveAvatar.videoElementRef}
+                    autoPlay
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                  <div
+                    ref={liveAvatar.audioContainerRef}
+                    className="pointer-events-none absolute left-0 top-0 h-0 w-0 overflow-hidden"
+                  />
+                  {!examinerSpeaking && (
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(15,23,42,0.08),_rgba(2,6,23,0.42))]" />
+                  )}
+                </div>
+              ) : null
+            }
+            exhibit={
                 exhibit?.type === "image" ? (
                   <div className="relative mx-auto flex h-full max-w-full items-center justify-center md:max-w-3xl">
                     <img

@@ -1,0 +1,255 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Room,
+  RoomEvent,
+  Track,
+  type RemoteTrack,
+} from "livekit-client";
+
+type LiveAvatarSessionResponse = {
+  sessionToken: string;
+  session_id: string;
+  livekit_url: string;
+  livekit_client_token: string;
+  max_session_duration?: number;
+};
+
+type LiveAvatarServerEvent = {
+  event_id?: string;
+  event_type: string;
+  session_id: string;
+  source_event_id?: string | null;
+  text?: string;
+  end_reason?: string;
+};
+
+type UseLiveAvatarOptions = {
+  onSpeakEnded?: () => void;
+  onSpeakStarted?: () => void;
+};
+
+export function useLiveAvatar(options?: UseLiveAvatarOptions) {
+  const roomRef = useRef<Room | null>(null);
+  const sessionTokenRef = useRef<string | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const audioContainerRef = useRef<HTMLDivElement | null>(null);
+  const currentVideoTrackRef = useRef<RemoteTrack | null>(null);
+  const currentAudioTrackRef = useRef<RemoteTrack | null>(null);
+  const pendingSpeakEndRef = useRef<(() => void) | null>(null);
+
+  const [isConfigured, setIsConfigured] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const cleanupTracks = useCallback(() => {
+    currentVideoTrackRef.current?.detach();
+    currentAudioTrackRef.current?.detach();
+    currentVideoTrackRef.current = null;
+    currentAudioTrackRef.current = null;
+
+    if (videoElementRef.current) {
+      videoElementRef.current.srcObject = null;
+    }
+
+    if (audioContainerRef.current) {
+      audioContainerRef.current.replaceChildren();
+    }
+  }, []);
+
+  const attachTrack = useCallback(
+    (track: RemoteTrack) => {
+      if (track.kind === Track.Kind.Video && videoElementRef.current) {
+        currentVideoTrackRef.current?.detach();
+        currentVideoTrackRef.current = track;
+        track.attach(videoElementRef.current);
+        void videoElementRef.current.play().catch(() => undefined);
+        return;
+      }
+
+      if (track.kind === Track.Kind.Audio && audioContainerRef.current) {
+        currentAudioTrackRef.current?.detach();
+        currentAudioTrackRef.current = track;
+        const audioEl = track.attach();
+        audioEl.autoplay = true;
+        audioContainerRef.current.replaceChildren(audioEl);
+      }
+    },
+    []
+  );
+
+  const handleServerEvent = useCallback(
+    (payload: Uint8Array, topic?: string) => {
+      if (topic !== "agent-response") {
+        return;
+      }
+
+      try {
+        const event = JSON.parse(
+          new TextDecoder().decode(payload)
+        ) as LiveAvatarServerEvent;
+
+        if (event.event_type === "avatar.speak_started") {
+          setIsSpeaking(true);
+          options?.onSpeakStarted?.();
+        }
+
+        if (event.event_type === "avatar.speak_ended") {
+          setIsSpeaking(false);
+          options?.onSpeakEnded?.();
+          pendingSpeakEndRef.current?.();
+          pendingSpeakEndRef.current = null;
+        }
+
+        if (event.event_type === "session.stopped") {
+          setIsReady(false);
+          setIsSpeaking(false);
+        }
+      } catch (err) {
+        console.error("Failed to parse LiveAvatar event:", err);
+      }
+    },
+    [options]
+  );
+
+  const startSession = useCallback(async () => {
+    if (roomRef.current && isReady) {
+      return true;
+    }
+
+    setError(null);
+    setIsConnecting(true);
+
+    try {
+      const response = await fetch("/api/liveavatar/session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const payload = (await response.json()) as LiveAvatarSessionResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setIsConfigured(!payload.error?.includes("Missing LiveAvatar configuration"));
+        throw new Error(payload.error || "Failed to start LiveAvatar session");
+      }
+
+      setIsConfigured(true);
+      sessionTokenRef.current = payload.sessionToken;
+      sessionIdRef.current = payload.session_id;
+
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+      });
+
+      room.on(RoomEvent.TrackSubscribed, attachTrack);
+      room.on(RoomEvent.TrackUnsubscribed, cleanupTracks);
+      room.on(RoomEvent.DataReceived, (data, _participant, _kind, topic) => {
+        handleServerEvent(data, topic);
+      });
+      room.on(RoomEvent.Disconnected, () => {
+        setIsReady(false);
+        setIsSpeaking(false);
+        cleanupTracks();
+      });
+
+      await room.connect(payload.livekit_url, payload.livekit_client_token, {
+        autoSubscribe: true,
+      });
+
+      roomRef.current = room;
+      setIsReady(true);
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to connect LiveAvatar";
+      setError(message);
+      setIsReady(false);
+      return false;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [attachTrack, cleanupTracks, handleServerEvent, isReady]);
+
+  const speakText = useCallback(async (text: string, onEnd?: () => void) => {
+    if (!roomRef.current || !sessionIdRef.current) {
+      throw new Error("LiveAvatar session is not ready");
+    }
+
+    pendingSpeakEndRef.current = onEnd || null;
+
+    await roomRef.current.localParticipant.publishData(
+      new TextEncoder().encode(
+        JSON.stringify({
+          event_id: crypto.randomUUID(),
+          event_type: "avatar.speak_text",
+          session_id: sessionIdRef.current,
+          text,
+        })
+      ),
+      {
+        reliable: true,
+        topic: "agent-control",
+      }
+    );
+  }, []);
+
+  const stopSession = useCallback(async () => {
+    pendingSpeakEndRef.current = null;
+
+    if (roomRef.current) {
+      roomRef.current.disconnect();
+      roomRef.current = null;
+    }
+
+    cleanupTracks();
+    setIsReady(false);
+    setIsSpeaking(false);
+
+    const token = sessionTokenRef.current;
+    sessionTokenRef.current = null;
+    sessionIdRef.current = null;
+
+    if (!token) {
+      return;
+    }
+
+    try {
+      await fetch("/api/liveavatar/session/stop", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sessionToken: token }),
+      });
+    } catch (err) {
+      console.error("Failed to stop LiveAvatar session:", err);
+    }
+  }, [cleanupTracks]);
+
+  useEffect(() => {
+    return () => {
+      void stopSession();
+    };
+  }, [stopSession]);
+
+  return {
+    isConfigured,
+    isConnecting,
+    isReady,
+    isSpeaking,
+    error,
+    videoElementRef,
+    audioContainerRef,
+    startSession,
+    stopSession,
+    speakText,
+  };
+}

@@ -10,6 +10,7 @@ type Props = {
   exhibit?: React.ReactNode;
   amplitude?: number;
   keywordDetected?: boolean;
+  avatarVideo?: React.ReactNode;
 };
 
 // const fillers = [
@@ -48,6 +49,7 @@ export function AiPanel({
   exhibit,
   amplitude = 0,
   keywordDetected = false,
+  avatarVideo,
 }: Props) {
   const [filler, setFiller] = useState("");
   const activeExhibit = !speaking && !thinking ? exhibit : null;
@@ -103,11 +105,15 @@ export function AiPanel({
       </div>
 
       <div className="absolute inset-0 flex items-center justify-center bg-transparent">
-        <div className="flex items-center justify-center scale-110">
-          {thinking && <SiriWaveComponent amplitude={0.2} speed={0.02} />}
-          {speaking && <SiriWaveComponent amplitude={amplitude} speed={0.08} />}
-          {!thinking && !speaking && <SiriWaveComponent amplitude={0.1} speed={0.03} />}
-        </div>
+        {avatarVideo ? (
+          <div className="h-full w-full">{avatarVideo}</div>
+        ) : (
+          <div className="flex items-center justify-center scale-110">
+            {thinking && <SiriWaveComponent amplitude={0.2} speed={0.02} />}
+            {speaking && <SiriWaveComponent amplitude={amplitude} speed={0.08} />}
+            {!thinking && !speaking && <SiriWaveComponent amplitude={0.1} speed={0.03} />}
+          </div>
+        )}
       </div>
 
       {activeExhibit && (
