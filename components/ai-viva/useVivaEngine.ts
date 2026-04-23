@@ -111,7 +111,14 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   }
 
   function getCurrentFastQuestion() {
-    return getFastModeQuestions(vivaCase)[fastQuestionIndexRef.current] || null;
+    const questions = getFastModeQuestions(vivaCase);
+    const historyLength = previousQARef.current.length;
+
+    if (historyLength <= 0) {
+      return questions[0] || null;
+    }
+
+    return questions[Math.min(historyLength - 1, questions.length - 1)] || null;
   }
 
   function getCurrentFastQuestionKeywordProgress(answer: string) {
