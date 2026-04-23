@@ -867,6 +867,25 @@ export default function VivaVoiceAi({
               </div>
             )}
 
+            <div className="absolute bottom-4 left-4 z-30 max-w-[min(32rem,calc(100%-7rem))] rounded-2xl border border-white/10 bg-slate-950/75 px-4 py-3 text-[11px] text-slate-300 backdrop-blur">
+              <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-slate-400">
+                <span>configured: {String(liveAvatar.isConfigured)}</span>
+                <span>connecting: {String(liveAvatar.isConnecting)}</span>
+                <span>ready: {String(liveAvatar.isReady)}</span>
+                <span>speaking: {String(liveAvatar.isSpeaking)}</span>
+                <span>listening: {String(liveAvatar.isListening)}</span>
+              </div>
+              <div className="max-h-24 overflow-y-auto space-y-1 font-mono">
+                {liveAvatar.debugLog.length > 0 ? (
+                  liveAvatar.debugLog.map((entry, index) => (
+                    <div key={`${entry}-${index}`}>{entry}</div>
+                  ))
+                ) : (
+                  <div>No LiveAvatar logs yet.</div>
+                )}
+              </div>
+            </div>
+
             <div className="absolute right-2 top-2 h-24 w-20 overflow-hidden rounded-2xl md:right-4 md:top-4 md:h-auto md:w-[260px] md:aspect-video">
               <CandidatePanel
                 cameraOn={cameraOn}

@@ -68,8 +68,16 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+
+  const pushDebug = useCallback((message: string) => {
+    const entry = `${new Date().toISOString()} ${message}`;
+    console.log("[LiveAvatar]", entry);
+    setDebugLog((current) => [...current.slice(-11), entry]);
+  }, []);
 
   const cleanupTracks = useCallback(() => {
+    pushDebug("cleanup tracks");
     currentVideoTrackRef.current?.detach();
     currentAudioTrackRef.current?.detach();
     currentVideoTrackRef.current = null;
@@ -86,6 +94,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
 
   const attachTrack = useCallback(
     (track: RemoteTrack) => {
+      pushDebug(`track subscribed: ${track.kind}`);
       if (track.kind === Track.Kind.Video && videoElementRef.current) {
         currentVideoTrackRef.current?.detach();
         currentVideoTrackRef.current = track;
@@ -102,7 +111,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
         audioContainerRef.current.replaceChildren(audioEl);
       }
     },
-    []
+    [pushDebug]
   );
 
   const handleServerEvent = useCallback(
@@ -115,6 +124,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
         const event = JSON.parse(
           new TextDecoder().decode(payload)
         ) as LiveAvatarServerEvent;
+        pushDebug(`server event: ${event.event_type}`);
 
         if (event.event_type === "avatar.speak_started") {
           setIsSpeaking(true);
@@ -138,7 +148,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
         console.error("Failed to parse LiveAvatar event:", err);
       }
     },
-    [options]
+    [options, pushDebug]
   );
 
   const startSession = useCallback(async () => {
@@ -148,6 +158,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
 
     setError(null);
     setIsConnecting(true);
+    pushDebug("starting session");
 
     try {
       const response = await fetch("/api/liveavatar/session", {
@@ -162,6 +173,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
         | LiveAvatarSessionErrorResponse;
 
       if ("error" in payload && typeof payload.error === "string") {
+        pushDebug(`session route error: ${payload.error}`);
         const details = payload.details as { message?: string } | undefined;
         const detailMessage =
           details && typeof details.message === "string"
@@ -176,6 +188,9 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
       }
 
       const sessionPayload = payload as LiveAvatarSessionResponse;
+      pushDebug(
+        `session payload keys: ${Object.keys(sessionPayload).join(", ")}`
+      );
 
       setIsConfigured(true);
       sessionTokenRef.current = sessionPayload.sessionToken;
@@ -196,6 +211,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
           : null;
 
       if (!roomUrl || !clientToken) {
+        pushDebug("invalid room credentials returned");
         throw new Error(
           `LiveAvatar returned invalid room credentials: ${JSON.stringify({
             keys: Object.keys(sessionPayload),
@@ -211,10 +227,15 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
         adaptiveStream: true,
         dynacast: true,
       });
+      pushDebug("room created");
 
       room.on(RoomEvent.TrackSubscribed, attachTrack);
-      room.on(RoomEvent.TrackUnsubscribed, cleanupTracks);
+      room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        pushDebug(`track unsubscribed: ${track.kind}`);
+        cleanupTracks();
+      });
       room.on(RoomEvent.ConnectionStateChanged, (state) => {
+        pushDebug(`connection state: ${state}`);
         if (state === "disconnected") {
           setIsReady(false);
           setIsSpeaking(false);
@@ -224,40 +245,48 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
       room.on(RoomEvent.MediaDevicesError, (err) => {
         const message =
           err instanceof Error ? err.message : "LiveAvatar media device error";
+        pushDebug(`media devices error: ${message}`);
         setError(message);
       });
       room.on(RoomEvent.DataReceived, (data, _participant, _kind, topic) => {
+        pushDebug(`data received topic: ${topic ?? "unknown"}`);
         handleServerEvent(data, topic);
       });
       room.on(RoomEvent.Disconnected, () => {
+        pushDebug("room disconnected");
         setIsReady(false);
         setIsSpeaking(false);
         setIsListening(false);
         cleanupTracks();
       });
 
+      pushDebug(`connecting room to ${roomUrl}`);
       await room.connect(roomUrl, clientToken, {
         autoSubscribe: true,
       });
 
       roomRef.current = room;
       setIsReady(true);
+      pushDebug("room connected and avatar ready");
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to connect LiveAvatar";
       console.error("LiveAvatar connect failed:", err);
+      pushDebug(`connect failed: ${message}`);
       setError(message);
       setIsReady(false);
       return false;
     } finally {
       setIsConnecting(false);
     }
-  }, [attachTrack, cleanupTracks, handleServerEvent, isReady]);
+  }, [attachTrack, cleanupTracks, handleServerEvent, isReady, pushDebug]);
 
   const sendCommand = useCallback(async (command: LiveAvatarCommand) => {
     if (!roomRef.current || !sessionIdRef.current) {
       throw new Error("LiveAvatar session is not ready");
     }
+
+    pushDebug(`send command: ${command.event_type}`);
 
     await roomRef.current.localParticipant.publishData(
       new TextEncoder().encode(
@@ -272,7 +301,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
         topic: "agent-control",
       }
     );
-  }, []);
+  }, [pushDebug]);
 
   const speakText = useCallback(async (text: string, onEnd?: () => void) => {
     pendingSpeakEndRef.current = onEnd || null;
@@ -315,6 +344,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
 
   const stopSession = useCallback(async () => {
     pendingSpeakEndRef.current = null;
+    pushDebug("stopping session");
 
     if (roomRef.current) {
       roomRef.current.disconnect();
@@ -331,6 +361,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
     sessionIdRef.current = null;
 
     if (!token) {
+      pushDebug("stop session skipped: no token");
       return;
     }
 
@@ -344,8 +375,9 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
       });
     } catch (err) {
       console.error("Failed to stop LiveAvatar session:", err);
+      pushDebug("stop session request failed");
     }
-  }, [cleanupTracks]);
+  }, [cleanupTracks, pushDebug]);
 
   useEffect(() => {
     return () => {
@@ -360,6 +392,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
     isSpeaking,
     isListening,
     error,
+    debugLog,
     videoElementRef,
     audioContainerRef,
     startSession,
