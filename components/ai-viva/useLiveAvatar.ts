@@ -19,6 +19,16 @@ type LiveAvatarSessionResponse = {
   [key: string]: unknown;
 };
 
+type LiveAvatarSessionErrorResponse = {
+  error?: string;
+  details?: {
+    code?: number;
+    message?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
 type LiveAvatarServerEvent = {
   event_id?: string;
   event_type: string;
@@ -135,41 +145,52 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
         },
       });
 
-      const payload = (await response.json()) as LiveAvatarSessionResponse & {
-        error?: string;
-      };
+      const payload = (await response.json()) as
+        | LiveAvatarSessionResponse
+        | LiveAvatarSessionErrorResponse;
 
-      if (!response.ok) {
-        setIsConfigured(!payload.error?.includes("Missing LiveAvatar configuration"));
-        throw new Error(payload.error || "Failed to start LiveAvatar session");
+      if ("error" in payload && typeof payload.error === "string") {
+        const details = payload.details as { message?: string } | undefined;
+        const detailMessage =
+          details && typeof details.message === "string"
+            ? ` (${details.message})`
+            : "";
+        setIsConfigured(!payload.error.includes("Missing LiveAvatar configuration"));
+        throw new Error(`${payload.error}${detailMessage}`);
       }
 
+      if (!response.ok) {
+        throw new Error("Failed to start LiveAvatar session");
+      }
+
+      const sessionPayload = payload as LiveAvatarSessionResponse;
+
       setIsConfigured(true);
-      sessionTokenRef.current = payload.sessionToken;
-      sessionIdRef.current = payload.session_id;
+      sessionTokenRef.current = sessionPayload.sessionToken;
+      sessionIdRef.current = sessionPayload.session_id;
 
       const roomUrl =
-        typeof payload.livekit_url === "string" && payload.livekit_url.trim()
-          ? payload.livekit_url.trim()
-          : typeof payload.url === "string" && payload.url.trim()
-          ? payload.url.trim()
+        typeof sessionPayload.livekit_url === "string" && sessionPayload.livekit_url.trim()
+          ? sessionPayload.livekit_url.trim()
+          : typeof sessionPayload.url === "string" && sessionPayload.url.trim()
+          ? sessionPayload.url.trim()
           : null;
 
       const clientToken =
-        typeof payload.livekit_client_token === "string" && payload.livekit_client_token.trim()
-          ? payload.livekit_client_token.trim()
-          : typeof payload.access_token === "string" && payload.access_token.trim()
-          ? payload.access_token.trim()
+        typeof sessionPayload.livekit_client_token === "string" && sessionPayload.livekit_client_token.trim()
+          ? sessionPayload.livekit_client_token.trim()
+          : typeof sessionPayload.access_token === "string" && sessionPayload.access_token.trim()
+          ? sessionPayload.access_token.trim()
           : null;
 
       if (!roomUrl || !clientToken) {
         throw new Error(
           `LiveAvatar returned invalid room credentials: ${JSON.stringify({
-            keys: Object.keys(payload),
-            livekit_url: typeof payload.livekit_url,
-            url: typeof payload.url,
-            livekit_client_token: typeof payload.livekit_client_token,
-            access_token: typeof payload.access_token,
+            keys: Object.keys(sessionPayload),
+            livekit_url: typeof sessionPayload.livekit_url,
+            url: typeof sessionPayload.url,
+            livekit_client_token: typeof sessionPayload.livekit_client_token,
+            access_token: typeof sessionPayload.access_token,
           })}`
         );
       }
