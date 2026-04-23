@@ -120,6 +120,7 @@ export default function VivaVoiceAi({
   const { speak, amplitude } = useSpeechOutput();
   const liveAvatar = useLiveAvatar();
   const examinerSpeaking = speaking || liveAvatar.isSpeaking;
+  const [avatarSessionActive, setAvatarSessionActive] = useState(false);
 
   const hasStartedRef = useRef(false);
   const endingRef = useRef(false);
@@ -157,13 +158,32 @@ export default function VivaVoiceAi({
     };
   }
 
+  async function setAvatarListening(listening: boolean) {
+    if (!avatarSessionActive || !liveAvatar.isReady) {
+      return;
+    }
+
+    try {
+      if (listening) {
+        await liveAvatar.startListening();
+      } else {
+        await liveAvatar.stopListening();
+      }
+    } catch (err) {
+      console.error("LiveAvatar listening state update failed:", err);
+    }
+  }
+
   async function speakAsExaminer(text: string, onEnd?: () => void) {
-    if (liveAvatar.isReady) {
+    if (avatarSessionActive && liveAvatar.isReady) {
       try {
+        await liveAvatar.stopListening();
+        await liveAvatar.interrupt();
         await liveAvatar.speakText(text, onEnd);
         return;
       } catch (err) {
-        console.error("LiveAvatar speak failed, falling back to TTS:", err);
+        console.error("LiveAvatar speak failed:", err);
+        return;
       }
     }
 
@@ -221,6 +241,7 @@ export default function VivaVoiceAi({
         advanceLockRef.current = true;
         stop();
         setIsListening(false);
+        void setAvatarListening(false);
         clearFastSilencePromptTimer();
         clearFastQuestionTimer();
         speakAsExaminer("Time is up. We are concluding the viva now.", async () => {
@@ -265,6 +286,7 @@ export default function VivaVoiceAi({
     resetTranscriptBuffer();
     setCandidateTranscript("");
     setIsListening(true);
+    void setAvatarListening(true);
     void start();
   }
 
@@ -305,6 +327,7 @@ export default function VivaVoiceAi({
     advanceLockRef.current = false;
     setCandidateTranscript(answerPrefixRef.current);
     setIsListening(true);
+    void setAvatarListening(true);
     void start();
   }
 
@@ -343,6 +366,7 @@ export default function VivaVoiceAi({
       answerPrefixRef.current = latestAnswer;
       stop();
       setIsListening(false);
+      void setAvatarListening(false);
       resetTranscriptBuffer();
       syncCandidateMessage(latestAnswer, false);
       setCandidateTranscript(latestAnswer);
@@ -547,6 +571,7 @@ export default function VivaVoiceAi({
     awaitingFastModeConfirmationRef.current = false;
     stop();
     setIsListening(false);
+    void setAvatarListening(false);
 
     const finalAnswer = (
       answerText?.trim() ? answerText : mergeWithAnswerPrefix(getTranscriptBuffer() || "")
@@ -619,6 +644,7 @@ export default function VivaVoiceAi({
     speakAsExaminer(warmupPrompt, () => {
       markSpeechEnded();
       setIsListening(true);
+      void setAvatarListening(true);
       void start();
 
       warmupTimeoutRef.current = setTimeout(() => {
@@ -627,6 +653,7 @@ export default function VivaVoiceAi({
         stop();
         resetTranscriptBuffer();
         setIsListening(false);
+        void setAvatarListening(false);
         setThinking(true);
 
         speakAsExaminer("Thank you. Audio is ready. Starting the viva now.", async () => {
@@ -659,8 +686,12 @@ export default function VivaVoiceAi({
         localStorage.setItem("candidateInfo", JSON.stringify(parsed));
       }
       const avatarStarted = await liveAvatar.startSession();
+      setAvatarSessionActive(avatarStarted);
       if (!avatarStarted) {
         console.warn("LiveAvatar session did not become ready. Falling back to TTS.", liveAvatar.error);
+      } else {
+        await liveAvatar.interrupt();
+        await liveAvatar.startListening();
       }
       await speakAsExaminer(greeting, async () => {
         await new Promise((res) => setTimeout(res, 2000));
@@ -681,7 +712,9 @@ export default function VivaVoiceAi({
     setIsListening(false);
     stop();
     closeSocket();
+    void setAvatarListening(false);
     await liveAvatar.stopSession();
+    setAvatarSessionActive(false);
 
     if (warmupTimeoutRef.current) {
       clearTimeout(warmupTimeoutRef.current);

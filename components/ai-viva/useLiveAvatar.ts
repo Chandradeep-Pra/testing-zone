@@ -43,6 +43,15 @@ type UseLiveAvatarOptions = {
   onSpeakStarted?: () => void;
 };
 
+type LiveAvatarCommand =
+  | {
+      event_type: "avatar.interrupt" | "avatar.start_listening" | "avatar.stop_listening";
+    }
+  | {
+      event_type: "avatar.speak_text";
+      text: string;
+    };
+
 export function useLiveAvatar(options?: UseLiveAvatarOptions) {
   const roomRef = useRef<Room | null>(null);
   const sessionTokenRef = useRef<string | null>(null);
@@ -57,6 +66,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const cleanupTracks = useCallback(() => {
@@ -108,6 +118,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
 
         if (event.event_type === "avatar.speak_started") {
           setIsSpeaking(true);
+          setIsListening(false);
           options?.onSpeakStarted?.();
         }
 
@@ -121,6 +132,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
         if (event.event_type === "session.stopped") {
           setIsReady(false);
           setIsSpeaking(false);
+          setIsListening(false);
         }
       } catch (err) {
         console.error("Failed to parse LiveAvatar event:", err);
@@ -206,6 +218,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
         if (state === "disconnected") {
           setIsReady(false);
           setIsSpeaking(false);
+          setIsListening(false);
         }
       });
       room.on(RoomEvent.MediaDevicesError, (err) => {
@@ -219,6 +232,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
       room.on(RoomEvent.Disconnected, () => {
         setIsReady(false);
         setIsSpeaking(false);
+        setIsListening(false);
         cleanupTracks();
       });
 
@@ -240,20 +254,17 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
     }
   }, [attachTrack, cleanupTracks, handleServerEvent, isReady]);
 
-  const speakText = useCallback(async (text: string, onEnd?: () => void) => {
+  const sendCommand = useCallback(async (command: LiveAvatarCommand) => {
     if (!roomRef.current || !sessionIdRef.current) {
       throw new Error("LiveAvatar session is not ready");
     }
-
-    pendingSpeakEndRef.current = onEnd || null;
 
     await roomRef.current.localParticipant.publishData(
       new TextEncoder().encode(
         JSON.stringify({
           event_id: crypto.randomUUID(),
-          event_type: "avatar.speak_text",
           session_id: sessionIdRef.current,
-          text,
+          ...command,
         })
       ),
       {
@@ -262,6 +273,45 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
       }
     );
   }, []);
+
+  const speakText = useCallback(async (text: string, onEnd?: () => void) => {
+    pendingSpeakEndRef.current = onEnd || null;
+    setIsListening(false);
+    await sendCommand({
+      event_type: "avatar.speak_text",
+      text,
+    });
+  }, [sendCommand]);
+
+  const interrupt = useCallback(async () => {
+    pendingSpeakEndRef.current = null;
+    setIsSpeaking(false);
+    await sendCommand({
+      event_type: "avatar.interrupt",
+    });
+  }, [sendCommand]);
+
+  const startListening = useCallback(async () => {
+    if (!roomRef.current) {
+      return;
+    }
+
+    setIsListening(true);
+    await sendCommand({
+      event_type: "avatar.start_listening",
+    });
+  }, [sendCommand]);
+
+  const stopListening = useCallback(async () => {
+    if (!roomRef.current) {
+      return;
+    }
+
+    setIsListening(false);
+    await sendCommand({
+      event_type: "avatar.stop_listening",
+    });
+  }, [sendCommand]);
 
   const stopSession = useCallback(async () => {
     pendingSpeakEndRef.current = null;
@@ -274,6 +324,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
     cleanupTracks();
     setIsReady(false);
     setIsSpeaking(false);
+    setIsListening(false);
 
     const token = sessionTokenRef.current;
     sessionTokenRef.current = null;
@@ -307,11 +358,15 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
     isConnecting,
     isReady,
     isSpeaking,
+    isListening,
     error,
     videoElementRef,
     audioContainerRef,
     startSession,
     stopSession,
     speakText,
+    interrupt,
+    startListening,
+    stopListening,
   };
 }
