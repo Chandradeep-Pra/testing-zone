@@ -12,6 +12,7 @@ type LiveAvatarTokenResponse = {
   message: string;
   data?: {
     token: string;
+    session_token?: string;
     session_id?: string;
   };
 };
@@ -77,8 +78,15 @@ export async function POST(req: NextRequest) {
   });
 
   const tokenPayload = (await tokenResponse.json()) as LiveAvatarTokenResponse;
+  const sessionToken = tokenPayload.data?.token || tokenPayload.data?.session_token || null;
 
-  if (!tokenResponse.ok || !tokenPayload.data?.token) {
+  if (!tokenResponse.ok || !sessionToken) {
+    console.error("LiveAvatar token request failed", {
+      status: tokenResponse.status,
+      message: tokenPayload.message,
+      hasData: Boolean(tokenPayload.data),
+      tokenKeys: tokenPayload.data ? Object.keys(tokenPayload.data) : [],
+    });
     return NextResponse.json(
       {
         error: tokenPayload.message || "Failed to create LiveAvatar session token",
@@ -87,8 +95,6 @@ export async function POST(req: NextRequest) {
       { status: tokenResponse.status || 500 }
     );
   }
-
-  const sessionToken = tokenPayload.data.token;
 
   const startResponse = await fetch("https://api.liveavatar.com/v1/sessions/start", {
     method: "POST",
@@ -102,6 +108,12 @@ export async function POST(req: NextRequest) {
   const startPayload = (await startResponse.json()) as LiveAvatarStartResponse;
 
   if (!startResponse.ok || !startPayload.data) {
+    console.error("LiveAvatar start request failed", {
+      status: startResponse.status,
+      message: startPayload.message,
+      hasData: Boolean(startPayload.data),
+      startKeys: startPayload.data ? Object.keys(startPayload.data) : [],
+    });
     return NextResponse.json(
       {
         error: startPayload.message || "Failed to start LiveAvatar session",
@@ -116,6 +128,15 @@ export async function POST(req: NextRequest) {
     startPayload.data.livekit_client_token || startPayload.data.access_token || null;
 
   if (!roomUrl || !clientToken) {
+    console.error("LiveAvatar start response missing room credentials", {
+      status: startResponse.status,
+      message: startPayload.message,
+      startKeys: Object.keys(startPayload.data),
+      livekitUrlType: typeof startPayload.data.livekit_url,
+      urlType: typeof startPayload.data.url,
+      clientTokenType: typeof startPayload.data.livekit_client_token,
+      accessTokenType: typeof startPayload.data.access_token,
+    });
     return NextResponse.json(
       {
         error: "LiveAvatar session started, but no client room credentials were returned.",
