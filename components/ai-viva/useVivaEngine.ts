@@ -35,6 +35,28 @@ function tokenize(value: string) {
     .filter(Boolean);
 }
 
+function getKeywordAlternatives(keyword: string) {
+  return keyword
+    .split(/\s*(?:\/|\||\bor\b|,)\s*/i)
+    .map((option) => option.trim())
+    .filter(Boolean);
+}
+
+function doesKeywordVariantMatch(answer: string, answerTokens: Set<string>, keyword: string) {
+  const normalizedKeyword = normalizeKeyword(keyword);
+
+  if (!normalizedKeyword) {
+    return false;
+  }
+
+  const keywordTokens = tokenize(keyword);
+  const tokenMatch =
+    keywordTokens.length > 0 &&
+    keywordTokens.every((token) => answerTokens.has(token));
+
+  return normalizeKeyword(answer).includes(normalizedKeyword) || tokenMatch;
+}
+
 function getMatchedKeywords(answer: string, keywords: string[]) {
   const normalizedAnswer = normalizeKeyword(answer);
   const answerTokens = new Set(tokenize(answer));
@@ -50,13 +72,13 @@ function getMatchedKeywords(answer: string, keywords: string[]) {
       return false;
     }
 
-    const keywordTokens = tokenize(keyword);
-    const tokenMatch =
-      keywordTokens.length > 0 &&
-      keywordTokens.every((token) => answerTokens.has(token));
+    const alternatives = getKeywordAlternatives(keyword);
+    const keywordMatched = alternatives.some((variant) =>
+      doesKeywordVariantMatch(normalizedAnswer, answerTokens, variant)
+    );
 
     return (
-      (normalizedAnswer.includes(normalizedKeyword) || tokenMatch) &&
+      keywordMatched &&
       keywords.findIndex(
         (candidate) => normalizeKeyword(candidate) === normalizedKeyword
       ) === index

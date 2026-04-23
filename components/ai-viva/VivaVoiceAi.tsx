@@ -85,6 +85,8 @@ export default function VivaVoiceAi({
     generateScore,
     next,
     doesAnswerMatchCurrentFastQuestion,
+    getCurrentFastQuestion,
+    getCurrentFastQuestionKeywordProgress,
     getHistory,
   } = useVivaEngine(vivaCase, selectedMode);
 
@@ -142,6 +144,11 @@ export default function VivaVoiceAi({
   const [isListening, setIsListening] = useState(false);
   const [keywordDetected, setKeywordDetected] = useState(false);
   const [candidateTranscript, setCandidateTranscript] = useState("");
+
+  const currentFastQuestion = isFastMode ? getCurrentFastQuestion() : null;
+  const fastKeywordProgress = isFastMode
+    ? getCurrentFastQuestionKeywordProgress(candidateTranscript)
+    : { matchedKeywords: [], totalKeywords: 0, allMatched: false };
 
   const vivaDurationSec = vivaCase.viva_rules.max_duration_minutes * 60;
   const countdownRunning = vivaStarted && !ending;
@@ -514,6 +521,7 @@ export default function VivaVoiceAi({
       },
     ]);
 
+    setThinking(false);
     applyApiResponse(data);
     speakAsExaminer(question, () => {
       markSpeechEnded();
@@ -582,11 +590,11 @@ export default function VivaVoiceAi({
         },
       ]);
 
+      setThinking(false);
       applyApiResponse(data);
       speakAsExaminer(question, () => {
         setVivaStarted(true);
         markSpeechEnded();
-        setThinking(false);
         beginListeningForAnswer();
       });
     } catch (error) {
@@ -812,6 +820,41 @@ export default function VivaVoiceAi({
               <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-sm leading-6 text-slate-300 min-h-24">
                 {candidateTranscript || "Your live answer transcript will appear here while you speak."}
               </div>
+
+              {isFastMode &&
+                currentFastQuestion &&
+                currentFastQuestion.answerKeywords.length > 0 && (
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                        Keyword Tracker
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {fastKeywordProgress.matchedKeywords.length}/{fastKeywordProgress.totalKeywords}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {currentFastQuestion.answerKeywords.map((keyword, index) => {
+                        const matched = fastKeywordProgress.matchedKeywords.includes(keyword);
+
+                        return (
+                          <div
+                            key={`${keyword}-${index}`}
+                            className={`rounded-full border px-3 py-1.5 text-xs transition-all ${
+                              matched
+                                ? "border-emerald-400/30 bg-emerald-400/12 text-emerald-200"
+                                : "border-white/10 bg-white/[0.04] text-slate-400"
+                            }`}
+                          >
+                            {matched ? "Heard: " : ""}
+                            {keyword}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
             </div>
 
             <div className="min-h-0 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.04]">
