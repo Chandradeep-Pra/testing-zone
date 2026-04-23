@@ -73,6 +73,7 @@ export default function VivaVoiceAi({
     "Before we begin, please say your full name and tell me in one short sentence how you are feeling today. This is only an audio check and will not be scored.";
   const warmupDurationMs = 5000;
   const fastModeTotalDurationSec = 10 * 60;
+  const fastQuestionWindowMs = 15 * 1000;
   const fastSilencePromptDelayMs = 2500;
   const isFastMode = selectedMode === "fast";
 
@@ -127,6 +128,7 @@ export default function VivaVoiceAi({
   const advanceLockRef = useRef(false);
   const keywordFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fastSilencePromptTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fastQuestionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const answerPrefixRef = useRef("");
   const awaitingFastModeConfirmationRef = useRef(false);
   const messagesRef = useRef<CandidateConversationMessage[]>([]);
@@ -163,6 +165,34 @@ export default function VivaVoiceAi({
     }
   }
 
+  function clearFastQuestionTimer() {
+    if (fastQuestionTimeoutRef.current) {
+      clearTimeout(fastQuestionTimeoutRef.current);
+      fastQuestionTimeoutRef.current = null;
+    }
+  }
+
+  function startFastQuestionTimer() {
+    if (!isFastMode || endingRef.current) {
+      return;
+    }
+
+    clearFastQuestionTimer();
+    fastQuestionTimeoutRef.current = setTimeout(() => {
+      if (endingRef.current || advanceLockRef.current) {
+        return;
+      }
+
+      if (awaitingFastModeConfirmationRef.current) {
+        awaitingFastModeConfirmationRef.current = false;
+      }
+
+      void submitCurrentAnswer(
+        mergeWithAnswerPrefix(getTranscriptBuffer() || candidateTranscript || answerPrefixRef.current)
+      );
+    }, fastQuestionWindowMs);
+  }
+
   function mergeWithAnswerPrefix(value: string) {
     return [answerPrefixRef.current, value].filter(Boolean).join(" ").trim();
   }
@@ -180,6 +210,7 @@ export default function VivaVoiceAi({
         stop();
         setIsListening(false);
         clearFastSilencePromptTimer();
+        clearFastQuestionTimer();
         speakAsExaminer("Time is up. We are concluding the viva now.", async () => {
           await endViva();
         });
@@ -225,13 +256,20 @@ export default function VivaVoiceAi({
     void start();
   }
 
-  function beginListeningForAnswer(existingText = "", reuseCurrentMessage = false) {
+  function beginListeningForAnswer(
+    existingText = "",
+    reuseCurrentMessage = false,
+    resetFastTimer = true
+  ) {
     if (endingRef.current) {
       return;
     }
 
     awaitingFastModeConfirmationRef.current = false;
     clearFastSilencePromptTimer();
+    if (resetFastTimer) {
+      startFastQuestionTimer();
+    }
     answerPrefixRef.current = existingText.trim();
 
     if (!reuseCurrentMessage || !liveCandidateMsgId.current) {
@@ -319,6 +357,7 @@ export default function VivaVoiceAi({
 
     flashKeywordDetected();
     clearFastSilencePromptTimer();
+    clearFastQuestionTimer();
     void submitCurrentAnswer(answerText);
     return true;
   }
@@ -365,7 +404,7 @@ export default function VivaVoiceAi({
         awaitingFastModeConfirmationRef.current = false;
 
         if (/\b(yes|yeah|yep|sure|okay|ok|continue)\b/.test(normalized)) {
-          beginListeningForAnswer(answerPrefixRef.current, true);
+          beginListeningForAnswer(answerPrefixRef.current, true, false);
           return;
         }
 
@@ -426,10 +465,11 @@ export default function VivaVoiceAi({
       if (fillerTimeoutRef.current) {
         clearTimeout(fillerTimeoutRef.current);
       }
-      if (keywordFlashTimeoutRef.current) {
-        clearTimeout(keywordFlashTimeoutRef.current);
-      }
-      clearFastSilencePromptTimer();
+    if (keywordFlashTimeoutRef.current) {
+      clearTimeout(keywordFlashTimeoutRef.current);
+    }
+    clearFastSilencePromptTimer();
+      clearFastQuestionTimer();
       closeSocket();
       stop();
     };
@@ -491,6 +531,7 @@ export default function VivaVoiceAi({
 
     advanceLockRef.current = true;
     clearFastSilencePromptTimer();
+    clearFastQuestionTimer();
     awaitingFastModeConfirmationRef.current = false;
     stop();
     setIsListening(false);
@@ -643,6 +684,7 @@ export default function VivaVoiceAi({
       keywordFlashTimeoutRef.current = null;
     }
     clearFastSilencePromptTimer();
+    clearFastQuestionTimer();
 
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {

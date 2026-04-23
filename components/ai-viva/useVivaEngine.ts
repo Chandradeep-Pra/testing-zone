@@ -22,8 +22,22 @@ function normalizeKeyword(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+function stemToken(token: string) {
+  return token
+    .replace(/(ing|ed|es|s)$/i, "")
+    .trim();
+}
+
+function tokenize(value: string) {
+  return normalizeKeyword(value)
+    .split(" ")
+    .map((token) => stemToken(token))
+    .filter(Boolean);
+}
+
 function getMatchedKeywords(answer: string, keywords: string[]) {
   const normalizedAnswer = normalizeKeyword(answer);
+  const answerTokens = new Set(tokenize(answer));
 
   if (!normalizedAnswer) {
     return [];
@@ -36,8 +50,13 @@ function getMatchedKeywords(answer: string, keywords: string[]) {
       return false;
     }
 
+    const keywordTokens = tokenize(keyword);
+    const tokenMatch =
+      keywordTokens.length > 0 &&
+      keywordTokens.every((token) => answerTokens.has(token));
+
     return (
-      normalizedAnswer.includes(normalizedKeyword) &&
+      (normalizedAnswer.includes(normalizedKeyword) || tokenMatch) &&
       keywords.findIndex(
         (candidate) => normalizeKeyword(candidate) === normalizedKeyword
       ) === index

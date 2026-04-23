@@ -172,9 +172,9 @@ export default function ReadyOverlay({
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-sky-400/10 text-sky-300">
                   <Volume2 size={18} />
                 </div>
-                <div className="text-sm font-medium text-white">Chirp Examiner Voices</div>
+                <div className="text-sm font-medium text-white">Examiner Selection</div>
                 <p className="mt-2 text-xs leading-5 text-slate-400">
-                  Two examiner personalities are available for this mode using Google Chirp 3 HD voices.
+                  Pick the examiner style that feels right for this session before you begin.
                 </p>
               </div>
 
