@@ -13,7 +13,10 @@ type LiveAvatarSessionResponse = {
   session_id: string;
   livekit_url: string;
   livekit_client_token: string;
+  url?: string | null;
+  access_token?: string | null;
   max_session_duration?: number;
+  [key: string]: unknown;
 };
 
 type LiveAvatarServerEvent = {
@@ -145,6 +148,32 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
       sessionTokenRef.current = payload.sessionToken;
       sessionIdRef.current = payload.session_id;
 
+      const roomUrl =
+        typeof payload.livekit_url === "string" && payload.livekit_url.trim()
+          ? payload.livekit_url.trim()
+          : typeof payload.url === "string" && payload.url.trim()
+          ? payload.url.trim()
+          : null;
+
+      const clientToken =
+        typeof payload.livekit_client_token === "string" && payload.livekit_client_token.trim()
+          ? payload.livekit_client_token.trim()
+          : typeof payload.access_token === "string" && payload.access_token.trim()
+          ? payload.access_token.trim()
+          : null;
+
+      if (!roomUrl || !clientToken) {
+        throw new Error(
+          `LiveAvatar returned invalid room credentials: ${JSON.stringify({
+            keys: Object.keys(payload),
+            livekit_url: typeof payload.livekit_url,
+            url: typeof payload.url,
+            livekit_client_token: typeof payload.livekit_client_token,
+            access_token: typeof payload.access_token,
+          })}`
+        );
+      }
+
       const room = new Room({
         adaptiveStream: true,
         dynacast: true,
@@ -172,7 +201,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
         cleanupTracks();
       });
 
-      await room.connect(payload.livekit_url, payload.livekit_client_token, {
+      await room.connect(roomUrl, clientToken, {
         autoSubscribe: true,
       });
 
