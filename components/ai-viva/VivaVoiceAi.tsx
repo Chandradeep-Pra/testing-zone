@@ -121,6 +121,7 @@ export default function VivaVoiceAi({
   const liveAvatar = useLiveAvatar();
   const examinerSpeaking = speaking || liveAvatar.isSpeaking;
   const [avatarSessionActive, setAvatarSessionActive] = useState(false);
+  const avatarSessionActiveRef = useRef(false);
 
   const hasStartedRef = useRef(false);
   const endingRef = useRef(false);
@@ -159,7 +160,7 @@ export default function VivaVoiceAi({
   }
 
   async function setAvatarListening(listening: boolean) {
-    if (!avatarSessionActive || !liveAvatar.isReady) {
+    if (!avatarSessionActiveRef.current) {
       return;
     }
 
@@ -175,7 +176,7 @@ export default function VivaVoiceAi({
   }
 
   async function speakAsExaminer(text: string, onEnd?: () => void) {
-    if (avatarSessionActive && liveAvatar.isReady) {
+    if (avatarSessionActiveRef.current) {
       try {
         await liveAvatar.stopListening();
         await liveAvatar.interrupt();
@@ -183,7 +184,7 @@ export default function VivaVoiceAi({
         return;
       } catch (err) {
         console.error("LiveAvatar speak failed:", err);
-        return;
+        // Fall back to local TTS on failure
       }
     }
 
@@ -687,6 +688,7 @@ export default function VivaVoiceAi({
       }
       const avatarStarted = await liveAvatar.startSession();
       setAvatarSessionActive(avatarStarted);
+      avatarSessionActiveRef.current = avatarStarted;
       if (!avatarStarted) {
         console.warn("LiveAvatar session did not become ready. Falling back to TTS.", liveAvatar.error);
       } else {
@@ -715,6 +717,7 @@ export default function VivaVoiceAi({
     void setAvatarListening(false);
     await liveAvatar.stopSession();
     setAvatarSessionActive(false);
+    avatarSessionActiveRef.current = false;
 
     if (warmupTimeoutRef.current) {
       clearTimeout(warmupTimeoutRef.current);
