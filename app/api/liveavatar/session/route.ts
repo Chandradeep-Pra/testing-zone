@@ -23,6 +23,8 @@ type LiveAvatarStartResponse = {
     session_id: string;
     livekit_url: string;
     livekit_client_token: string;
+    url?: string | null;
+    access_token?: string | null;
     livekit_agent_token?: string | null;
     max_session_duration?: number;
     ws_url?: string | null;
@@ -109,8 +111,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const roomUrl = startPayload.data.livekit_url || startPayload.data.url || null;
+  const clientToken =
+    startPayload.data.livekit_client_token || startPayload.data.access_token || null;
+
+  if (!roomUrl || !clientToken) {
+    return NextResponse.json(
+      {
+        error: "LiveAvatar session started, but no client room credentials were returned.",
+        details: startPayload,
+      },
+      { status: 502 }
+    );
+  }
+
   return NextResponse.json({
     sessionToken,
     ...startPayload.data,
+    livekit_url: roomUrl,
+    livekit_client_token: clientToken,
   });
 }

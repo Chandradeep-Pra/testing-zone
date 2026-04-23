@@ -152,6 +152,17 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
 
       room.on(RoomEvent.TrackSubscribed, attachTrack);
       room.on(RoomEvent.TrackUnsubscribed, cleanupTracks);
+      room.on(RoomEvent.ConnectionStateChanged, (state) => {
+        if (state === "disconnected") {
+          setIsReady(false);
+          setIsSpeaking(false);
+        }
+      });
+      room.on(RoomEvent.MediaDevicesError, (err) => {
+        const message =
+          err instanceof Error ? err.message : "LiveAvatar media device error";
+        setError(message);
+      });
       room.on(RoomEvent.DataReceived, (data, _participant, _kind, topic) => {
         handleServerEvent(data, topic);
       });
@@ -170,6 +181,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to connect LiveAvatar";
+      console.error("LiveAvatar connect failed:", err);
       setError(message);
       setIsReady(false);
       return false;

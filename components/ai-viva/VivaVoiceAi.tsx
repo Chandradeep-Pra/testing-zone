@@ -658,7 +658,10 @@ export default function VivaVoiceAi({
         parsed.selectedExaminerId = examinerChoice.id;
         localStorage.setItem("candidateInfo", JSON.stringify(parsed));
       }
-      await liveAvatar.startSession();
+      const avatarStarted = await liveAvatar.startSession();
+      if (!avatarStarted) {
+        console.warn("LiveAvatar session did not become ready. Falling back to TTS.", liveAvatar.error);
+      }
       await speakAsExaminer(greeting, async () => {
         await new Promise((res) => setTimeout(res, 2000));
         startWarmup();
@@ -824,6 +827,12 @@ export default function VivaVoiceAi({
               <Sparkles size={13} className="text-emerald-300" />
               <span>{selectedExaminer.personality}</span>
             </div>
+
+            {!liveAvatar.isReady && liveAvatar.error && (
+              <div className="absolute bottom-24 left-4 right-4 z-30 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-xs text-amber-100 backdrop-blur">
+                LiveAvatar did not connect, so the app is using fallback TTS. Error: {liveAvatar.error}
+              </div>
+            )}
 
             <div className="absolute right-2 top-2 h-24 w-20 overflow-hidden rounded-2xl md:right-4 md:top-4 md:h-auto md:w-[260px] md:aspect-video">
               <CandidatePanel
