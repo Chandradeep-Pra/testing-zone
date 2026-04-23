@@ -68,6 +68,11 @@
 
 import { useRef, useState } from "react";
 
+type SpeechOptions = {
+  voiceName?: string;
+  languageCode?: string;
+};
+
 export function useSpeechOutput() {
 const [amplitude, setAmplitude] = useState(0);
 
@@ -75,7 +80,7 @@ const audioRef = useRef<HTMLAudioElement | null>(null);
 const audioContextRef = useRef<AudioContext | null>(null);
 const analyserRef = useRef<AnalyserNode | null>(null);
 
-async function speak(text: string, onEnd?: () => void) {
+async function speak(text: string, onEnd?: () => void, options?: SpeechOptions) {
 
 
 try {
@@ -92,7 +97,11 @@ try {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      text,
+      voiceName: options?.voiceName,
+      languageCode: options?.languageCode,
+    }),
   });
 
   const blob = await res.blob();

@@ -1,4 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
+
+type CountdownState = {
+  secondsLeft: number;
+};
+
+type CountdownAction =
+  | { type: "reset"; value: number }
+  | { type: "tick" };
+
+function countdownReducer(state: CountdownState, action: CountdownAction): CountdownState {
+  switch (action.type) {
+    case "reset":
+      return { secondsLeft: action.value };
+    case "tick":
+      return { secondsLeft: Math.max(0, state.secondsLeft - 1) };
+    default:
+      return state;
+  }
+}
 
 export function useCountdown(
   initialSeconds: number,
@@ -6,35 +25,37 @@ export function useCountdown(
   onComplete?: () => void,
   resetKey?: string | number
 ) {
-  const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
+  const [state, dispatch] = useReducer(countdownReducer, {
+    secondsLeft: initialSeconds,
+  });
 
   useEffect(() => {
-    setSecondsLeft(initialSeconds);
+    dispatch({ type: "reset", value: initialSeconds });
   }, [initialSeconds, resetKey]);
 
   useEffect(() => {
     if (!running) return;
-    if (secondsLeft <= 0) return;
+    if (state.secondsLeft <= 0) return;
 
     const id = window.setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(id);
-          if (onComplete) {
-            onComplete();
-          }
-          return 0;
+      if (state.secondsLeft <= 1) {
+        window.clearInterval(id);
+        if (onComplete) {
+          onComplete();
         }
-        return prev - 1;
-      });
+        dispatch({ type: "reset", value: 0 });
+        return;
+      }
+
+      dispatch({ type: "tick" });
     }, 1000);
 
     return () => window.clearInterval(id);
-  }, [running, secondsLeft, onComplete]);
+  }, [running, state.secondsLeft, onComplete]);
 
-  const minutes = Math.floor(secondsLeft / 60);
-  const seconds = secondsLeft % 60;
+  const minutes = Math.floor(state.secondsLeft / 60);
+  const seconds = state.secondsLeft % 60;
 
-  return { secondsLeft, minutes, seconds };
+  return { secondsLeft: state.secondsLeft, minutes, seconds };
 }
 

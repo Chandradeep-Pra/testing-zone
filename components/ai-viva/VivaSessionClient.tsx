@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import VivaVoiceAi from "@/components/ai-viva/VivaVoiceAi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 
 type CandidateInfo = {
@@ -21,6 +22,8 @@ type StoredCandidateInfo = CandidateInfo & {
   selectedCaseTitle?: string;
   selectedCase?: VivaCaseRecord;
   selectedMode?: VivaMode;
+  selectedExaminerId?: string;
+  selectedExaminer?: ExaminerVoice;
   conversation?: unknown[];
   report?: unknown;
 };
@@ -29,12 +32,14 @@ function getStoredCandidate(vivaCase: VivaCaseRecord): {
   candidate: CandidateInfo;
   submitted: boolean;
   selectedMode: VivaMode;
+  selectedExaminerId?: string;
 } {
   if (typeof window === "undefined") {
     return {
       candidate: { name: "", email: "" },
       submitted: false,
       selectedMode: "calm",
+      selectedExaminerId: getDefaultExaminer("calm").id,
     };
   }
 
@@ -45,6 +50,7 @@ function getStoredCandidate(vivaCase: VivaCaseRecord): {
         candidate: { name: "", email: "" },
         submitted: false,
         selectedMode: "calm",
+        selectedExaminerId: getDefaultExaminer("calm").id,
       };
     }
 
@@ -57,12 +63,14 @@ function getStoredCandidate(vivaCase: VivaCaseRecord): {
       submitted:
         Boolean(parsed.name && parsed.email) && parsed.selectedCaseId === vivaCase.id,
       selectedMode: parsed.selectedMode || "calm",
+      selectedExaminerId: parsed.selectedExaminerId || getDefaultExaminer(parsed.selectedMode || "calm").id,
     };
   } catch {
     return {
       candidate: { name: "", email: "" },
       submitted: false,
       selectedMode: "calm",
+      selectedExaminerId: getDefaultExaminer("calm").id,
     };
   }
 }
@@ -112,6 +120,8 @@ export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseReco
           selectedCaseTitle: vivaCase.case.title,
           selectedCase: vivaCase,
           selectedMode: selectedModeFromUrl,
+          selectedExaminerId: getDefaultExaminer(selectedModeFromUrl).id,
+          selectedExaminer: getDefaultExaminer(selectedModeFromUrl),
           conversation: [],
           report: null,
         };
@@ -134,12 +144,15 @@ export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseReco
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-slate-900 border-slate-700">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_transparent_40%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-neutral-100 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md border-white/10 bg-slate-950/85 shadow-[0_24px_80px_rgba(2,6,23,0.55)] backdrop-blur-xl">
         <CardHeader>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300">
+            AI
+          </div>
           <CardTitle className="text-center text-slate-100">Candidate Information</CardTitle>
           <p className="text-center text-sm text-slate-400">{vivaCase.case.title}</p>
-          <p className="text-center text-xs uppercase tracking-wide text-emerald-400">
+          <p className="text-center text-xs uppercase tracking-[0.24em] text-emerald-400">
             {selectedModeFromUrl === "fast" ? "Fast and Furious" : "Calm and Composed"}
           </p>
         </CardHeader>

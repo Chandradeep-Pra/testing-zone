@@ -1,7 +1,6 @@
-//@ts-nocheck
 "use client";
 
-import { Clock, PhoneOff, Camera, CameraOff } from "lucide-react";
+import { Clock, PhoneOff, Camera, CameraOff, Sparkles, UserRound, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CandidatePanel } from "./CandidatePanel";
@@ -14,11 +13,31 @@ import ReadyOverlay from "./ReadyOverlay";
 import { useCountdown } from "./useCountdown";
 import ChatTimeline from "./ChatTimeline";
 
+import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 
 type VivaMode = "calm" | "fast";
+type QaHistoryItem = { question?: string; answer?: string };
+type CandidateConversationMessage = {
+  id: string;
+  role: "ai" | "candidate";
+  text: string;
+  live?: boolean;
+};
+type StoredCandidateInfo = {
+  name?: string;
+  email?: string;
+  selectedExaminer?: ExaminerVoice;
+  selectedExaminerId?: string;
+  conversation?: CandidateConversationMessage[];
+  qaHistory?: QaHistoryItem[];
+  selectedCaseId?: string;
+  selectedCaseTitle?: string;
+  selectedCase?: VivaCaseRecord;
+  selectedMode?: VivaMode;
+};
 
-function buildConversationFromQaHistory(history) {
+function buildConversationFromQaHistory(history: QaHistoryItem[]) {
   return history.flatMap((item) => {
     const entries = [];
 
@@ -53,24 +72,33 @@ export default function VivaVoiceAi({
   const warmupPrompt =
     "Before we begin, please say your full name and tell me in one short sentence how you are feeling today. This is only an audio check and will not be scored.";
   const warmupDurationMs = 5000;
-  const fastAnswerWindowSec = 10;
+  const fastModeTotalDurationSec = 10 * 60;
+  const fastSilencePromptDelayMs = 2500;
   const isFastMode = selectedMode === "fast";
 
   const [candidate, setCandidate] = useState({ name: "", email: "" });
+  const [selectedExaminer, setSelectedExaminer] = useState<ExaminerVoice>(
+    getDefaultExaminer(selectedMode)
+  );
   const {
     generateScore,
     next,
     doesAnswerMatchCurrentFastQuestion,
-    getCurrentFastQuestionKeywordProgress,
     getHistory,
   } = useVivaEngine(vivaCase, selectedMode);
 
   useEffect(() => {
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {
-      const parsed = JSON.parse(stored);
-      setCandidate(parsed);
-      if (parsed.conversation) {
+      const parsed = JSON.parse(stored) as StoredCandidateInfo;
+      setCandidate({
+        name: parsed.name || "",
+        email: parsed.email || "",
+      });
+      if (parsed.selectedExaminer) {
+        setSelectedExaminer(parsed.selectedExaminer);
+      }
+      if (Array.isArray(parsed.conversation)) {
         setMessages(parsed.conversation);
       }
     }
@@ -98,38 +126,66 @@ export default function VivaVoiceAi({
   const liveCandidateMsgId = useRef<string | null>(null);
   const advanceLockRef = useRef(false);
   const keywordFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const messagesRef = useRef([]);
+  const fastSilencePromptTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const answerPrefixRef = useRef("");
+  const awaitingFastModeConfirmationRef = useRef(false);
+  const messagesRef = useRef<CandidateConversationMessage[]>([]);
 
   const [readyVisible, setReadyVisible] = useState(true);
   const [ending, setEnding] = useState(false);
   const [vivaStarted, setVivaStarted] = useState(false);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<CandidateConversationMessage[]>([]);
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [questionTurn, setQuestionTurn] = useState(0);
   const [keywordDetected, setKeywordDetected] = useState(false);
   const [candidateTranscript, setCandidateTranscript] = useState("");
 
   const vivaDurationSec = vivaCase.viva_rules.max_duration_minutes * 60;
-  const countdownRunning = vivaStarted && !ending && (isFastMode ? isListening : true);
-  const countdownTotal = isFastMode ? fastAnswerWindowSec : vivaDurationSec;
+  const countdownRunning = vivaStarted && !ending;
+  const countdownTotal = isFastMode ? fastModeTotalDurationSec : vivaDurationSec;
+
+  function getExaminerSpeechOptions() {
+    return {
+      voiceName: selectedExaminer.voiceName,
+      languageCode: selectedExaminer.languageCode,
+    };
+  }
+
+  function speakAsExaminer(text: string, onEnd?: () => void) {
+    return speak(text, onEnd, getExaminerSpeechOptions());
+  }
+
+  function clearFastSilencePromptTimer() {
+    if (fastSilencePromptTimeoutRef.current) {
+      clearTimeout(fastSilencePromptTimeoutRef.current);
+      fastSilencePromptTimeoutRef.current = null;
+    }
+  }
+
+  function mergeWithAnswerPrefix(value: string) {
+    return [answerPrefixRef.current, value].filter(Boolean).join(" ").trim();
+  }
 
   const { minutes, seconds } = useCountdown(
     countdownTotal,
     countdownRunning,
     () => {
-      if (
-        isFastMode &&
-        !endingRef.current &&
-        !advanceLockRef.current &&
-        vivaStarted &&
-        isListening
-      ) {
-        void submitCurrentAnswer(getTranscriptBuffer());
+      if (endingRef.current || advanceLockRef.current) {
+        return;
+      }
+
+      if (isFastMode) {
+        advanceLockRef.current = true;
+        stop();
+        setIsListening(false);
+        clearFastSilencePromptTimer();
+        speakAsExaminer("Time is up. We are concluding the viva now.", async () => {
+          await endViva();
+        });
       }
     },
-    isFastMode ? questionTurn : vivaDurationSec
+    isFastMode ? "fast-total-timer" : vivaDurationSec
   );
 
   const fillers = [
@@ -157,6 +213,116 @@ export default function VivaVoiceAi({
     }, 700);
   }
 
+  function beginListeningForConfirmation() {
+    if (endingRef.current) {
+      return;
+    }
+
+    liveCandidateMsgId.current = null;
+    resetTranscriptBuffer();
+    setCandidateTranscript("");
+    setIsListening(true);
+    void start();
+  }
+
+  function beginListeningForAnswer(existingText = "", reuseCurrentMessage = false) {
+    if (endingRef.current) {
+      return;
+    }
+
+    awaitingFastModeConfirmationRef.current = false;
+    clearFastSilencePromptTimer();
+    answerPrefixRef.current = existingText.trim();
+
+    if (!reuseCurrentMessage || !liveCandidateMsgId.current) {
+      const id = crypto.randomUUID();
+      liveCandidateMsgId.current = id;
+
+      setMessages((msgs) => [
+        ...msgs,
+        {
+          id,
+          role: "candidate",
+          text: answerPrefixRef.current,
+          live: true,
+        },
+      ]);
+    } else {
+      syncCandidateMessage(answerPrefixRef.current, true);
+    }
+
+    resetTranscriptBuffer();
+    advanceLockRef.current = false;
+    setCandidateTranscript(answerPrefixRef.current);
+    setIsListening(true);
+    void start();
+  }
+
+  function promptForFastModeContinuation(answerText: string) {
+    if (
+      !isFastMode ||
+      !vivaStarted ||
+      endingRef.current ||
+      advanceLockRef.current ||
+      awaitingFastModeConfirmationRef.current
+    ) {
+      return;
+    }
+
+    const normalizedAnswer = answerText.trim();
+    if (!normalizedAnswer || doesAnswerMatchCurrentFastQuestion(normalizedAnswer)) {
+      return;
+    }
+
+    clearFastSilencePromptTimer();
+
+    fastSilencePromptTimeoutRef.current = setTimeout(() => {
+      const latestAnswer = mergeWithAnswerPrefix(getTranscriptBuffer()) || normalizedAnswer;
+
+      if (
+        endingRef.current ||
+        advanceLockRef.current ||
+        awaitingFastModeConfirmationRef.current ||
+        !latestAnswer ||
+        doesAnswerMatchCurrentFastQuestion(latestAnswer)
+      ) {
+        return;
+      }
+
+      awaitingFastModeConfirmationRef.current = true;
+      answerPrefixRef.current = latestAnswer;
+      stop();
+      setIsListening(false);
+      resetTranscriptBuffer();
+      syncCandidateMessage(latestAnswer, false);
+      setCandidateTranscript(latestAnswer);
+
+      speakAsExaminer("Do you want to add anything else to your answer?", () => {
+        beginListeningForConfirmation();
+      });
+    }, fastSilencePromptDelayMs);
+  }
+
+  function tryAdvanceFastMode(answerText: string) {
+    if (
+      !isFastMode ||
+      !vivaStarted ||
+      endingRef.current ||
+      advanceLockRef.current
+    ) {
+      return false;
+    }
+
+    if (!doesAnswerMatchCurrentFastQuestion(answerText)) {
+      return false;
+    }
+
+    flashKeywordDetected();
+    clearFastSilencePromptTimer();
+    void submitCurrentAnswer(answerText);
+    return true;
+  }
+
   const {
     start,
     stop,
@@ -167,22 +333,23 @@ export default function VivaVoiceAi({
     (interim) => {
       if (ending) return;
 
-      setCandidateTranscript(interim);
+      if (awaitingFastModeConfirmationRef.current) {
+        setCandidateTranscript(interim);
+        return;
+      }
+
+      const combinedInterim = mergeWithAnswerPrefix(interim);
+
+      setCandidateTranscript(combinedInterim);
 
       setMessages((msgs) =>
         msgs.map((m) =>
-          m.id === liveCandidateMsgId.current ? { ...m, text: interim } : m
+          m.id === liveCandidateMsgId.current ? { ...m, text: combinedInterim } : m
         )
       );
 
-      if (
-        isFastMode &&
-        vivaStarted &&
-        !advanceLockRef.current &&
-        getCurrentFastQuestionKeywordProgress(interim).allMatched
-      ) {
-        flashKeywordDetected();
-        void submitCurrentAnswer(interim);
+      if (!tryAdvanceFastMode(combinedInterim)) {
+        promptForFastModeContinuation(combinedInterim);
       }
     },
 
@@ -193,17 +360,44 @@ export default function VivaVoiceAi({
         return;
       }
 
-      setCandidateTranscript(finalText);
+      if (awaitingFastModeConfirmationRef.current) {
+        const normalized = finalText.toLowerCase();
+        awaitingFastModeConfirmationRef.current = false;
 
-      if (
-        isFastMode &&
-        vivaStarted &&
-        getCurrentFastQuestionKeywordProgress(finalText).allMatched
-      ) {
-        flashKeywordDetected();
+        if (/\b(yes|yeah|yep|sure|okay|ok|continue)\b/.test(normalized)) {
+          beginListeningForAnswer(answerPrefixRef.current, true);
+          return;
+        }
+
+        if (/\b(no|nope|nah|move on|next)\b/.test(normalized)) {
+          await submitCurrentAnswer(answerPrefixRef.current);
+          return;
+        }
+
+        speakAsExaminer(
+          "Please say yes if you want to continue, or no if you want to move to the next question.",
+          () => {
+            beginListeningForConfirmation();
+          }
+        );
+        return;
       }
 
-      await submitCurrentAnswer(finalText);
+      const combinedFinalText = mergeWithAnswerPrefix(finalText);
+      setCandidateTranscript(combinedFinalText);
+
+      if (isFastMode) {
+        if (tryAdvanceFastMode(combinedFinalText)) {
+          return;
+        }
+
+        answerPrefixRef.current = combinedFinalText;
+        syncCandidateMessage(combinedFinalText, true);
+        promptForFastModeContinuation(combinedFinalText);
+        return;
+      }
+
+      await submitCurrentAnswer(combinedFinalText);
     }
   );
 
@@ -215,7 +409,7 @@ export default function VivaVoiceAi({
     if (remaining === 20 && !endingRef.current) {
       endingRef.current = true;
 
-      speak(
+      speakAsExaminer(
         "Thank you. We are concluding the viva now. Generating your score.",
         async () => {
           await endViva();
@@ -235,6 +429,7 @@ export default function VivaVoiceAi({
       if (keywordFlashTimeoutRef.current) {
         clearTimeout(keywordFlashTimeoutRef.current);
       }
+      clearFastSilencePromptTimer();
       closeSocket();
       stop();
     };
@@ -250,31 +445,6 @@ export default function VivaVoiceAi({
         m.id === liveCandidateMsgId.current ? { ...m, text, live } : m
       )
     );
-  }
-
-  function beginListeningForAnswer() {
-    if (endingRef.current) {
-      return;
-    }
-
-    const id = crypto.randomUUID();
-    liveCandidateMsgId.current = id;
-
-    setMessages((msgs) => [
-      ...msgs,
-      {
-        id,
-        role: "candidate",
-        text: "",
-        live: true,
-      },
-    ]);
-
-    resetTranscriptBuffer();
-    advanceLockRef.current = false;
-    setCandidateTranscript("");
-    setIsListening(true);
-    void start();
   }
 
   async function askNextQuestion(userAnswer: string) {
@@ -293,20 +463,19 @@ export default function VivaVoiceAi({
     if (!data?.question) {
       return;
     }
+    const question = data.question;
 
     setMessages((msgs) => [
       ...msgs,
       {
         id: crypto.randomUUID(),
         role: "ai",
-        text: data.question,
+        text: question,
       },
     ]);
 
     applyApiResponse(data);
-    setQuestionTurn((turn) => turn + 1);
-
-    speak(data.question, () => {
+    speakAsExaminer(question, () => {
       markSpeechEnded();
       if (isFastMode && data.imageUsed) {
         clearExhibit();
@@ -321,10 +490,15 @@ export default function VivaVoiceAi({
     }
 
     advanceLockRef.current = true;
+    clearFastSilencePromptTimer();
+    awaitingFastModeConfirmationRef.current = false;
     stop();
     setIsListening(false);
 
-    const finalAnswer = (answerText || getTranscriptBuffer() || "").trim();
+    const finalAnswer = (
+      answerText?.trim() ? answerText : mergeWithAnswerPrefix(getTranscriptBuffer() || "")
+    ).trim();
+    answerPrefixRef.current = "";
     resetTranscriptBuffer();
     setCandidateTranscript(finalAnswer);
     syncCandidateMessage(finalAnswer, false);
@@ -336,7 +510,7 @@ export default function VivaVoiceAi({
         if (endingRef.current) return;
         const filler = fillers[fillerIndexRef.current % fillers.length];
         fillerIndexRef.current += 1;
-        speak(filler);
+        speakAsExaminer(filler);
       }, 1200);
     } else {
       setThinking(true);
@@ -357,19 +531,18 @@ export default function VivaVoiceAi({
       if (!data?.question) {
         return;
       }
+      const question = data.question;
 
       setMessages([
         {
           id: crypto.randomUUID(),
           role: "ai",
-          text: data.question,
+          text: question,
         },
       ]);
 
       applyApiResponse(data);
-      setQuestionTurn(1);
-
-      speak(data.question, () => {
+      speakAsExaminer(question, () => {
         setVivaStarted(true);
         markSpeechEnded();
         setThinking(false);
@@ -390,7 +563,7 @@ export default function VivaVoiceAi({
       warmupTimeoutRef.current = null;
     }
 
-    speak(warmupPrompt, () => {
+    speakAsExaminer(warmupPrompt, () => {
       markSpeechEnded();
       setIsListening(true);
       void start();
@@ -403,7 +576,7 @@ export default function VivaVoiceAi({
         setIsListening(false);
         setThinking(true);
 
-        speak("Thank you. Audio is ready. Starting the viva now.", async () => {
+        speakAsExaminer("Thank you. Audio is ready. Starting the viva now.", async () => {
           await new Promise((res) => setTimeout(res, 400));
           await startViva();
         });
@@ -411,7 +584,10 @@ export default function VivaVoiceAi({
     });
   }
 
-  async function handleBegin(cameraPref = false) {
+  async function handleBegin(
+    cameraPref = false,
+    examinerChoice: ExaminerVoice = getDefaultExaminer(selectedMode)
+  ) {
     if (hasStartedRef.current) return;
 
     hasStartedRef.current = true;
@@ -421,9 +597,20 @@ export default function VivaVoiceAi({
 
     try {
       const greeting = `Hello ${candidate.name}, welcome to the Urologics AI Examiner viva. Please wait while we prepare your session.`;
+      setSelectedExaminer(examinerChoice);
+      const stored = localStorage.getItem("candidateInfo");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        parsed.selectedExaminer = examinerChoice;
+        parsed.selectedExaminerId = examinerChoice.id;
+        localStorage.setItem("candidateInfo", JSON.stringify(parsed));
+      }
       speak(greeting, async () => {
         await new Promise((res) => setTimeout(res, 2000));
         startWarmup();
+      }, {
+        voiceName: examinerChoice.voiceName,
+        languageCode: examinerChoice.languageCode,
       });
     } catch (error) {
       console.error("Error in greeting:", error);
@@ -455,6 +642,7 @@ export default function VivaVoiceAi({
       clearTimeout(keywordFlashTimeoutRef.current);
       keywordFlashTimeoutRef.current = null;
     }
+    clearFastSilencePromptTimer();
 
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {
@@ -469,6 +657,8 @@ export default function VivaVoiceAi({
       parsed.selectedCaseTitle = vivaCase.case.title;
       parsed.selectedCase = vivaCase;
       parsed.selectedMode = selectedMode;
+      parsed.selectedExaminer = selectedExaminer;
+      parsed.selectedExaminerId = selectedExaminer.id;
       localStorage.setItem("candidateInfo", JSON.stringify(parsed));
     }
 
@@ -476,8 +666,14 @@ export default function VivaVoiceAi({
   }
 
   return (
-    <main className="h-screen bg-slate-950 text-slate-100 flex flex-col w-full relative">
-      {readyVisible && <ReadyOverlay onBegin={handleBegin} />}
+    <main className="h-screen w-full bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.16),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_38%,_#020617_100%)] text-slate-100 flex flex-col relative overflow-hidden">
+      {readyVisible && (
+        <ReadyOverlay
+          onBegin={handleBegin}
+          vivaTitle={vivaCase.case.title}
+          selectedMode={selectedMode}
+        />
+      )}
 
       {ending && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm">
@@ -489,67 +685,116 @@ export default function VivaVoiceAi({
         </div>
       )}
 
-      <div className="h-12 sm:h-14 md:h-16 px-2 sm:px-4 md:px-8 flex items-center justify-between bg-slate-900/60 backdrop-blur-xl border-b border-slate-800">
-        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 min-w-0">
-          <div className="h-1 w-1 sm:h-1.5 sm:w-1.5 md:h-2 md:w-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-          <span className="text-xs md:text-sm uppercase tracking-wide text-slate-400 hidden sm:inline white-space-nowrap">
+      <div className="border-b border-white/10 bg-slate-950/70 px-3 py-3 backdrop-blur-xl sm:px-5 md:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300">
+              <ShieldCheck size={18} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-[0.22em] text-slate-500">
+                Examiner Session
+              </div>
+              <div className="truncate text-sm font-semibold text-slate-100 md:text-base">
+                {selectedExaminer.name} • {selectedExaminer.title}
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden flex-1 justify-center md:flex">
+            <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-300">
+              {vivaCase.case.title}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs uppercase tracking-[0.18em] text-slate-400">
             {isFastMode ? "Fast and Furious" : "Live Viva"}
-          </span>
-        </div>
-
-        <div className="text-slate-200 font-medium text-xs sm:text-sm md:text-base hidden md:block flex-1 text-center px-2">
-          Urologics AI Examiner
-        </div>
-
-        <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 rounded-full bg-slate-800/70 border border-emerald-500/20 text-xs sm:text-sm md:text-base font-semibold text-emerald-400 flex-shrink-0">
-          <Clock size={12} className="sm:h-4 sm:w-4 md:h-[18px] md:w-[18px]" />
-          <span>{minutes}:{seconds.toString().padStart(2, "0")}</span>
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col gap-2 sm:gap-3 md:gap-4 p-2 sm:p-3 md:p-4 h-full min-h-0">
-        <div className="relative bg-slate-950 border border-slate-800 rounded-lg md:rounded-xl overflow-hidden flex-1 min-h-0">
-          <AiPanel
-            amplitude={amplitude}
-            speaking={speaking}
-            thinking={thinking}
-            transcript={transcript}
-            keywordDetected={keywordDetected}
-            exhibit={
-              exhibit?.type === "image" ? (
-                <div className="relative max-w-full md:max-w-3xl mx-auto h-full flex items-center justify-center">
-                  <img
-                    src={exhibit.src}
-                    alt="Viva exhibit"
-                    className="rounded-lg md:rounded-xl shadow-xl max-h-[60vh] md:max-h-[70vh] w-auto"
-                  />
-
-                  <button
-                    onClick={clearExhibit}
-                    className="absolute top-2 right-2 md:top-3 md:right-3 bg-black/70 hover:bg-black/90 text-white text-xs px-2 md:px-3 py-1 rounded-full transition-colors"
-                  >
-                    Close
-                  </button>
-                </div>
-              ) : null
-            }
-          />
-
-          <div className="absolute top-1.5 right-1.5 md:top-4 md:right-4 w-20 md:w-[260px] h-24 md:h-auto aspect-video md:aspect-auto">
-            <CandidatePanel
-              cameraOn={cameraOn}
-              listening={isListening}
-              transcript={candidateTranscript}
-            />
+            </span>
+            <div className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300">
+              <Clock size={14} />
+              <span>{minutes}:{seconds.toString().padStart(2, "0")}</span>
+            </div>
           </div>
         </div>
-
-        {/* <div className="h-40 md:h-56 rounded-lg md:rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
-          <ChatTimeline messages={messages} />
-        </div> */}
       </div>
 
-      <div className="h-12 sm:h-14 md:h-16 flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:gap-6 px-2 sm:px-3 md:px-4 py-1 sm:py-2 bg-slate-900/60 backdrop-blur-xl border-t border-slate-800 overflow-x-auto">
+      <div className="flex-1 p-3 sm:p-4 md:p-5 min-h-0">
+        <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+          <div className="relative min-h-[380px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
+            <AiPanel
+              amplitude={amplitude}
+              speaking={speaking}
+              thinking={thinking}
+              transcript={transcript}
+              keywordDetected={keywordDetected}
+              exhibit={
+                exhibit?.type === "image" ? (
+                  <div className="relative mx-auto flex h-full max-w-full items-center justify-center md:max-w-3xl">
+                    <img
+                      src={exhibit.src}
+                      alt="Viva exhibit"
+                      className="max-h-[60vh] w-auto rounded-2xl shadow-xl md:max-h-[70vh]"
+                    />
+
+                    <button
+                      onClick={clearExhibit}
+                      className="absolute right-2 top-2 rounded-full bg-black/70 px-3 py-1 text-xs text-white transition-colors hover:bg-black/90 md:right-3 md:top-3"
+                    >
+                      Close
+                    </button>
+                  </div>
+                ) : null
+              }
+            />
+
+            <div className="absolute left-4 top-4 z-30 flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs text-slate-300 backdrop-blur">
+              <Sparkles size={13} className="text-emerald-300" />
+              <span>{selectedExaminer.personality}</span>
+            </div>
+
+            <div className="absolute right-2 top-2 h-24 w-20 overflow-hidden rounded-2xl md:right-4 md:top-4 md:h-auto md:w-[260px] md:aspect-video">
+              <CandidatePanel
+                cameraOn={cameraOn}
+                listening={isListening}
+              />
+            </div>
+          </div>
+
+          <div className="grid min-h-0 gap-4 lg:grid-rows-[auto_1fr_auto]">
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+              <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">
+                <UserRound size={14} />
+                Candidate Feed
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-sm leading-6 text-slate-300 min-h-24">
+                {candidateTranscript || "Your live answer transcript will appear here while you speak."}
+              </div>
+            </div>
+
+            <div className="min-h-0 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.04]">
+              <div className="border-b border-white/10 px-4 py-3 text-xs uppercase tracking-[0.22em] text-slate-500">
+                Session Timeline
+              </div>
+              <ChatTimeline messages={messages} />
+            </div>
+
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
+              {isFastMode ? (
+                <p>
+                  Fast mode stays on a total 10 minute clock. If you pause before covering all key words, the examiner now asks whether you want to add anything else before moving on.
+                </p>
+              ) : (
+                <p>
+                  Calm mode follows a more natural viva pace with adaptive follow-up questioning and a professional conversational cadence.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 bg-slate-950/70 px-3 py-3 backdrop-blur-xl sm:gap-3 md:gap-6">
         <button
           onClick={() => setCameraOn((v) => !v)}
           disabled={!cameraEnabled}

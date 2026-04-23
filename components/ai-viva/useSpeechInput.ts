@@ -1,17 +1,25 @@
-//@ts-nocheck
 "use client";
 
 import { useRef } from "react";
 
-export function useSpeechInput(onInterim, onFinal) {
-  const wsRef = useRef(null);
+type SttMessage = {
+  transcript?: string;
+  final?: boolean;
+  speechEnded?: boolean;
+};
+
+export function useSpeechInput(
+  onInterim: (text: string) => void,
+  onFinal: (text: string) => void | Promise<void>
+) {
+  const wsRef = useRef<WebSocket | null>(null);
   const transcriptBuffer = useRef("");
   const interimTranscriptRef = useRef("");
 
-  const audioContextRef = useRef(null);
-  const workletRef = useRef(null);
-  const sourceRef = useRef(null);
-  const mediaStreamRef = useRef(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const workletRef = useRef<AudioWorkletNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   async function ensureSocketReady() {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -19,7 +27,7 @@ export function useSpeechInput(onInterim, onFinal) {
     }
 
     if (wsRef.current?.readyState === WebSocket.CONNECTING) {
-      await new Promise((resolve, reject) => {
+      await new Promise<WebSocket>((resolve, reject) => {
         const ws = wsRef.current;
         if (!ws) {
           reject(new Error("Socket unavailable"));
@@ -27,7 +35,9 @@ export function useSpeechInput(onInterim, onFinal) {
         }
 
         ws.addEventListener("open", () => resolve(ws), { once: true });
-        ws.addEventListener("error", reject, { once: true });
+        ws.addEventListener("error", () => reject(new Error("Socket connection failed")), {
+          once: true,
+        });
       });
 
       return wsRef.current;
@@ -37,16 +47,8 @@ export function useSpeechInput(onInterim, onFinal) {
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
 
-    ws.onopen = () => {
-      console.log("STT socket connected");
-    };
-
-    ws.onclose = () => {
-      console.log("STT socket closed");
-    };
-
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+      const data = JSON.parse(event.data as string) as SttMessage;
       if (!data) return;
 
       if (data.transcript) {
@@ -78,10 +80,8 @@ export function useSpeechInput(onInterim, onFinal) {
           .join(" ")
           .trim();
 
-        console.log("Submitting answer:", finalText);
-
         if (finalText) {
-          onFinal(finalText);
+          void onFinal(finalText);
         }
 
         transcriptBuffer.current = "";
@@ -89,17 +89,17 @@ export function useSpeechInput(onInterim, onFinal) {
       }
     };
 
-    await new Promise((resolve, reject) => {
+    await new Promise<WebSocket>((resolve, reject) => {
       ws.addEventListener("open", () => resolve(ws), { once: true });
-      ws.addEventListener("error", reject, { once: true });
+      ws.addEventListener("error", () => reject(new Error("Socket connection failed")), {
+        once: true,
+      });
     });
 
     return ws;
   }
 
   async function start() {
-    console.log("Starting speech input");
-
     await ensureSocketReady();
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -119,19 +119,16 @@ export function useSpeechInput(onInterim, onFinal) {
     const worklet = new AudioWorkletNode(audioContext, "audio-processor");
     workletRef.current = worklet;
 
-    worklet.port.onmessage = (event) => {
+    worklet.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(event.data);
       }
     };
 
     source.connect(worklet);
-    console.log("Mic streaming to STT");
   }
 
   function stop() {
-    console.log("Stopping microphone");
-
     if (workletRef.current) {
       workletRef.current.disconnect();
       workletRef.current = null;
@@ -148,7 +145,7 @@ export function useSpeechInput(onInterim, onFinal) {
     }
 
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      void audioContextRef.current.close();
       audioContextRef.current = null;
     }
   }

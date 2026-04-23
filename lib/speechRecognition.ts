@@ -1,9 +1,26 @@
-export function createSpeechRecognition(
-  onFinal: (text: string) => void
-) {
+type SpeechRecognitionResultEventLike = Event & {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
+export function createSpeechRecognition(onFinal: (text: string) => void) {
   const SpeechRecognition =
-    (window as any).SpeechRecognition ||
-    (window as any).webkitSpeechRecognition;
+    window.SpeechRecognition || window.webkitSpeechRecognition;
 
   if (!SpeechRecognition) {
     alert("Speech Recognition not supported");
@@ -15,7 +32,7 @@ export function createSpeechRecognition(
   recognition.continuous = false;
   recognition.interimResults = false;
 
-  recognition.onresult = (event: any) => {
+  recognition.onresult = (event) => {
     const transcript = event.results[0][0].transcript;
     onFinal(transcript);
   };

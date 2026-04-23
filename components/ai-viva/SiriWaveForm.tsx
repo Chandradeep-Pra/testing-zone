@@ -13,7 +13,7 @@ export default function SiriWaveComponent({
   speed = 0.08,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const waveRef = useRef<any>(null);
+  const waveRef = useRef<SiriWave | null>(null);
 
   // init wave
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function SiriWaveComponent({
     return () => {
       wave.dispose();
     };
-  }, []);
+  }, [speed]);
 
   // update amplitude (reactivity fix)
   useEffect(() => {

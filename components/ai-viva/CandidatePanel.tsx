@@ -6,13 +6,11 @@ import { useEffect, useRef } from "react";
 type Props = {
   cameraOn: boolean;
   listening: boolean;
-  transcript?: string;
 };
 
 export function CandidatePanel({
   cameraOn,
   listening,
-  transcript,
 }: Props) {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -38,7 +36,7 @@ export function CandidatePanel({
           videoRef.current.srcObject = stream;
         }
 
-      } catch (err) {
+      } catch {
         console.warn("Camera permission denied");
       }
     }
@@ -69,11 +67,11 @@ export function CandidatePanel({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg md:rounded-xl border w-full h-full
-      bg-slate-900/80 backdrop-blur-xl
+      className={`relative h-full w-full overflow-hidden rounded-2xl border
+      bg-slate-950/85 backdrop-blur-xl
       ${listening
-        ? "border-blue-400 shadow-[0_0_20px_rgba(96,165,250,0.35)]"
-        : "border-slate-800"
+        ? "border-sky-400/60 shadow-[0_0_24px_rgba(56,189,248,0.22)]"
+        : "border-white/10"
       }`}
     >
 
@@ -99,14 +97,14 @@ export function CandidatePanel({
 
       {/* HEADER */}
 
-      <div className="absolute top-0.5 left-1 md:top-2 md:left-3 text-xs md:text-xs text-slate-300">
+      <div className="absolute left-2 top-2 rounded-full bg-black/35 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-300 md:left-3 md:top-3 md:text-[11px]">
         You
       </div>
 
       {/* MIC STATUS */}
 
       {listening && (
-        <div className="absolute top-0.5 right-0.5 md:top-2 md:right-3 flex items-center gap-0.5 text-blue-400 text-xs">
+        <div className="absolute right-1 top-1 flex items-center gap-1 rounded-full bg-sky-400/10 px-2 py-1 text-[10px] text-sky-300 md:right-3 md:top-3 md:text-xs">
           <Mic size={10} className="md:h-[14px] md:w-[14px]" />
           <span className="hidden sm:inline">Listening</span>
         </div>

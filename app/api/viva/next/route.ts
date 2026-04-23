@@ -1,74 +1,82 @@
-//@ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
-import { vivaContext } from "@/ai-viva-data/vivaContext";
-import {
-  ExaminerState,
-  createInitialExaminerState
-} from "@/ai-viva-data/examinerState";
-import { geminiModel } from "@/lib/gemni";
-import { EXAMINER_SYSTEM_PROMPT } from "@/ai-viva-data/examinerPrompt";
 
-/* ============================================================
-   1. Gemini Output Normalisation (HARDENED)
-============================================================ */
-function normalizeGeminiResponse(raw: any) {
+import { vivaContext } from "@/ai-viva-data/vivaContext";
+import { ExaminerState, createInitialExaminerState } from "@/ai-viva-data/examinerState";
+import { EXAMINER_SYSTEM_PROMPT } from "@/ai-viva-data/examinerPrompt";
+import { geminiModel } from "@/lib/gemni";
+
+type GeminiResponse = {
+  type?: string;
+  text?: string;
+  action?: string | null;
+  scoreDelta?: Partial<ExaminerState["dimensionScores"]> | null;
+};
+
+type SessionRecord = {
+  examinerState: ExaminerState;
+  usedExhibits: Set<string>;
+  initialized: boolean;
+  basePrompt: string;
+  examinerMemory: string;
+};
+
+type NextRequestBody = {
+  sessionId: string;
+  userAnswer?: string;
+  timeElapsedSec: number;
+};
+
+function normalizeGeminiResponse(raw: unknown) {
   if (!raw) return { type: "question", text: "Please continue.", action: null };
 
   if (typeof raw === "string") {
-    try { return JSON.parse(raw); }
-    catch { return { type: "question", text: raw, action: null }; }
-  }
-
-  if (raw?.text && typeof raw.text === "string") {
-    try { return JSON.parse(raw.text); }
-    catch {
-      return {
-        type: raw.type ?? "question",
-        text: raw.text,
-        action: raw.action ?? null,
-        scoreDelta: raw.scoreDelta ?? null
-      };
+    try {
+      return JSON.parse(raw) as GeminiResponse;
+    } catch {
+      return { type: "question", text: raw, action: null };
     }
   }
 
-  if (raw?.type && raw?.text) return raw;
+  if (typeof raw === "object" && raw !== null && "text" in raw) {
+    const candidate = raw as GeminiResponse;
+    if (typeof candidate.text === "string") {
+      try {
+        return JSON.parse(candidate.text) as GeminiResponse;
+      } catch {
+        return {
+          type: candidate.type ?? "question",
+          text: candidate.text,
+          action: candidate.action ?? null,
+          scoreDelta: candidate.scoreDelta ?? null,
+        };
+      }
+    }
+  }
+
+  if (typeof raw === "object" && raw !== null && "type" in raw && "text" in raw) {
+    return raw as GeminiResponse;
+  }
 
   return { type: "question", text: "Please continue.", action: null };
 }
 
-/* ============================================================
-   2. Session Store (LONG-LIVED EXAMINER)
-============================================================ */
-const sessions = new Map<
-  string,
-  {
-    examinerState: ExaminerState;
-    usedExhibits: Set<string>;
-
-    initialized: boolean;
-    basePrompt: string;
-    examinerMemory: string;
-  }
->();
+const sessions = new Map<string, SessionRecord>();
 
 function getOrCreateSession(sessionId: string) {
   if (!sessions.has(sessionId)) {
     sessions.set(sessionId, {
       examinerState: createInitialExaminerState(),
       usedExhibits: new Set(),
-
       initialized: false,
       basePrompt: "",
-      examinerMemory: ""
+      examinerMemory: "",
     });
   }
+
   return sessions.get(sessionId)!;
 }
 
-/* ============================================================
-   3. Session Initialization (ONCE ONLY)
-============================================================ */
-function initializeSession(session) {
+function initializeSession(session: SessionRecord) {
   session.basePrompt = `
 ${EXAMINER_SYSTEM_PROMPT}
 
@@ -76,17 +84,12 @@ CASE CONTEXT:
 ${vivaContext.case.stem}
 
 AVAILABLE EXHIBITS:
-${vivaContext.exhibits
-  .map(e => `- ${e.id}: ${e.description}`)
-  .join("\n")}
+${vivaContext.exhibits.map((e) => `- ${e.id}: ${e.description}`).join("\n")}
 `;
   session.initialized = true;
 }
 
-/* ============================================================
-   4. Examiner Memory (COMPRESSED & CUMULATIVE)
-============================================================ */
-function updateExaminerMemory(answer: string, session) {
+function updateExaminerMemory(answer: string, session: SessionRecord) {
   const a = answer.toLowerCase();
   const notes: string[] = [];
 
@@ -114,10 +117,13 @@ function updateExaminerMemory(answer: string, session) {
   }
 }
 
-/* ============================================================
-   5. Gemini Caller (LEAN, CONTEXTUAL)
-============================================================ */
-async function callGemini({ session, lastAnswer }: any) {
+async function callGemini({
+  session,
+  lastAnswer,
+}: {
+  session: SessionRecord;
+  lastAnswer: string;
+}) {
   const prompt = `
 ${session.basePrompt}
 
@@ -131,24 +137,11 @@ Ask the next SINGLE viva question.
 `;
 
   const result = await geminiModel.generateContent(prompt);
+  const rawText = result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-  // Prefer structured candidates output from Gemini
-  let rawText: string | null = null;
-  if (
-    result.response &&
-    result.response.candidates &&
-    result.response.candidates[0] &&
-    result.response.candidates[0].content &&
-    result.response.candidates[0].content.parts &&
-    result.response.candidates[0].content.parts[0] &&
-    typeof result.response.candidates[0].content.parts[0].text === 'string'
-  ) {
-    rawText = result.response.candidates[0].content.parts[0].text;
-  } else {
-    throw new Error('Unexpected Gemini response structure');
+  if (typeof rawText !== "string") {
+    throw new Error("Unexpected Gemini response structure");
   }
-
-  console.log("Gemini Raw Response:", rawText);
 
   const cleaned = rawText
     .replace(/^```json\s*/i, "")
@@ -157,12 +150,8 @@ Ask the next SINGLE viva question.
     .trim();
 
   return normalizeGeminiResponse(cleaned);
-
 }
 
-/* ============================================================
-   6. Helpers
-============================================================ */
 function shouldEndViva(state: ExaminerState) {
   return (
     state.timeElapsedSec >= vivaContext.viva_rules.max_duration_minutes * 60 ||
@@ -178,28 +167,25 @@ function snapScore(score: number): 4 | 5 | 6 | 7 | 8 {
   return 8;
 }
 
-function buildEndResponse(state: ExaminerState, session) {
+function buildEndResponse(state: ExaminerState, session: SessionRecord) {
   return {
     type: "end",
     finalScores: {
       basic_knowledge: snapScore(state.dimensionScores.basic_knowledge),
       higher_order: snapScore(state.dimensionScores.higher_order),
       clinical_skills: snapScore(state.dimensionScores.clinical_skills),
-      professionalism: snapScore(state.dimensionScores.professionalism)
+      professionalism: snapScore(state.dimensionScores.professionalism),
     },
     report: {
       summary: session.examinerMemory,
       coveredObjectives: state.coveredObjectives,
-      level: vivaContext.case.level
-    }
+      level: vivaContext.case.level,
+    },
   };
 }
 
-/* ============================================================
-   7. POST Handler (FINAL FLOW)
-============================================================ */
 export async function POST(req: NextRequest) {
-  const { sessionId, userAnswer, timeElapsedSec } = await req.json();
+  const { sessionId, userAnswer, timeElapsedSec } = (await req.json()) as NextRequestBody;
 
   const session = getOrCreateSession(sessionId);
   const state = session.examinerState;
@@ -210,41 +196,37 @@ export async function POST(req: NextRequest) {
 
   state.timeElapsedSec = timeElapsedSec;
 
-
-  /* ---- END CHECK ---- */
   if (shouldEndViva(state)) {
     return NextResponse.json(buildEndResponse(state, session));
   }
 
-  /* ---- OPENING QUESTION ---- */
   if (state.questionsAsked === 0) {
     const aiResponse = await callGemini({
       session,
-      lastAnswer: ""
+      lastAnswer: "",
     });
 
     state.questionsAsked += 1;
     return NextResponse.json(aiResponse);
   }
 
-  /* ---- WAIT (HUMAN-LIKE) ---- */
   if (!userAnswer || !userAnswer.trim()) {
     return NextResponse.json({ type: "wait" });
   }
 
   updateExaminerMemory(userAnswer, session);
 
-  let aiResponse;
+  let aiResponse: GeminiResponse;
   try {
     aiResponse = await callGemini({
       session,
-      lastAnswer: userAnswer
+      lastAnswer: userAnswer,
     });
   } catch {
     aiResponse = {
       type: "question",
       text: "What would you do next?",
-      action: null
+      action: null,
     };
   }
 
@@ -258,20 +240,24 @@ export async function POST(req: NextRequest) {
   }
 
   if (aiResponse.scoreDelta) {
-    for (const key of Object.keys(aiResponse.scoreDelta)) {
-      state.dimensionScores[key] += aiResponse.scoreDelta[key];
-    }
+    state.dimensionScores = {
+      basic_knowledge:
+        state.dimensionScores.basic_knowledge + (aiResponse.scoreDelta.basic_knowledge ?? 0),
+      higher_order:
+        state.dimensionScores.higher_order + (aiResponse.scoreDelta.higher_order ?? 0),
+      clinical_skills:
+        state.dimensionScores.clinical_skills + (aiResponse.scoreDelta.clinical_skills ?? 0),
+      professionalism:
+        state.dimensionScores.professionalism + (aiResponse.scoreDelta.professionalism ?? 0),
+    };
   }
-
-  console.log("📊 CUMULATIVE VIVA SCORES:", {
-  basic_knowledge: state.dimensionScores.basic_knowledge,
-  higher_order: state.dimensionScores.higher_order,
-  clinical_skills: state.dimensionScores.clinical_skills,
-  professionalism: state.dimensionScores.professionalism,
-});
 
   if (aiResponse.type === "question") {
     state.questionsAsked += 1;
+  }
+
+  if (shouldEndViva(state)) {
+    return NextResponse.json(buildEndResponse(state, session));
   }
 
   return NextResponse.json(aiResponse);

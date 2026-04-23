@@ -1,5 +1,3 @@
-//@ts-nocheck
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -40,7 +38,7 @@ type ConversationMessage = {
 };
 
 function buildConversationFromQaHistory(history = []) {
-  return history.flatMap((item: any) => {
+  return history.flatMap((item: { question?: string; answer?: string }) => {
     const entries = [];
 
     if (item.question?.trim()) {
@@ -71,10 +69,11 @@ export default function ReviewPage() {
   useEffect(() => {
     const raw = sessionStorage.getItem("viva-final-score");
     if (!raw) return;
+    const scorePayload = raw;
 
     async function processAndSend() {
       try {
-        const evalObj = JSON.parse(raw);
+        const evalObj = JSON.parse(scorePayload);
         const storedCandidate = localStorage.getItem("candidateInfo");
         const parsedCandidate = storedCandidate ? JSON.parse(storedCandidate) : null;
 
@@ -206,7 +205,7 @@ export default function ReviewPage() {
       }
     }
 
-    processAndSend();
+    void processAndSend();
   }, []);
 
   if (!report) {
@@ -329,7 +328,7 @@ export default function ReviewPage() {
                   </div>
 
                   <div className="text-2xl md:text-2xl font-semibold text-slate-300 flex-shrink-0">
-                    {domain.score}
+                    {domain.score}/8
                   </div>
                 </div>
 

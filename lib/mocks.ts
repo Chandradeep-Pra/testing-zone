@@ -1,21 +1,29 @@
 const REMOTE_MOCKS_URL = "https://urocms.vercel.app/api/mocks";
 const REMOTE_QUIZZES_URL = "https://urocms.vercel.app/api/quizzes";
 
-/* ───────── TYPES ───────── */
+type TimestampLike = {
+  _seconds?: number;
+};
+
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord | null {
+  return typeof value === "object" && value !== null ? (value as UnknownRecord) : null;
+}
 
 export type Quiz = {
   id: string;
   title: string;
   type: string;
   durationMinutes: number;
-  createdAt?: any;
+  createdAt?: string | number | TimestampLike;
 };
 
 export type MockEvent = {
   id: string;
   quizId: string;
   title?: string;
-  startTime: any;
+  startTime: string | number | TimestampLike;
   durationMinutes: number;
 };
 
@@ -23,23 +31,21 @@ export type MockRecord = {
   id: string;
   quizId: string;
   title: string;
-  startTime: any;
+  startTime: string | number | TimestampLike;
   durationMinutes: number;
   quiz?: Quiz;
 };
 
-/* ───────── HELPERS ───────── */
-
-function normalizeDate(value: any): number {
+function normalizeDate(value: unknown): number {
   if (!value) return 0;
 
-  // Firestore timestamp
-  if (value?._seconds) {
-    return value._seconds * 1000;
+  const timestamp = asRecord(value);
+  if (typeof timestamp?._seconds === "number") {
+    return timestamp._seconds * 1000;
   }
 
-  const time = new Date(value).getTime();
-  return isNaN(time) ? 0 : time;
+  const time = new Date(value as string | number).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }
 
 function getDefaultMock(): MockRecord {
@@ -52,26 +58,30 @@ function getDefaultMock(): MockRecord {
   };
 }
 
-/* ───────── NORMALIZER ───────── */
-
-export function normalizeMock(payload: any): MockRecord {
+export function normalizeMock(payload: unknown): MockRecord {
   const fallback = getDefaultMock();
+  const source = asRecord(payload);
 
-  if (!payload || typeof payload !== "object") {
+  if (!source) {
     return fallback;
   }
 
   return {
-    id: payload.id || fallback.id,
-    quizId: payload.quizId || fallback.quizId,
-    title: payload.title || "Mock Quiz",
-    startTime: payload.startTime || fallback.startTime,
+    id: typeof source.id === "string" ? source.id : fallback.id,
+    quizId: typeof source.quizId === "string" ? source.quizId : fallback.quizId,
+    title: typeof source.title === "string" ? source.title : "Mock Quiz",
+    startTime:
+      typeof source.startTime === "string" ||
+      typeof source.startTime === "number" ||
+      asRecord(source.startTime)
+        ? (source.startTime as string | number | TimestampLike)
+        : fallback.startTime,
     durationMinutes:
-      Number(payload.durationMinutes) || fallback.durationMinutes,
+      typeof source.durationMinutes === "number"
+        ? source.durationMinutes
+        : fallback.durationMinutes,
   };
 }
-
-/* ───────── FETCHERS ───────── */
 
 export async function fetchRemoteMocks(): Promise<MockRecord[]> {
   const res = await fetch(REMOTE_MOCKS_URL, {
@@ -82,20 +92,17 @@ export async function fetchRemoteMocks(): Promise<MockRecord[]> {
     throw new Error("Failed to fetch mocks");
   }
 
-  const data = await res.json();
-
-  const mocks = Array.isArray(data?.mocks)
-    ? data.mocks
+  const data = (await res.json()) as { mocks?: unknown[] } | unknown[];
+  const mocks = Array.isArray((data as { mocks?: unknown[] })?.mocks)
+    ? ((data as { mocks?: unknown[] }).mocks ?? [])
     : Array.isArray(data)
     ? data
     : [];
 
-  return mocks.map((m: any) => normalizeMock(m));
+  return mocks.map((mock) => normalizeMock(mock));
 }
 
-export async function fetchRemoteMockById(
-  id: string
-): Promise<MockRecord | null> {
+export async function fetchRemoteMockById(id: string): Promise<MockRecord | null> {
   const res = await fetch(`${REMOTE_MOCKS_URL}/${id}`, {
     cache: "no-store",
   });
@@ -106,12 +113,10 @@ export async function fetchRemoteMockById(
     throw new Error("Failed to fetch mock");
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as { mock?: unknown } | unknown;
 
-  return normalizeMock(data?.mock || data);
+  return normalizeMock(asRecord(data)?.mock ?? data);
 }
-
-/* ───────── QUIZ FETCH (OPTIONAL JOIN) ───────── */
 
 export async function fetchRemoteQuizzes(): Promise<Quiz[]> {
   const res = await fetch(REMOTE_QUIZZES_URL, {
@@ -122,30 +127,23 @@ export async function fetchRemoteQuizzes(): Promise<Quiz[]> {
     throw new Error("Failed to fetch quizzes");
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as { quizzes?: Quiz[] } | Quiz[];
 
-  return Array.isArray(data?.quizzes)
-    ? data.quizzes
+  return Array.isArray((data as { quizzes?: Quiz[] })?.quizzes)
+    ? ((data as { quizzes?: Quiz[] }).quizzes ?? [])
     : Array.isArray(data)
     ? data
     : [];
 }
 
-/* ───────── COMBINED (MOST USEFUL) ───────── */
-
 export async function fetchMocksWithQuizzes(): Promise<MockRecord[]> {
-  const [mocks, quizzes] = await Promise.all([
-    fetchRemoteMocks(),
-    fetchRemoteQuizzes(),
-  ]);
+  const [mocks, quizzes] = await Promise.all([fetchRemoteMocks(), fetchRemoteQuizzes()]);
 
   return mocks.map((mock) => ({
     ...mock,
-    quiz: quizzes.find((q) => q.id === mock.quizId),
+    quiz: quizzes.find((quiz) => quiz.id === mock.quizId),
   }));
 }
-
-/* ───────── STATUS HELPERS ───────── */
 
 export function getMockStatus(mock: MockRecord): "Scheduled" | "Live" | "Completed" {
   const now = Date.now();

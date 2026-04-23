@@ -64,57 +64,76 @@ export type VivaCaseRecord = {
   modes?: VivaCaseModes;
 };
 
-function toSlug(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "exhibit";
+type UnknownRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): UnknownRecord | null {
+  return typeof value === "object" && value !== null ? (value as UnknownRecord) : null;
 }
 
-function normalizeExhibit(exhibit: any, index: number) {
-  const label = exhibit?.label || `Exhibit ${index + 1}`;
-  const file = typeof exhibit?.file === "string" ? exhibit.file : undefined;
-  const url = typeof exhibit?.url === "string" ? exhibit.url : undefined;
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function toSlug(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "exhibit"
+  );
+}
+
+function normalizeExhibit(exhibit: unknown, index: number) {
+  const source = asRecord(exhibit);
+  const label = typeof source?.label === "string" ? source.label : `Exhibit ${index + 1}`;
+  const file = typeof source?.file === "string" ? source.file : undefined;
+  const url = typeof source?.url === "string" ? source.url : undefined;
 
   return {
-    id: exhibit?.id || `${toSlug(label)}-${index + 1}`,
-    kind: exhibit?.kind || "image",
+    id: typeof source?.id === "string" ? source.id : `${toSlug(label)}-${index + 1}`,
+    kind: typeof source?.kind === "string" ? source.kind : "image",
     label,
     url,
     file,
-    description: exhibit?.description || "",
+    description: typeof source?.description === "string" ? source.description : "",
   };
 }
 
-function normalizeModeQuestion(question: any, index: number): VivaModeQuestion {
+function normalizeModeQuestion(question: unknown, index: number): VivaModeQuestion {
+  const source = asRecord(question);
+
   return {
-    id: question?.id || `question-${index + 1}`,
-    question: question?.question || "",
-    answerKeywords: Array.isArray(question?.answerKeywords) ? question.answerKeywords : [],
-    linkedExhibitIds: Array.isArray(question?.linkedExhibitIds) ? question.linkedExhibitIds : [],
+    id: typeof source?.id === "string" ? source.id : `question-${index + 1}`,
+    question: typeof source?.question === "string" ? source.question : "",
+    answerKeywords: asStringArray(source?.answerKeywords),
+    linkedExhibitIds: asStringArray(source?.linkedExhibitIds),
   };
 }
 
-function normalizeModes(modes: any): VivaCaseModes | undefined {
-  if (!modes || typeof modes !== "object") {
+function normalizeModes(modes: unknown): VivaCaseModes | undefined {
+  const source = asRecord(modes);
+  if (!source) {
     return undefined;
   }
 
+  const calmAndComposed = asRecord(source.calmAndComposed);
+  const fastAndFurious = asRecord(source.fastAndFurious);
+
   return {
-    calmAndComposed: modes.calmAndComposed
+    calmAndComposed: calmAndComposed
       ? {
-          enabled: Boolean(modes.calmAndComposed.enabled),
+          enabled: Boolean(calmAndComposed.enabled),
         }
       : undefined,
-    fastAndFurious: modes.fastAndFurious
+    fastAndFurious: fastAndFurious
       ? {
-          enabled: Boolean(modes.fastAndFurious.enabled),
+          enabled: Boolean(fastAndFurious.enabled),
           questionCount:
-            typeof modes.fastAndFurious.questionCount === "number"
-              ? modes.fastAndFurious.questionCount
+            typeof fastAndFurious.questionCount === "number"
+              ? fastAndFurious.questionCount
               : undefined,
-          questions: Array.isArray(modes.fastAndFurious.questions)
-            ? modes.fastAndFurious.questions.map((question: any, index: number) =>
+          questions: Array.isArray(fastAndFurious.questions)
+            ? fastAndFurious.questions.map((question, index) =>
                 normalizeModeQuestion(question, index)
               )
             : [],
@@ -145,38 +164,76 @@ export function getDefaultVivaCase(): VivaCaseRecord {
   };
 }
 
-export function normalizeVivaCase(payload: any): VivaCaseRecord {
-  const source = payload?.case?.case ? payload.case : payload;
+export function normalizeVivaCase(payload: unknown): VivaCaseRecord {
+  const payloadRecord = asRecord(payload);
+  const nestedCase = asRecord(payloadRecord?.case);
+  const source =
+    nestedCase && asRecord(nestedCase.case) ? nestedCase : payloadRecord;
   const fallback = getDefaultVivaCase();
 
-  if (!source || typeof source !== "object") {
+  if (!source) {
     return fallback;
   }
 
+  const sourceCase = asRecord(source.case);
+  const sourceMarkingCriteria = asRecord(source.marking_criteria);
+  const sourceRules = asRecord(source.viva_rules);
+
   return {
-    id: source.id || fallback.id,
+    id: typeof source.id === "string" ? source.id : fallback.id,
     case: {
-      title: source.case?.title || source.title || fallback.case.title,
-      level: source.case?.level || source.level || fallback.case.level,
-      stem: source.case?.stem || source.stem || fallback.case.stem,
-      objectives: source.case?.objectives || source.objectives || fallback.case.objectives,
+      title:
+        typeof sourceCase?.title === "string"
+          ? sourceCase.title
+          : typeof source.title === "string"
+          ? source.title
+          : fallback.case.title,
+      level:
+        typeof sourceCase?.level === "string"
+          ? sourceCase.level
+          : typeof source.level === "string"
+          ? source.level
+          : fallback.case.level,
+      stem:
+        typeof sourceCase?.stem === "string"
+          ? sourceCase.stem
+          : typeof source.stem === "string"
+          ? source.stem
+          : fallback.case.stem,
+      objectives:
+        asStringArray(sourceCase?.objectives).length > 0
+          ? asStringArray(sourceCase?.objectives)
+          : asStringArray(source.objectives).length > 0
+          ? asStringArray(source.objectives)
+          : fallback.case.objectives,
     },
     exhibits: Array.isArray(source.exhibits)
-      ? source.exhibits.map((exhibit: any, index: number) => normalizeExhibit(exhibit, index))
+      ? source.exhibits.map((exhibit, index) => normalizeExhibit(exhibit, index))
       : fallback.exhibits,
     marking_criteria: {
       must_mention:
-        source.marking_criteria?.must_mention || fallback.marking_criteria.must_mention,
+        asStringArray(sourceMarkingCriteria?.must_mention).length > 0
+          ? asStringArray(sourceMarkingCriteria?.must_mention)
+          : fallback.marking_criteria.must_mention,
       critical_fail:
-        source.marking_criteria?.critical_fail || fallback.marking_criteria.critical_fail,
+        asStringArray(sourceMarkingCriteria?.critical_fail).length > 0
+          ? asStringArray(sourceMarkingCriteria?.critical_fail)
+          : fallback.marking_criteria.critical_fail,
     },
     viva_rules: {
       ...fallback.viva_rules,
-      ...(source.viva_rules || {}),
+      ...(sourceRules
+        ? {
+            ...sourceRules,
+          }
+        : {}),
     },
-    attemptsCount: source.attemptsCount,
-    attempts: source.attempts,
-    allowedUser: source.allowedUser,
+    attemptsCount:
+      typeof source.attemptsCount === "number" ? source.attemptsCount : undefined,
+    attempts: Array.isArray(source.attempts)
+      ? (source.attempts as VivaCaseAttempt[])
+      : undefined,
+    allowedUser: asStringArray(source.allowedUser),
     modes: normalizeModes(source.modes),
   };
 }
@@ -190,10 +247,14 @@ export async function fetchRemoteVivaCases(): Promise<VivaCaseRecord[]> {
     throw new Error("Failed to fetch viva cases");
   }
 
-  const data = await res.json();
-  const cases = Array.isArray(data?.cases) ? data.cases : Array.isArray(data) ? data : [];
+  const data = (await res.json()) as { cases?: unknown[] } | unknown[];
+  const cases = Array.isArray((data as { cases?: unknown[] })?.cases)
+    ? ((data as { cases?: unknown[] }).cases ?? [])
+    : Array.isArray(data)
+    ? data
+    : [];
 
-  return cases.map((item: any) => normalizeVivaCase(item));
+  return cases.map((item) => normalizeVivaCase(item));
 }
 
 export async function fetchRemoteVivaCaseById(id: string): Promise<VivaCaseRecord | null> {
@@ -209,6 +270,6 @@ export async function fetchRemoteVivaCaseById(id: string): Promise<VivaCaseRecor
     throw new Error("Failed to fetch viva case");
   }
 
-  const data = await res.json();
-  return normalizeVivaCase(data?.case || data);
+  const data = (await res.json()) as { case?: unknown } | unknown;
+  return normalizeVivaCase(asRecord(data)?.case ?? data);
 }

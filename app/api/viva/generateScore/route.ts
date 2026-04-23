@@ -31,7 +31,7 @@ Objectives: ${vivaCase.case.objectives.join("; ")}
 Must mention: ${vivaCase.marking_criteria.must_mention.join("; ")}
 Critical fail: ${vivaCase.marking_criteria.critical_fail.join("; ")}
 
-Score each domain from 4–8.
+Score each domain from 1-8.
 
 Domains:
 1. basic_knowledge
@@ -41,7 +41,8 @@ Domains:
 
 Provide:
 
-- score (4-8)
+- score (1-8)
+- use whole numbers only
 - short summary
 - detailed reasoning
 
@@ -54,7 +55,7 @@ Also provide:
 Transcript:
 ${transcript}
 
-we are using google speech to text so there are chances that it can misheard some spelling so dont consider it in scoring and try to analyse what can be the word that user spoke and give user the marks
+We are using Google speech to text, so there can be occasional transcription errors. Interpret likely intended medical terms fairly before scoring.
 
 Return ONLY JSON in this format:
 

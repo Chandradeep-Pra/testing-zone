@@ -18,7 +18,7 @@ export default function Home() {
         </h1>
 
         <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-10">
-          Practice like you're in the real exam. Face a dynamic examiner,
+          Practice like you&apos;re in the real exam. Face a dynamic examiner,
           interpret clinical scenarios, and receive structured feedback —
           all in one seamless viva experience.
         </p>

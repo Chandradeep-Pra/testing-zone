@@ -1,12 +1,14 @@
-//@ts-nocheck
 "use client";
 
 import { useEffect, useRef } from "react";
 import { Bot, User } from "lucide-react";
 
-export default function ChatTimeline({ messages }) {
-  const containerRef = useRef(null);
-  const bottomRef = useRef(null);
+type ChatMessage =
+  | { id?: string; role: "ai" | "candidate"; text: string; live?: boolean }
+  | { id?: string; role: "image"; src: string; description?: string };
+
+export default function ChatTimeline({ messages }: { messages: ChatMessage[] }) {
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
@@ -16,7 +18,7 @@ export default function ChatTimeline({ messages }) {
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-scroll p-4 space-y-4">
+    <div className="flex-1 overflow-y-scroll p-4 space-y-4 bg-[linear-gradient(180deg,rgba(15,23,42,0.18),rgba(2,6,23,0.08))]">
 
       {messages.map((msg) => {
         if (msg.role === "ai") {
@@ -29,9 +31,9 @@ export default function ChatTimeline({ messages }) {
 
               <div
                 className="
-                  bg-slate-900
-                  border border-slate-800
-                  rounded-xl
+                  bg-slate-950/80
+                  border border-white/10
+                  rounded-2xl
                   px-4 py-3
                   text-sm
                   leading-relaxed
@@ -51,9 +53,9 @@ export default function ChatTimeline({ messages }) {
 
               <div
                 className="
-                  bg-blue-500/15
-                  border border-blue-500/30
-                  rounded-xl
+                  bg-sky-500/10
+                  border border-sky-400/20
+                  rounded-2xl
                   px-4 py-3
                   text-sm
                   leading-relaxed
@@ -87,6 +89,7 @@ export default function ChatTimeline({ messages }) {
 
               <img
                 src={msg.src}
+                alt="Exhibit"
                 className="
                   rounded-lg
                   border border-slate-800
