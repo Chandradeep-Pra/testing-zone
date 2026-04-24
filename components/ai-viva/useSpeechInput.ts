@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 type SttMessage = {
   transcript?: string;
@@ -10,7 +10,8 @@ type SttMessage = {
 
 export function useSpeechInput(
   onInterim: (text: string) => void,
-  onFinal: (text: string) => void | Promise<void>
+  onFinal: (text: string) => void | Promise<void>,
+  onSpeechEndedWithoutFinal?: () => void | Promise<void>
 ) {
   const wsRef = useRef<WebSocket | null>(null);
   const transcriptBuffer = useRef("");
@@ -20,6 +21,15 @@ export function useSpeechInput(
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const onInterimRef = useRef(onInterim);
+  const onFinalRef = useRef(onFinal);
+  const onSpeechEndedWithoutFinalRef = useRef(onSpeechEndedWithoutFinal);
+
+  useEffect(() => {
+    onInterimRef.current = onInterim;
+    onFinalRef.current = onFinal;
+    onSpeechEndedWithoutFinalRef.current = onSpeechEndedWithoutFinal;
+  }, [onInterim, onFinal, onSpeechEndedWithoutFinal]);
 
   async function ensureSocketReady() {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -62,7 +72,7 @@ export function useSpeechInput(
           }
 
           interimTranscriptRef.current = "";
-          onInterim(transcriptBuffer.current);
+          onInterimRef.current(transcriptBuffer.current);
         } else {
           interimTranscriptRef.current = data.transcript.trim();
           const combinedTranscript = [transcriptBuffer.current, interimTranscriptRef.current]
@@ -70,7 +80,7 @@ export function useSpeechInput(
             .join(" ")
             .trim();
 
-          onInterim(combinedTranscript);
+          onInterimRef.current(combinedTranscript);
         }
       }
 
@@ -81,7 +91,9 @@ export function useSpeechInput(
           .trim();
 
         if (finalText) {
-          void onFinal(finalText);
+          void onFinalRef.current(finalText);
+        } else if (onSpeechEndedWithoutFinalRef.current) {
+          void onSpeechEndedWithoutFinalRef.current();
         }
 
         transcriptBuffer.current = "";

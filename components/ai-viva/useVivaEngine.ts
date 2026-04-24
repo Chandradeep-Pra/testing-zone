@@ -112,13 +112,9 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
 
   function getCurrentFastQuestion() {
     const questions = getFastModeQuestions(vivaCase);
-    const historyLength = previousQARef.current.length;
+    const currentAskedIndex = Math.max(0, fastQuestionIndexRef.current - 1);
 
-    if (historyLength <= 0) {
-      return questions[0] || null;
-    }
-
-    return questions[Math.min(historyLength - 1, questions.length - 1)] || null;
+    return questions[currentAskedIndex] || questions[0] || null;
   }
 
   function getCurrentFastQuestionKeywordProgress(answer: string) {
