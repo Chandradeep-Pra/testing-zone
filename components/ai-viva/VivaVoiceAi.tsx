@@ -25,7 +25,7 @@ type CandidateConversationMessage = {
   text: string;
   live?: boolean;
 };
-type FastPauseState = "idle" | "monitoring" | "detected" | "prompted";
+type FastPauseState = "idle" | "monitoring" | "detected";
 type StoredCandidateInfo = {
   name?: string;
   email?: string;
@@ -75,7 +75,6 @@ export default function VivaVoiceAi({
     "Before we begin, for the audio check please state your full name and how you are feeling today. This will not be scored.";
   const warmupDurationMs = 5000;
   const fastModeTotalDurationSec = 10 * 60;
-  const fastSilencePromptDelayMs = 2500;
   const isFastMode = selectedMode === "fast";
 
   const [candidate, setCandidate] = useState({ name: "", email: "" });
@@ -130,15 +129,10 @@ export default function VivaVoiceAi({
   const warmupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fillerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fillerIndexRef = useRef(0);
-  const fastPromptIndexRef = useRef(0);
   const liveCandidateMsgId = useRef<string | null>(null);
   const advanceLockRef = useRef(false);
   const keywordFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fastSilencePromptTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fastPromptResponseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const answerPrefixRef = useRef("");
-  const awaitingFastModeConfirmationRef = useRef(false);
-  const fastPromptAskedRef = useRef(false);
   const messagesRef = useRef<CandidateConversationMessage[]>([]);
 
   const [readyVisible, setReadyVisible] = useState(true);
@@ -151,6 +145,7 @@ export default function VivaVoiceAi({
   const [keywordDetected, setKeywordDetected] = useState(false);
   const [candidateTranscript, setCandidateTranscript] = useState("");
   const [fastPauseState, setFastPauseState] = useState<FastPauseState>("idle");
+  const [fastTimerStarted, setFastTimerStarted] = useState(false);
 
   const currentFastQuestion = isFastMode ? getCurrentFastQuestion() : null;
   const fastKeywordProgress = isFastMode
@@ -158,15 +153,13 @@ export default function VivaVoiceAi({
     : { matchedKeywords: [], totalKeywords: 0, allMatched: false };
   const fastPauseLabel =
     fastPauseState === "monitoring"
-      ? "Listening for a pause before the follow-up prompt."
+      ? "Listening for speech to end before submitting this answer."
       : fastPauseState === "detected"
-        ? "Pause detected. Examiner is deciding whether to prompt or move on."
-        : fastPauseState === "prompted"
-          ? "Pause detected. The examiner has asked if you want to add anything else."
+        ? "Pause detected. Submitting the current answer."
           : "Pause detection idle.";
 
   const vivaDurationSec = vivaCase.viva_rules.max_duration_minutes * 60;
-  const countdownRunning = vivaStarted && !ending;
+  const countdownRunning = (isFastMode ? fastTimerStarted : vivaStarted) && !ending;
   const countdownTotal = isFastMode ? fastModeTotalDurationSec : vivaDurationSec;
 
   function getExaminerSpeechOptions() {
@@ -209,38 +202,7 @@ export default function VivaVoiceAi({
   }
 
   function clearFastSilencePromptTimer() {
-    if (fastSilencePromptTimeoutRef.current) {
-      clearTimeout(fastSilencePromptTimeoutRef.current);
-      fastSilencePromptTimeoutRef.current = null;
-    }
-
     setFastPauseState((current) => (current === "detected" ? "idle" : current));
-  }
-
-  function clearFastPromptResponseTimer() {
-    if (fastPromptResponseTimeoutRef.current) {
-      clearTimeout(fastPromptResponseTimeoutRef.current);
-      fastPromptResponseTimeoutRef.current = null;
-    }
-  }
-
-  function startFastPromptResponseTimer() {
-    clearFastPromptResponseTimer();
-    setFastPauseState("prompted");
-
-    fastPromptResponseTimeoutRef.current = setTimeout(() => {
-      if (
-        endingRef.current ||
-        advanceLockRef.current ||
-        !awaitingFastModeConfirmationRef.current
-      ) {
-        return;
-      }
-
-      awaitingFastModeConfirmationRef.current = false;
-      setFastPauseState("idle");
-      void submitCurrentAnswer(answerPrefixRef.current);
-    }, fastSilencePromptDelayMs);
   }
 
   function mergeWithAnswerPrefix(value: string) {
@@ -276,12 +238,6 @@ export default function VivaVoiceAi({
     "That is alright, let us continue",
     "",
   ];
-  const fastPromptPhrases = [
-    "Do you want to add anything else to your answer?",
-    "Would you like to add anything more to your answer?",
-    "Anything else you want to include in that answer?",
-  ];
-
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
@@ -307,14 +263,9 @@ export default function VivaVoiceAi({
       return;
     }
 
-    awaitingFastModeConfirmationRef.current = false;
     clearFastSilencePromptTimer();
-    clearFastPromptResponseTimer();
     setFastPauseState("idle");
     answerPrefixRef.current = existingText.trim();
-    if (!reuseCurrentMessage) {
-      fastPromptAskedRef.current = false;
-    }
 
     if (!reuseCurrentMessage || !liveCandidateMsgId.current) {
       const id = crypto.randomUUID();
@@ -349,7 +300,6 @@ export default function VivaVoiceAi({
       !vivaStarted ||
       endingRef.current ||
       advanceLockRef.current ||
-      awaitingFastModeConfirmationRef.current ||
       !latestAnswer ||
       doesAnswerMatchCurrentFastQuestion(latestAnswer)
     ) {
@@ -357,31 +307,7 @@ export default function VivaVoiceAi({
     }
 
     setFastPauseState("detected");
-
-    if (fastPromptAskedRef.current) {
-      void submitCurrentAnswer(latestAnswer);
-      return;
-    }
-
-    fastPromptAskedRef.current = true;
-    awaitingFastModeConfirmationRef.current = true;
-    answerPrefixRef.current = latestAnswer;
-    stop();
-    setIsListening(false);
-    void setAvatarListening(false);
-    resetTranscriptBuffer();
-    syncCandidateMessage(latestAnswer, false);
-    setCandidateTranscript(latestAnswer);
-
-    const prompt =
-      fastPromptPhrases[fastPromptIndexRef.current % fastPromptPhrases.length];
-    fastPromptIndexRef.current += 1;
-
-    speakAsExaminer(prompt, () => {
-      beginListeningForAnswer(answerPrefixRef.current, true);
-      awaitingFastModeConfirmationRef.current = true;
-      startFastPromptResponseTimer();
-    });
+    void submitCurrentAnswer(latestAnswer);
   }
 
   function tryAdvanceFastMode(answerText: string) {
@@ -425,18 +351,6 @@ export default function VivaVoiceAi({
 
     setCandidateTranscript(fallbackText);
 
-    if (awaitingFastModeConfirmationRef.current) {
-      awaitingFastModeConfirmationRef.current = false;
-      clearFastPromptResponseTimer();
-      setFastPauseState("idle");
-      if (tryAdvanceFastMode(fallbackText)) {
-        return;
-      }
-      syncCandidateMessage(fallbackText, false);
-      await submitCurrentAnswer(fallbackText);
-      return;
-    }
-
     if (tryAdvanceFastMode(fallbackText)) {
       return;
     }
@@ -455,12 +369,6 @@ export default function VivaVoiceAi({
   } = useSpeechInput(
     (interim) => {
       if (ending) return;
-
-      if (awaitingFastModeConfirmationRef.current) {
-        awaitingFastModeConfirmationRef.current = false;
-        clearFastPromptResponseTimer();
-        setFastPauseState("idle");
-      }
 
       const combinedInterim = mergeWithAnswerPrefix(interim);
 
@@ -486,18 +394,6 @@ export default function VivaVoiceAi({
 
       const combinedFinalText = mergeWithAnswerPrefix(finalText);
       setCandidateTranscript(combinedFinalText);
-
-      if (awaitingFastModeConfirmationRef.current) {
-        awaitingFastModeConfirmationRef.current = false;
-        clearFastPromptResponseTimer();
-        setFastPauseState("idle");
-        if (tryAdvanceFastMode(combinedFinalText)) {
-          return;
-        }
-        syncCandidateMessage(combinedFinalText, false);
-        await submitCurrentAnswer(combinedFinalText);
-        return;
-      }
 
       if (isFastMode) {
         if (tryAdvanceFastMode(combinedFinalText)) {
@@ -571,7 +467,6 @@ export default function VivaVoiceAi({
         clearTimeout(keywordFlashTimeoutRef.current);
       }
       clearFastSilencePromptTimer();
-      clearFastPromptResponseTimer();
       closeSocket();
       stop();
     };
@@ -631,10 +526,7 @@ export default function VivaVoiceAi({
 
     advanceLockRef.current = true;
     clearFastSilencePromptTimer();
-    clearFastPromptResponseTimer();
     setFastPauseState("idle");
-    awaitingFastModeConfirmationRef.current = false;
-    fastPromptAskedRef.current = false;
     stop();
     setIsListening(false);
     void setAvatarListening(false);
@@ -687,6 +579,9 @@ export default function VivaVoiceAi({
 
       setThinking(false);
       applyApiResponse(data);
+      if (isFastMode) {
+        setFastTimerStarted(true);
+      }
       speakAsExaminer(question, () => {
         setVivaStarted(true);
         markSpeechEnded();
@@ -797,8 +692,8 @@ export default function VivaVoiceAi({
       keywordFlashTimeoutRef.current = null;
     }
     clearFastSilencePromptTimer();
-    clearFastPromptResponseTimer();
     setFastPauseState("idle");
+    setFastTimerStarted(false);
 
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {
@@ -955,13 +850,11 @@ export default function VivaVoiceAi({
               {isFastMode && candidateTranscript.trim() && (
                 <div
                   className={`mt-3 rounded-2xl border px-4 py-3 text-xs backdrop-blur ${
-                    fastPauseState === "prompted"
-                      ? "border-amber-400/30 bg-amber-500/10 text-amber-100"
-                      : fastPauseState === "detected"
-                        ? "border-orange-400/30 bg-orange-500/10 text-orange-100"
-                        : fastPauseState === "monitoring"
-                          ? "border-sky-400/30 bg-sky-500/10 text-sky-100"
-                          : "border-white/10 bg-white/[0.03] text-slate-400"
+                    fastPauseState === "detected"
+                      ? "border-orange-400/30 bg-orange-500/10 text-orange-100"
+                      : fastPauseState === "monitoring"
+                        ? "border-sky-400/30 bg-sky-500/10 text-sky-100"
+                        : "border-white/10 bg-white/[0.03] text-slate-400"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -1024,7 +917,7 @@ export default function VivaVoiceAi({
             <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
               {isFastMode ? (
                 <p>
-                  Fast mode stays on a total 10 minute clock. If you pause for 2.5 seconds before covering all key words, the examiner asks once whether you want to add anything else, then moves on if you stay silent.
+                  Fast mode stays on a total 10 minute clock. Once the first case question is asked, a pause submits the current answer immediately, the same way calm mode does.
                 </p>
               ) : (
                 <p>
