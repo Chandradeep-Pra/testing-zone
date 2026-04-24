@@ -12,6 +12,7 @@ import { useVivaEngine } from "./useVivaEngine";
 import ReadyOverlay from "./ReadyOverlay";
 import { useCountdown } from "./useCountdown";
 import ChatTimeline from "./ChatTimeline";
+import { useLiveAvatar } from "./useLiveAvatar";
 
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
@@ -118,6 +119,10 @@ export default function VivaVoiceAi({
   } = useVivaSession();
 
   const { speak, amplitude } = useSpeechOutput();
+  const liveAvatar = useLiveAvatar();
+  const examinerSpeaking = speaking || liveAvatar.isSpeaking;
+  const [avatarSessionActive, setAvatarSessionActive] = useState(false);
+  const avatarSessionActiveRef = useRef(false);
 
   const hasStartedRef = useRef(false);
   const endingRef = useRef(false);
@@ -160,7 +165,35 @@ export default function VivaVoiceAi({
     };
   }
 
-  function speakAsExaminer(text: string, onEnd?: () => void) {
+  async function setAvatarListening(listening: boolean) {
+    if (!avatarSessionActiveRef.current) {
+      return;
+    }
+
+    try {
+      if (listening) {
+        await liveAvatar.startListening();
+      } else {
+        await liveAvatar.stopListening();
+      }
+    } catch (err) {
+      console.error("LiveAvatar listening state update failed:", err);
+    }
+  }
+
+  async function speakAsExaminer(text: string, onEnd?: () => void) {
+    if (avatarSessionActiveRef.current) {
+      try {
+        await liveAvatar.stopListening();
+        await liveAvatar.interrupt();
+        await liveAvatar.speakText(text, onEnd);
+        return;
+      } catch (err) {
+        console.error("LiveAvatar speak failed:", err);
+        // Fall back to local TTS on failure
+      }
+    }
+
     return speak(text, onEnd, getExaminerSpeechOptions());
   }
 
@@ -187,6 +220,7 @@ export default function VivaVoiceAi({
         advanceLockRef.current = true;
         stop();
         setIsListening(false);
+        void setAvatarListening(false);
         clearFastSilencePromptTimer();
         speakAsExaminer("Time is up. We are concluding the viva now.", async () => {
           await endViva();
@@ -230,6 +264,7 @@ export default function VivaVoiceAi({
     resetTranscriptBuffer();
     setCandidateTranscript("");
     setIsListening(true);
+    void setAvatarListening(true);
     void start();
   }
 
@@ -269,6 +304,7 @@ export default function VivaVoiceAi({
     advanceLockRef.current = false;
     setCandidateTranscript(answerPrefixRef.current);
     setIsListening(true);
+    void setAvatarListening(true);
     void start();
   }
 
@@ -313,6 +349,7 @@ export default function VivaVoiceAi({
       answerPrefixRef.current = latestAnswer;
       stop();
       setIsListening(false);
+      void setAvatarListening(false);
       resetTranscriptBuffer();
       syncCandidateMessage(latestAnswer, false);
       setCandidateTranscript(latestAnswer);
@@ -510,6 +547,7 @@ export default function VivaVoiceAi({
     awaitingFastModeConfirmationRef.current = false;
     stop();
     setIsListening(false);
+    void setAvatarListening(false);
 
     const finalAnswer = (
       answerText?.trim() ? answerText : mergeWithAnswerPrefix(getTranscriptBuffer() || "")
@@ -582,6 +620,7 @@ export default function VivaVoiceAi({
     speakAsExaminer(warmupPrompt, () => {
       markSpeechEnded();
       setIsListening(true);
+      void setAvatarListening(true);
       void start();
 
       warmupTimeoutRef.current = setTimeout(() => {
@@ -590,6 +629,7 @@ export default function VivaVoiceAi({
         stop();
         resetTranscriptBuffer();
         setIsListening(false);
+        void setAvatarListening(false);
         setThinking(true);
 
         speakAsExaminer("Thank you. Audio is ready. Starting the viva now.", async () => {
@@ -621,12 +661,18 @@ export default function VivaVoiceAi({
         parsed.selectedExaminerId = examinerChoice.id;
         localStorage.setItem("candidateInfo", JSON.stringify(parsed));
       }
-      speak(greeting, async () => {
+      const avatarStarted = await liveAvatar.startSession();
+      setAvatarSessionActive(avatarStarted);
+      avatarSessionActiveRef.current = avatarStarted;
+      if (!avatarStarted) {
+        console.warn("LiveAvatar session did not become ready. Falling back to TTS.", liveAvatar.error);
+      } else {
+        await liveAvatar.interrupt();
+        await liveAvatar.startListening();
+      }
+      await speakAsExaminer(greeting, async () => {
         await new Promise((res) => setTimeout(res, 2000));
         startWarmup();
-      }, {
-        voiceName: examinerChoice.voiceName,
-        languageCode: examinerChoice.languageCode,
       });
     } catch (error) {
       console.error("Error in greeting:", error);
@@ -643,6 +689,10 @@ export default function VivaVoiceAi({
     setIsListening(false);
     stop();
     closeSocket();
+    void setAvatarListening(false);
+    await liveAvatar.stopSession();
+    setAvatarSessionActive(false);
+    avatarSessionActiveRef.current = false;
 
     if (warmupTimeoutRef.current) {
       clearTimeout(warmupTimeoutRef.current);
@@ -738,13 +788,32 @@ export default function VivaVoiceAi({
       <div className="flex-1 p-3 sm:p-4 md:p-5 min-h-0">
         <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[1.35fr_0.65fr]">
           <div className="relative min-h-[380px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
-            <AiPanel
-              amplitude={amplitude}
-              speaking={speaking}
-              thinking={thinking}
-              transcript={transcript}
-              keywordDetected={keywordDetected}
-              exhibit={
+          <AiPanel
+            amplitude={amplitude}
+            speaking={examinerSpeaking}
+            thinking={thinking}
+            transcript={transcript}
+            keywordDetected={keywordDetected}
+            avatarVideo={
+              liveAvatar.isReady ? (
+                <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.28),_rgba(2,6,23,0.96))]">
+                  <video
+                    ref={liveAvatar.videoElementRef}
+                    autoPlay
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                  <div
+                    ref={liveAvatar.audioContainerRef}
+                    className="pointer-events-none absolute left-0 top-0 h-0 w-0 overflow-hidden"
+                  />
+                  {!examinerSpeaking && (
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(15,23,42,0.08),_rgba(2,6,23,0.42))]" />
+                  )}
+                </div>
+              ) : null
+            }
+            exhibit={
                 exhibit?.type === "image" ? (
                   <div className="relative mx-auto flex h-full max-w-full items-center justify-center md:max-w-3xl">
                     <img
@@ -767,6 +836,31 @@ export default function VivaVoiceAi({
             <div className="absolute left-4 top-4 z-30 flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs text-slate-300 backdrop-blur">
               <Sparkles size={13} className="text-emerald-300" />
               <span>{selectedExaminer.personality}</span>
+            </div>
+
+            {!liveAvatar.isReady && liveAvatar.error && (
+              <div className="absolute bottom-24 left-4 right-4 z-30 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-xs text-amber-100 backdrop-blur">
+                LiveAvatar did not connect, so the app is using fallback TTS. Error: {liveAvatar.error}
+              </div>
+            )}
+
+            <div className="absolute bottom-4 left-4 z-30 max-w-[min(32rem,calc(100%-7rem))] rounded-2xl border border-white/10 bg-slate-950/75 px-4 py-3 text-[11px] text-slate-300 backdrop-blur">
+              <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-slate-400">
+                <span>configured: {String(liveAvatar.isConfigured)}</span>
+                <span>connecting: {String(liveAvatar.isConnecting)}</span>
+                <span>ready: {String(liveAvatar.isReady)}</span>
+                <span>speaking: {String(liveAvatar.isSpeaking)}</span>
+                <span>listening: {String(liveAvatar.isListening)}</span>
+              </div>
+              <div className="max-h-24 overflow-y-auto space-y-1 font-mono">
+                {liveAvatar.debugLog.length > 0 ? (
+                  liveAvatar.debugLog.map((entry, index) => (
+                    <div key={`${entry}-${index}`}>{entry}</div>
+                  ))
+                ) : (
+                  <div>No LiveAvatar logs yet.</div>
+                )}
+              </div>
             </div>
 
             <div className="absolute right-2 top-2 h-24 w-20 overflow-hidden rounded-2xl md:right-4 md:top-4 md:h-auto md:w-[260px] md:aspect-video">
