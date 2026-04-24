@@ -52,7 +52,7 @@ function cleanResponse(text: string) {
 
 function formatRecentQA(previousQA: Array<{ question: string; answer: string }>) {
   return previousQA
-    .slice(-2)
+    .slice(-4)
     .map(
       ({ question, answer }, index) =>
         `Q${index + 1}: ${question}\nA${index + 1}: ${answer || "[no answer yet]"}`
