@@ -85,7 +85,7 @@ export function AiPanel({
       }`}
     >
       <div className="absolute left-5 top-5 text-xs uppercase tracking-[0.28em] text-slate-500">
-        AI Examiner
+        Urologics AI Viva
       </div>
 
       <div className="absolute right-5 top-5 text-xs">

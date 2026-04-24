@@ -1,131 +1,68 @@
 "use client";
 
+import { ArrowLeft, AudioLines, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
+
+import UrologicsBrand from "@/components/brand/UrologicsBrand";
 
 const BeatAnalyze = () => {
   const router = useRouter();
   const [link, setLink] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const hasLink = link.trim().length > 0;
-
   return (
-    <main className="
-      min-h-screen
-      bg-[color:var(--color-background)]
-      px-6 py-5
-    ">
-      {/* Top bar */}
-      <div className="flex items-center mb-10">
-        <button
-          onClick={() => router.back()}
-          className="
-            flex items-center gap-2
-            text-sm font-medium
-            text-[color:var(--color-muted)]
-            hover:text-[color:var(--color-foreground)]
-            transition-colors
-          "
-        >
-          <span className="text-lg leading-none">‹</span>
-          Back
-        </button>
-      </div>
+    <main className="urologics-shell px-6 py-8">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <header className="urologics-panel flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+          <UrologicsBrand product="Labs" tag="Internal utility surface" />
+          <button onClick={() => router.back()} className="urologics-button-secondary gap-2">
+            <ArrowLeft size={16} />
+            Back
+          </button>
+        </header>
 
-      {/* Content */}
-      <section className="max-w-xl mx-auto">
-        <h1 className="text-2xl font-semibold mb-1">
-          Beat Analyzer
-        </h1>
-        <p className="text-sm text-[color:var(--color-muted)] mb-10">
-          Load a dance video and listen to its rhythm structure
-        </p>
+        <section className="urologics-panel p-8 md:p-10">
+          <div className="urologics-chip">Experimental Utility</div>
+          <h1 className="mt-6 text-4xl font-semibold text-white">Urologics Rhythm Lab</h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">
+            A branded utility page for internal analysis tools, aligned visually with the main Urologics experience.
+          </p>
 
-        {/* Input + Actions Row */}
-        <div className="flex items-center gap-3">
-          {/* Input */}
-          <div className="
-            flex-1
-            bg-[color:var(--color-surface)]
-            border border-[color:var(--color-border)]
-            rounded-2xl
-            px-4 py-3
-            transition-colors
-            focus-within:border-[color:var(--color-accent)]
-          ">
+          <div className="mt-8 flex flex-col gap-4 md:flex-row">
             <input
               type="text"
-              placeholder="Paste YouTube link"
+              placeholder="Paste a YouTube link"
               value={link}
               onChange={(e) => {
                 setLink(e.target.value);
                 setIsPlaying(false);
               }}
-              className="
-                w-full
-                bg-transparent
-                outline-none
-                text-sm
-                placeholder:text-[color:var(--color-muted)]
-              "
+              className="urologics-input flex-1"
             />
-          </div>
-
-          {/* Play button */}
-          {hasLink && (
             <button
-              onClick={() => setIsPlaying(!isPlaying)}
-              className="
-                w-11 h-11
-                rounded-full
-                flex items-center justify-center
-                bg-[color:var(--color-accent-soft)]
-                hover:bg-[color:var(--color-accent)]
-                transition-all
-                group
-              "
+              onClick={() => setIsPlaying((value) => !value)}
+              disabled={!link.trim()}
+              className="urologics-button-secondary disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <span className="
-                text-[color:var(--color-accent)]
-                group-hover:text-white
-                text-sm
-              ">
-                {isPlaying ? "❚❚" : "▶"}
-              </span>
+              <AudioLines size={16} />
             </button>
-          )}
-
-          {/* Analyze button */}
-          {hasLink && (
             <button
-              className="
-                h-11
-                px-4
-                rounded-xl
-                text-sm font-medium
-                border border-[color:var(--color-border)]
-                text-[color:var(--color-foreground)]
-                hover:border-[color:var(--color-accent)]
-                transition-colors
-              "
+              disabled={!link.trim()}
+              className="urologics-button-primary gap-2 disabled:cursor-not-allowed disabled:opacity-40"
             >
+              <Wand2 size={16} />
               Analyze Beats
             </button>
-          )}
-        </div>
+          </div>
 
-        {/* Playback hint */}
-        {isPlaying && (
-          <p className="
-            mt-4
-            text-sm
-            text-[color:var(--color-muted)]
-          ">
-            Playing audio preview…
-          </p>
-        )}
-      </section>
+          {isPlaying && (
+            <div className="urologics-subpanel mt-6 p-4 text-sm text-slate-300">
+              Playing audio preview...
+            </div>
+          )}
+        </section>
+      </div>
     </main>
   );
 };

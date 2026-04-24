@@ -5,30 +5,33 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl text-sm font-bold whitespace-nowrap outline-none focus-visible:ring-[3px] focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50 select-none transition-colors duration-150 ease-in-out [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default:
+          "bg-[#0d9488] text-white border-b-4 border-[#0f766e] hover:bg-[#14b8a6] active:border-b-0 active:translate-y-[4px] active:mb-[4px]",
+        primary:
+          "bg-[#0d9488] text-white border-b-4 border-[#0f766e] hover:bg-[#14b8a6] active:border-b-0 active:translate-y-[4px] active:mb-[4px]",
         destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40",
+          "bg-[#ef4444] text-white border-b-4 border-[#b91c1c] hover:bg-[#f87171] active:border-b-0 active:translate-y-[4px] active:mb-[4px]",
         outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "bg-transparent text-slate-300 border-2 border-[#27272a] border-b-4 hover:bg-[#27272a] hover:text-white active:border-b-2 active:translate-y-[2px] active:mb-[2px]",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "bg-[#27272a] text-slate-300 border-b-4 border-[#3f3f46] hover:bg-[#3f3f46] hover:text-white active:border-b-0 active:translate-y-[4px] active:mb-[4px]",
         ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
+          "text-slate-300 hover:bg-[#27272a] hover:text-white active:bg-[#3f3f46]",
+        link: "text-[#2dd4bf] underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
-        "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
+        default: "h-12 px-6 py-3 has-[>svg]:px-5",
+        xs: "h-8 gap-1.5 rounded-xl border-b-2 px-3 text-xs has-[>svg]:px-2.5 [&_svg:not([class*='size-'])]:size-4 active:translate-y-[2px] active:mb-[2px]",
+        sm: "h-10 gap-2 rounded-xl border-b-[3px] px-4 text-sm has-[>svg]:px-3 active:translate-y-[3px] active:mb-[3px]",
+        lg: "h-14 rounded-2xl border-b-[5px] px-8 text-lg has-[>svg]:px-6 active:translate-y-[5px] active:mb-[5px]",
+        icon: "size-12 rounded-2xl",
+        "icon-xs": "size-8 rounded-xl border-b-2 active:translate-y-[2px] active:mb-[2px] [&_svg:not([class*='size-'])]:size-4",
+        "icon-sm": "size-10 rounded-xl border-b-[3px] active:translate-y-[3px] active:mb-[3px]",
+        "icon-lg": "size-14 rounded-2xl border-b-[5px] active:translate-y-[5px] active:mb-[5px]",
       },
     },
     defaultVariants: {

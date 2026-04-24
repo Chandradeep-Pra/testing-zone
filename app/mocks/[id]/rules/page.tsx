@@ -1,7 +1,10 @@
 "use client";
 
+import { ArrowRight, ClipboardCheck, TimerReset } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+
+import UrologicsBrand from "@/components/brand/UrologicsBrand";
 
 interface Mock {
   id: string;
@@ -12,7 +15,6 @@ interface Mock {
 export default function MockRulesPage() {
   const { id } = useParams();
   const router = useRouter();
-
   const [mock, setMock] = useState<Mock | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,7 +23,6 @@ export default function MockRulesPage() {
       try {
         const res = await fetch(`/api/mocks/${id}`);
         const data = await res.json();
-
         setMock(data.mock);
       } catch (err) {
         console.error(err);
@@ -30,76 +31,77 @@ export default function MockRulesPage() {
       }
     };
 
-    if (id) load();
+    if (id) {
+      void load();
+    }
   }, [id]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-gray-400">
-        Loading...
-      </div>
+      <main className="urologics-shell flex min-h-screen items-center justify-center">
+        <div className="urologics-panel px-8 py-6 text-slate-300">Loading mock briefing...</div>
+      </main>
     );
   }
 
   if (!mock) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-gray-500">
-        Mock not found
-      </div>
+      <main className="urologics-shell flex min-h-screen items-center justify-center">
+        <div className="urologics-panel px-8 py-6 text-slate-400">Mock not found.</div>
+      </main>
     );
   }
 
-  const totalTime = mock.durationMinutes + 10; // including break
+  const totalTime = mock.durationMinutes + 10;
 
   return (
-    <main className="min-h-screen bg-black text-white px-6 flex items-center justify-center">
+    <main className="urologics-shell px-6 py-8">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <header className="urologics-panel px-6 py-5">
+          <UrologicsBrand product="Grand Mocks" tag="Candidate briefing" />
+        </header>
 
-      <div className="max-w-2xl w-full bg-gray-900 border border-gray-800 rounded-2xl p-8">
-
-        {/* TITLE */}
-        <h1 className="text-3xl font-bold mb-4">
-          {mock.title || "Mock Quiz"}
-        </h1>
-
-        <p className="text-gray-400 mb-6">
-          Please read the instructions carefully before starting the quiz.
-        </p>
-
-        {/* RULES */}
-        <div className="space-y-4 text-gray-300 text-sm leading-relaxed">
-
-          <p>• You have <b>{mock.durationMinutes} minutes</b> to complete this quiz.</p>
-
-          <p>• You are allowed <b>one break of 10 minutes</b> during the quiz.</p>
-
-          <p>• The break can be used only once and cannot be split.</p>
-
-          <p>• Total allowed time including break is <b>{totalTime} minutes</b>.</p>
-
-          <p>• Do not refresh or close the browser during the test.</p>
-
-          <p>• Once started, the timer will continue running.</p>
-
-          <p>• Make sure you are in a distraction-free environment.</p>
-
-          <p>• Your responses will be evaluated automatically.</p>
-
-          <p className="text-emerald-400 font-medium">
-            All the best 👍
+        <section className="urologics-panel p-8 md:p-10">
+          <div className="urologics-chip">Session Rules</div>
+          <h1 className="mt-6 text-4xl font-semibold text-white">{mock.title || "Grand Mock"}</h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">
+            Review the mock conditions before you enter the timed session. The visual design mirrors the rest of the Urologics product line so the transition feels like one complete platform.
           </p>
 
-        </div>
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            <div className="urologics-subpanel p-5">
+              <TimerReset className="text-teal-300" size={18} />
+              <div className="mt-3 text-sm font-semibold text-white">Main timer</div>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                You have {mock.durationMinutes} minutes for the test, with one optional 10 minute break.
+              </p>
+            </div>
+            <div className="urologics-subpanel p-5">
+              <ClipboardCheck className="text-sky-300" size={18} />
+              <div className="mt-3 text-sm font-semibold text-white">Exam conditions</div>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                The timer continues once started, so use a stable connection and a distraction-free environment.
+              </p>
+            </div>
+          </div>
 
-        {/* CTA */}
-        <button
-          onClick={() => router.push(`/mocks/${id}`)}
-          className="w-full mt-8 bg-emerald-600 hover:bg-emerald-500 py-4 rounded-xl font-semibold text-lg"
-        >
-          Start Quiz
-        </button>
+          <div className="mt-8 space-y-3 text-sm leading-7 text-slate-300">
+            <p>You have <strong>{mock.durationMinutes} minutes</strong> to complete the mock.</p>
+            <p>You may take <strong>one break of 10 minutes</strong> during the session.</p>
+            <p>Total available time including the break is <strong>{totalTime} minutes</strong>.</p>
+            <p>Do not refresh or close the browser while the mock is active.</p>
+            <p>Your responses are stored locally during the session and used for the result screen.</p>
+          </div>
 
+          <button
+            onClick={() => router.push(`/mocks/${id}`)}
+            className="urologics-button-primary mt-10 gap-2"
+          >
+            Start Mock Session
+            <ArrowRight size={16} />
+          </button>
+        </section>
       </div>
-
     </main>
   );
 }

@@ -1,7 +1,11 @@
 "use client";
 
+import { CalendarClock, CircleDot, Mail, ShieldCheck, Sparkles, TimerReset } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+
+import UrologicsBrand from "@/components/brand/UrologicsBrand";
+import UrologicsNav from "@/components/brand/UrologicsNav";
 
 type TimestampLike = {
   _seconds?: number;
@@ -42,7 +46,6 @@ export default function TodayMocksPage() {
   const [selectedMock, setSelectedMock] = useState<Mock | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-
   const router = useRouter();
 
   useEffect(() => {
@@ -51,22 +54,12 @@ export default function TodayMocksPage() {
         const res = await fetch("/api/mocks");
         const data = (await res.json()) as { mocks?: Mock[] };
 
-        const isTodayMock = (mock: Mock) => {
-          const start = getStart(mock.startTime);
-          return start && isToday(start);
-        };
-
-        const isLiveOrUpcoming = (mock: Mock) => {
+        const filtered = (data.mocks || []).filter((mock) => {
           const start = getStart(mock.startTime);
           const end = start + 7 * 24 * 60 * 60 * 1000;
-          const now = Date.now();
+          return start && isToday(start) && Date.now() <= end;
+        });
 
-          return now <= end;
-        };
-
-        const filtered = (data.mocks || []).filter(
-          (mock) => isTodayMock(mock) && isLiveOrUpcoming(mock)
-        );
         setMocks(filtered);
 
         const saved = localStorage.getItem("mockUser");
@@ -87,93 +80,150 @@ export default function TodayMocksPage() {
 
   const handleContinue = () => {
     if (!name || !email || !selectedMock) return;
-
     localStorage.setItem("mockUser", JSON.stringify({ name, email }));
     router.push(`/mocks/${selectedMock.id}/rules`);
   };
 
   return (
-    <main className="min-h-screen bg-black px-6 text-white">
-      <section className="pb-16 pt-24 text-center">
-        <h1 className="text-5xl font-bold">
-          Today&apos;s Scheduled Mocks
-          <span className="mt-2 block text-emerald-400">Get Ready</span>
-        </h1>
-      </section>
+    <main className="urologics-shell relative overflow-hidden bg-[#03101d]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_22%),radial-gradient(circle_at_85%_15%,rgba(251,191,36,0.14),transparent_18%),radial-gradient(circle_at_70%_100%,rgba(45,212,191,0.14),transparent_26%)]" />
 
-      <section className="mx-auto max-w-6xl pb-24">
-        {loading ? (
-          <p className="text-center text-gray-400">Loading...</p>
-        ) : mocks.length === 0 ? (
-          <p className="text-center text-gray-500">No mocks scheduled for today</p>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-3">
-            {mocks.map((mock) => (
-              <div
-                key={mock.id}
-                className="rounded-2xl border border-gray-800 bg-gray-900 p-6"
-              >
-                <span className="mb-4 inline-block rounded-full bg-blue-500 px-3 py-1 text-xs text-white">
-                  Live
-                </span>
+      <div className="relative mx-auto max-w-7xl px-5 py-5 md:px-6">
+        <header className="urologics-header flex flex-wrap items-center justify-between gap-4 px-5 py-4 md:px-6">
+          <UrologicsBrand product="Grand Mocks" tag="Timed practice with premium exam-day polish" />
+          <UrologicsNav current="Mocks" />
+        </header>
 
-                <h2 className="mb-2 text-xl font-semibold">{mock.title || "Mock Quiz"}</h2>
-
-                <div className="mb-6 space-y-1 text-sm text-gray-400">
-                  <p>{mock.durationMinutes} mins</p>
-                  <p>
-                    Available Till:{" "}
-                    {new Date(getStart(mock.startTime) + 7 * 24 * 60 * 60 * 1000).toLocaleString()}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setSelectedMock(mock)}
-                  className="w-full rounded-xl bg-emerald-600 py-3 font-semibold hover:bg-emerald-500"
-                >
-                  Register
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {selectedMock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="w-full max-w-md rounded-2xl border border-gray-800 bg-gray-900 p-6">
-            <h2 className="mb-4 text-xl font-semibold">Enter Details</h2>
-
-            <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Your Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-gray-700 bg-black px-4 py-3 outline-none"
-              />
-
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-gray-700 bg-black px-4 py-3 outline-none"
-              />
+        <section className="grid gap-7 py-8 lg:grid-cols-[1.08fr_0.92fr] lg:py-12">
+          <div className="rounded-[34px] border border-white/10 bg-[linear-gradient(145deg,rgba(9,20,38,0.98),rgba(15,35,59,0.92))] p-7 shadow-[0_28px_74px_rgba(2,6,23,0.42)] md:p-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/20 bg-sky-400/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-sky-100">
+              <Sparkles size={14} />
+              Mocks
             </div>
 
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setSelectedMock(null)}
-                className="flex-1 rounded-xl bg-gray-700 py-3"
-              >
+            <h1 className="mt-7 text-4xl font-extrabold tracking-[-0.04em] text-white md:text-6xl">
+              Timed mock sessions.
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-8 text-slate-200 md:text-lg">
+              Join today&apos;s mock or grand mock.
+            </p>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-5">
+                <CalendarClock className="text-sky-200" size={18} />
+                <div className="mt-3 text-sm font-bold text-white">Today</div>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Active sessions only.</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-5">
+                <TimerReset className="text-amber-200" size={18} />
+                <div className="mt-3 text-sm font-bold text-white">Timed</div>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Simple timed flow.</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-5">
+                <ShieldCheck className="text-teal-200" size={18} />
+                <div className="mt-3 text-sm font-bold text-white">Ready</div>
+                <p className="mt-2 text-sm leading-6 text-slate-300">Built for exam prep.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[34px] border border-white/10 bg-[linear-gradient(145deg,rgba(24,24,53,0.9),rgba(8,17,31,0.94))] p-7 shadow-[0_24px_60px_rgba(2,6,23,0.36)] md:p-8">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-fuchsia-200">
+              Sessions
+            </div>
+            <div className="mt-4 text-3xl font-extrabold tracking-[-0.03em] text-white">
+              {loading ? "Loading mock schedule" : `${mocks.length} active sessions today`}
+            </div>
+            <p className="mt-4 text-sm leading-7 text-slate-200">
+              Pick a session and continue.
+            </p>
+          </div>
+        </section>
+
+        <section className="pb-16">
+          {loading ? (
+            <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(145deg,rgba(9,20,38,0.98),rgba(15,35,59,0.92))] p-10 text-center text-slate-200">
+              Loading scheduled mocks...
+            </div>
+          ) : mocks.length === 0 ? (
+            <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(145deg,rgba(9,20,38,0.98),rgba(15,35,59,0.92))] p-10 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06] text-sky-200">
+                <CalendarClock size={20} />
+              </div>
+              <div className="text-xl font-bold text-white">No sessions today</div>
+              <p className="mt-3 text-sm leading-7 text-slate-200">
+                New sessions will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {mocks.map((mock, index) => (
+                <div
+                  key={mock.id}
+                  className={`rounded-[30px] border border-white/10 p-6 shadow-[0_24px_60px_rgba(2,6,23,0.34)] ${
+                    index % 3 === 0
+                      ? "bg-[linear-gradient(145deg,rgba(7,33,45,0.96),rgba(10,22,38,0.94))]"
+                      : index % 3 === 1
+                        ? "bg-[linear-gradient(145deg,rgba(16,24,52,0.96),rgba(8,17,31,0.94))]"
+                        : "bg-[linear-gradient(145deg,rgba(31,19,49,0.96),rgba(8,17,31,0.94))]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-100">
+                      <CircleDot size={10} />
+                      Live Today
+                    </span>
+                    <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-300">
+                      {mock.durationMinutes} min
+                    </span>
+                  </div>
+                  <h2 className="mt-5 text-2xl font-bold text-white">{mock.title || "Grand Mock"}</h2>
+                  <p className="mt-3 text-sm leading-7 text-slate-200">
+                    Available until{" "}
+                    {new Date(getStart(mock.startTime) + 7 * 24 * 60 * 60 * 1000).toLocaleString()}
+                  </p>
+                  <button
+                    onClick={() => setSelectedMock(mock)}
+                    className="mt-8 inline-flex w-full items-center justify-center rounded-full bg-white px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-sky-100"
+                  >
+                    Register For Session
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {selectedMock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-xl">
+          <div className="w-full max-w-lg rounded-[32px] border border-white/10 bg-[linear-gradient(145deg,rgba(9,20,38,0.98),rgba(15,35,59,0.92))] p-8 shadow-[0_30px_80px_rgba(2,6,23,0.48)]">
+            <UrologicsBrand compact product="Grand Mocks" tag="Candidate registration" />
+            <div className="mt-6 text-2xl font-bold text-white">{selectedMock.title}</div>
+            <p className="mt-3 text-sm leading-7 text-slate-200">
+              Enter your details to continue.
+            </p>
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                  <ShieldCheck size={14} />
+                  Full Name
+                </label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" className="urologics-input" />
+              </div>
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                  <Mail size={14} />
+                  Email
+                </label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email" className="urologics-input" />
+              </div>
+            </div>
+            <div className="mt-8 flex gap-3">
+              <button onClick={() => setSelectedMock(null)} className="inline-flex flex-1 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.1]">
                 Cancel
               </button>
-
-              <button
-                onClick={handleContinue}
-                className="flex-1 rounded-xl bg-emerald-600 py-3 font-semibold hover:bg-emerald-500"
-              >
+              <button onClick={handleContinue} className="inline-flex flex-1 items-center justify-center rounded-full bg-[#7ff0d8] px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-[#9bf5e1]">
                 Continue
               </button>
             </div>

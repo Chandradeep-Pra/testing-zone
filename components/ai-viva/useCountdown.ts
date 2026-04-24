@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 
 type CountdownState = {
   secondsLeft: number;
@@ -6,14 +6,18 @@ type CountdownState = {
 
 type CountdownAction =
   | { type: "reset"; value: number }
-  | { type: "tick" };
+  | { type: "set"; value: number };
 
 function countdownReducer(state: CountdownState, action: CountdownAction): CountdownState {
   switch (action.type) {
     case "reset":
       return { secondsLeft: action.value };
-    case "tick":
-      return { secondsLeft: Math.max(0, state.secondsLeft - 1) };
+    case "set":
+      if (state.secondsLeft === action.value) {
+        return state;
+      }
+
+      return { secondsLeft: action.value };
     default:
       return state;
   }
@@ -28,27 +32,53 @@ export function useCountdown(
   const [state, dispatch] = useReducer(countdownReducer, {
     secondsLeft: initialSeconds,
   });
+  const deadlineRef = useRef<number | null>(null);
+  const completedRef = useRef(false);
 
   useEffect(() => {
     dispatch({ type: "reset", value: initialSeconds });
+    deadlineRef.current = null;
+    completedRef.current = false;
   }, [initialSeconds, resetKey]);
 
   useEffect(() => {
-    if (!running) return;
-    if (state.secondsLeft <= 0) return;
+    if (!running) {
+      deadlineRef.current = null;
+      return;
+    }
 
-    const id = window.setInterval(() => {
-      if (state.secondsLeft <= 1) {
-        window.clearInterval(id);
-        if (onComplete) {
-          onComplete();
-        }
-        dispatch({ type: "reset", value: 0 });
+    if (state.secondsLeft <= 0) {
+      if (!completedRef.current) {
+        completedRef.current = true;
+        onComplete?.();
+      }
+      return;
+    }
+
+    if (deadlineRef.current === null) {
+      deadlineRef.current = Date.now() + state.secondsLeft * 1000;
+    }
+
+    const tick = () => {
+      if (deadlineRef.current === null) {
         return;
       }
 
-      dispatch({ type: "tick" });
-    }, 1000);
+      const nextSeconds = Math.max(
+        0,
+        Math.ceil((deadlineRef.current - Date.now()) / 1000)
+      );
+
+      dispatch({ type: "set", value: nextSeconds });
+
+      if (nextSeconds <= 0 && !completedRef.current) {
+        completedRef.current = true;
+        onComplete?.();
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, 250);
 
     return () => window.clearInterval(id);
   }, [running, state.secondsLeft, onComplete]);
@@ -58,4 +88,3 @@ export function useCountdown(
 
   return { secondsLeft: state.secondsLeft, minutes, seconds };
 }
-

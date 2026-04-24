@@ -12,6 +12,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import {
   getDefaultExaminer,
   EXAMINER_VOICES,
@@ -131,25 +132,31 @@ export default function ReadyOverlay({
       <div className="w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/90 shadow-[0_30px_120px_rgba(2,6,23,0.65)]">
         <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
           <div className="border-b border-white/10 p-8 lg:border-b-0 lg:border-r">
-            <div className="mb-8 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-400/25 bg-emerald-400/10 text-emerald-300">
-                <ShieldCheck size={22} />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.28em] text-emerald-400">
-                  Session Setup
-                </p>
-                <h1 className="text-2xl font-semibold text-white">
-                  {selectedMode === "fast" ? "Fast and Furious" : "Calm and Composed"} Viva
-                </h1>
+            <div className="mb-8 space-y-4">
+              <UrologicsBrand
+                product="AI Viva"
+                tag={selectedMode === "fast" ? "Fast and Furious session" : "Calm and Composed session"}
+              />
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-400/25 bg-emerald-400/10 text-emerald-300">
+                  <ShieldCheck size={22} />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.28em] text-emerald-400">
+                    Session Setup
+                  </p>
+                  <h1 className="text-2xl font-semibold text-white">
+                    {selectedMode === "fast" ? "Fast and Furious" : "Calm and Composed"} Viva
+                  </h1>
+                </div>
               </div>
             </div>
 
             <div className="space-y-3">
               <p className="text-lg font-medium text-slate-100">{vivaTitle}</p>
               <p className="max-w-2xl text-sm leading-6 text-slate-400">
-                Choose your examiner, confirm your microphone, and step into a polished exam room
-                experience. Fast mode runs on a total 10 minute clock and ends as soon as the question set is complete.
+                Choose your examiner, confirm your microphone, and enter the premium Urologics AI Viva room.
+                Fast mode runs on a total 10 minute clock and ends as soon as the question set is complete.
               </p>
             </div>
 

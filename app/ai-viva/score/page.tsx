@@ -1,19 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Trophy,
-  CheckCircle2,
-  AlertTriangle,
   Activity,
+  CheckCircle2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ShieldCheck,
+  Target,
+  Trophy,
+  AlertTriangle,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-import toast from "react-hot-toast";
+import UrologicsBrand from "@/components/brand/UrologicsBrand";
 
 interface DomainReport {
   name: string;
@@ -30,12 +32,6 @@ interface Report {
   domains: DomainReport[];
   improvementPlan: string[];
 }
-
-type ConversationMessage = {
-  id?: string;
-  role: "ai" | "candidate";
-  text: string;
-};
 
 function buildConversationFromQaHistory(history = []) {
   return history.flatMap((item: { question?: string; answer?: string }) => {
@@ -64,7 +60,6 @@ function buildConversationFromQaHistory(history = []) {
 export default function ReviewPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [report, setReport] = useState<Report | null>(null);
-  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("viva-final-score");
@@ -77,20 +72,15 @@ export default function ReviewPage() {
         const storedCandidate = localStorage.getItem("candidateInfo");
         const parsedCandidate = storedCandidate ? JSON.parse(storedCandidate) : null;
 
-        const domainKeys = [
+        const domains: DomainReport[] = [
           "basic_knowledge",
           "higher_order_processing",
           "clinical_skills",
           "professionalism",
-        ];
-
-        const domains: DomainReport[] = domainKeys.map((key) => {
+        ].map((key) => {
           const val = evalObj[key];
-
           return {
-            name: key
-              .replace(/_/g, " ")
-              .replace(/\b\w/g, (c) => c.toUpperCase()),
+            name: key.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
             score: Number(val?.score) || 0,
             summary: val?.summary || "",
             reasoning: val?.reason || "",
@@ -98,7 +88,7 @@ export default function ReviewPage() {
         });
 
         const overall = Math.round(
-          domains.reduce((sum, d) => sum + d.score, 0) / domains.length
+          domains.reduce((sum, domain) => sum + domain.score, 0) / domains.length
         );
 
         const finalReport = {
@@ -106,7 +96,7 @@ export default function ReviewPage() {
             evalObj.caseTitle ||
             parsedCandidate?.selectedCaseTitle ||
             parsedCandidate?.selectedCase?.case?.title ||
-            "AI Viva Case",
+            "Urologics AI Viva",
           overallScore: overall,
           strengthsOverall: evalObj.strengthsOverall || [],
           weaknessesOverall: evalObj.weaknessesOverall || [],
@@ -127,81 +117,24 @@ export default function ReviewPage() {
         if (!Array.isArray(parsed.conversation) || parsed.conversation.length === 0) {
           parsed.conversation = buildConversationFromQaHistory(qaHistory);
         }
-        setConversation(parsed.conversation);
-
         localStorage.setItem("candidateInfo", JSON.stringify(parsed));
 
-        /* -----------------------------
-           🚀 SINGLE API CALL
-        ----------------------------- */
-
-        toast.custom(
-          (t) => (
-            <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl ${
-                t.visible ? "animate-in fade-in slide-in-from-top-2" : "animate-out fade-out"
-              }`}
-              style={{
-                background: "linear-gradient(135deg, #1e293b, #0f172a)",
-                border: "1px solid rgba(148,163,184,0.2)",
-                boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
-              }}
-            >
-              <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-
-              <div>
-                <p className="text-sm font-medium text-white">Sending your report</p>
-                <p className="text-xs text-slate-400">Emailing your results…</p>
-              </div>
-            </div>
-          ),
-          { id: "send-mail" }
-        );
-
-        console.log("🟡 [FLOW] Calling API...");
+        toast.loading("Sending your Urologics AI Viva report...", { id: "send-mail" });
 
         const res = await fetch("/api/send-report", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            candidateInfo: parsed,
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ candidateInfo: parsed }),
         });
 
-        console.log("🟢 [FLOW] API Response:", res.status);
-
         if (!res.ok) {
-          const text = await res.text();
-          console.error("❌ API ERROR:", text);
           throw new Error("Failed to send email");
         }
 
-        toast.custom(
-          (t) => (
-            <div
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl ${
-                t.visible ? "animate-in fade-in slide-in-from-top-2" : "animate-out fade-out"
-              }`}
-              style={{
-                background: "linear-gradient(135deg, #065f46, #022c22)",
-                border: "1px solid rgba(34,197,94,0.3)",
-              }}
-            >
-              <CheckCircle2 className="text-emerald-400" size={20} />
-              <div>
-                <p className="text-sm font-semibold text-white">Report Sent</p>
-                <p className="text-xs text-emerald-300">Check your inbox 📩</p>
-              </div>
-            </div>
-          ),
-          { id: "send-mail" }
-        );
-
+        toast.success("Report sent successfully", { id: "send-mail" });
       } catch (err) {
         console.error("Error:", err);
-        toast.error("Failed to send report ❌", { id: "send-mail" });
+        toast.error("Failed to send report", { id: "send-mail" });
       }
     }
 
@@ -210,212 +143,144 @@ export default function ReviewPage() {
 
   if (!report) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <p className="text-slate-400">Loading score…</p>
+      <main className="urologics-shell flex min-h-screen items-center justify-center">
+        <div className="urologics-panel px-8 py-6 text-slate-300">Loading Urologics AI Viva score...</div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 px-4 py-6 md:px-6 md:py-10">
-      <div className="w-full max-w-5xl mx-auto space-y-8 md:space-y-10">
+    <main className="urologics-shell px-4 py-6 md:px-6 md:py-8">
+      <div className="mx-auto max-w-6xl space-y-8">
+        <header className="urologics-panel flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+          <UrologicsBrand product="AI Viva" tag="Performance report" />
+          <div className="urologics-chip">Scored Out Of 8</div>
+        </header>
 
-        {/* HEADER */}
-        <section className="border-b border-slate-800 pb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <Trophy className="text-emerald-400 flex-shrink-0" size={20} />
+        <section className="grid gap-6 lg:grid-cols-[1fr_0.42fr]">
+          <div className="urologics-panel p-8">
+            <div className="flex items-start gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-400/10 text-teal-300">
+                <Trophy size={22} />
+              </div>
               <div>
-                <h1 className="text-lg md:text-xl font-semibold">
-                  Performance Report
-                </h1>
-                <p className="text-slate-400 text-xs md:text-sm line-clamp-2">
+                <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                  Urologics AI Viva Report
+                </div>
+                <h1 className="mt-3 text-3xl font-semibold text-white md:text-4xl">
                   {report.caseTitle}
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">
+                  A branded performance summary covering domain scores, strengths, weaknesses, and next-step focus areas.
                 </p>
               </div>
             </div>
+          </div>
 
-            <div className="text-right flex-shrink-0">
-              <div className="text-3xl md:text-4xl font-semibold text-emerald-400">
-                {report.overallScore} 
-              </div>
-              <div className="text-xs text-slate-500">
-                Overall / 8
-              </div>
-            </div>
+          <div className="urologics-panel flex flex-col items-center justify-center p-8 text-center">
+            <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Overall Score</div>
+            <div className="mt-4 text-6xl font-semibold text-teal-300">{report.overallScore}</div>
+            <div className="mt-2 text-sm text-slate-400">out of 8</div>
           </div>
         </section>
 
-        {/* STRENGTHS & WEAKNESSES */}
         {(report.strengthsOverall.length > 0 || report.weaknessesOverall.length > 0) && (
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-
-            {report.strengthsOverall.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
-                  <h2 className="text-xs md:text-sm font-medium text-emerald-400">
-                    Strengths
-                  </h2>
-                </div>
-
-                <div className="space-y-2">
-                  {report.strengthsOverall.map((item, i) => (
-                    <div
-                      key={i}
-                      className="bg-emerald-500/10 border border-emerald-500/20 p-2 md:p-3 rounded-lg text-xs md:text-sm"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
+          <section className="grid gap-6 md:grid-cols-2">
+            <div className="urologics-panel p-6">
+              <div className="flex items-center gap-2 text-teal-300">
+                <CheckCircle2 size={16} />
+                <h2 className="text-xs uppercase tracking-[0.24em]">Strengths</h2>
               </div>
-            )}
-
-            {report.weaknessesOverall.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <AlertTriangle size={16} className="text-red-400 flex-shrink-0" />
-                  <h2 className="text-xs md:text-sm font-medium text-red-400">
-                    Weaknesses
-                  </h2>
-                </div>
-
-                <div className="space-y-2">
-                  {report.weaknessesOverall.map((item, i) => (
-                    <div
-                      key={i}
-                      className="bg-red-500/10 border border-red-500/20 p-2 md:p-3 rounded-lg text-xs md:text-sm"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
+              <div className="mt-5 space-y-3">
+                {report.strengthsOverall.map((item, i) => (
+                  <div key={i} className="urologics-subpanel p-4 text-sm leading-6 text-slate-200">
+                    {item}
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
 
+            <div className="urologics-panel p-6">
+              <div className="flex items-center gap-2 text-amber-300">
+                <AlertTriangle size={16} />
+                <h2 className="text-xs uppercase tracking-[0.24em]">Weaknesses</h2>
+              </div>
+              <div className="mt-5 space-y-3">
+                {report.weaknessesOverall.map((item, i) => (
+                  <div key={i} className="urologics-subpanel p-4 text-sm leading-6 text-slate-200">
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
           </section>
         )}
 
-        {/* DOMAIN PERFORMANCE */}
-        <section className="space-y-4 md:space-y-6 border-t border-slate-800 pt-6">
-
-          <div className="flex items-center gap-2">
-            <Activity size={16} className="text-slate-400 flex-shrink-0" />
-            <h2 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wide">
-              Domain Performance
-            </h2>
+        <section className="urologics-panel p-6">
+          <div className="flex items-center gap-2 text-slate-400">
+            <Activity size={16} />
+            <h2 className="text-xs uppercase tracking-[0.24em]">Domain Performance</h2>
           </div>
+          <div className="mt-6 space-y-4">
+            {report.domains.map((domain, index) => {
+              const isOpen = expanded === index;
 
-          {report.domains.map((domain, index) => {
-            const isOpen = expanded === index;
-
-            return (
-              <div
-                key={index}
-                className="border border-slate-800 rounded-lg p-3 md:p-4 space-y-3"
-              >
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-6">
-
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-slate-200 text-sm md:text-base">
-                      {domain.name}
+              return (
+                <div key={index} className="urologics-subpanel p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="max-w-3xl">
+                      <div className="text-lg font-semibold text-white">{domain.name}</div>
+                      <p className="mt-2 text-sm leading-6 text-slate-400">{domain.summary}</p>
                     </div>
-
-                    <p className="text-xs md:text-sm text-slate-400 mt-1 line-clamp-2">
-                      {domain.summary}
-                    </p>
+                    <div className="text-3xl font-semibold text-teal-300">{domain.score}/8</div>
                   </div>
-
-                  <div className="text-2xl md:text-2xl font-semibold text-slate-300 flex-shrink-0">
-                    {domain.score}/8
-                  </div>
-                </div>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="px-0 text-xs md:text-sm text-slate-400 hover:text-slate-200 w-full md:w-auto justify-start md:justify-start"
-                  onClick={() =>
-                    setExpanded(isOpen ? null : index)
-                  }
-                >
-                  {isOpen ? (
-                    <>
-                      Hide detailed feedback <ChevronUp size={14} className="ml-1" />
-                    </>
-                  ) : (
-                    <>
-                      View detailed feedback <ChevronDown size={14} className="ml-1" />
-                    </>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-3 px-0 text-slate-400 hover:text-white"
+                    onClick={() => setExpanded(isOpen ? null : index)}
+                  >
+                    {isOpen ? "Hide detailed review" : "View detailed review"}
+                    {isOpen ? <ChevronUp size={14} className="ml-1" /> : <ChevronDown size={14} className="ml-1" />}
+                  </Button>
+                  {isOpen && (
+                    <div className="mt-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-sm leading-7 text-slate-300">
+                      {domain.reasoning}
+                    </div>
                   )}
-                </Button>
-
-                {isOpen && (
-                  <div className="text-xs md:text-sm text-slate-300 leading-relaxed bg-slate-900/60 p-3 md:p-4 rounded-md border border-slate-800">
-                    {domain.reasoning}
-                  </div>
-                )}
-
-              </div>
-            );
-          })}
-
+                </div>
+              );
+            })}
+          </div>
         </section>
 
-        {/* NEXT FOCUS AREA */}
         {report.improvementPlan.length > 0 && (
-          <section className="space-y-4 border-t border-slate-800 pt-6">
-
-            <h2 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wide">
-              Next Focus Areas
-            </h2>
-
-            <div className="flex flex-wrap gap-2 md:gap-3">
+          <section className="urologics-panel p-6">
+            <div className="flex items-center gap-2 text-slate-400">
+              <Target size={16} />
+              <h2 className="text-xs uppercase tracking-[0.24em]">Next Focus Areas</h2>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
               {report.improvementPlan.map((item, i) => (
-                <Badge
-                  key={i}
-                  variant="secondary"
-                  className="bg-slate-800 text-slate-200 px-2 md:px-3 py-1 text-xs md:text-sm"
-                >
+                <Badge key={i} className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-slate-200">
                   {item}
                 </Badge>
               ))}
             </div>
-
           </section>
         )}
 
-        {conversation.length > 0 && (
-          <section className="space-y-4 border-t border-slate-800 pt-6">
-            <h2 className="text-xs md:text-sm font-medium text-slate-400 uppercase tracking-wide">
-              Q&amp;A
-            </h2>
-
-            <div className="space-y-3">
-              {conversation.map((message, index) => (
-                <div
-                  key={message.id || `${message.role}-${index}`}
-                  className={`rounded-lg border p-3 md:p-4 text-xs md:text-sm ${
-                    message.role === "ai"
-                      ? "border-emerald-500/20 bg-emerald-500/10 text-slate-100"
-                      : "border-blue-500/20 bg-blue-500/10 text-slate-100"
-                  }`}
-                >
-                  <div className="mb-1 text-[11px] md:text-xs font-medium uppercase tracking-wide text-slate-400">
-                    {message.role === "ai" ? "Question" : "Answer"}
-                  </div>
-                  <div className="leading-relaxed text-slate-200">
-                    {message.text || "No response"}
-                  </div>
-                </div>
-              ))}
+        <section className="urologics-panel flex items-center gap-4 p-6">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05] text-slate-300">
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-white">Report delivery is automatic</div>
+            <div className="mt-1 text-sm text-slate-400">
+              Your branded Urologics report is sent to the candidate email on file.
             </div>
-          </section>
-        )}
-
-       
-
+          </div>
+        </section>
       </div>
     </main>
   );

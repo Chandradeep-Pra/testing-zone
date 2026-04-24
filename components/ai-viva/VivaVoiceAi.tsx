@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, PhoneOff, Camera, CameraOff, Sparkles, UserRound, ShieldCheck } from "lucide-react";
+import { Clock, PhoneOff, Camera, CameraOff, Sparkles, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CandidatePanel } from "./CandidatePanel";
@@ -14,6 +14,7 @@ import { useCountdown } from "./useCountdown";
 import ChatTimeline from "./ChatTimeline";
 import { useLiveAvatar } from "./useLiveAvatar";
 
+import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 
@@ -71,13 +72,12 @@ export default function VivaVoiceAi({
   vivaCase: VivaCaseRecord;
   selectedMode?: VivaMode;
 }) {
-  const warmupPrompt =
-    "Before we begin, for the audio check please state your full name and how you are feeling today. This will not be scored.";
   const warmupDurationMs = 5000;
   const fastModeTotalDurationSec = 10 * 60;
   const isFastMode = selectedMode === "fast";
 
   const [candidate, setCandidate] = useState({ name: "", email: "" });
+  const warmupPrompt = `Hi ${candidate.name || "there"}, how are you feeling today?`;
   const [selectedExaminer, setSelectedExaminer] = useState<ExaminerVoice>(
     getDefaultExaminer(selectedMode)
   );
@@ -146,6 +146,7 @@ export default function VivaVoiceAi({
   const [candidateTranscript, setCandidateTranscript] = useState("");
   const [fastPauseState, setFastPauseState] = useState<FastPauseState>("idle");
   const [fastTimerStarted, setFastTimerStarted] = useState(false);
+  const [fastTimerResetKey, setFastTimerResetKey] = useState(0);
 
   const currentFastQuestion = isFastMode ? getCurrentFastQuestion() : null;
   const fastKeywordProgress = isFastMode
@@ -218,17 +219,10 @@ export default function VivaVoiceAi({
       }
 
       if (isFastMode) {
-        advanceLockRef.current = true;
-        stop();
-        setIsListening(false);
-        void setAvatarListening(false);
-        clearFastSilencePromptTimer();
-        speakAsExaminer("Time is up. We are concluding the viva now.", async () => {
-          await endViva();
-        });
+        void concludeVivaFromTimer();
       }
     },
-    isFastMode ? "fast-total-timer" : vivaDurationSec
+    isFastMode ? `fast-total-timer-${fastTimerResetKey}` : vivaDurationSec
   );
 
   const fillers = [
@@ -519,6 +513,38 @@ export default function VivaVoiceAi({
     });
   }
 
+  async function concludeVivaFromTimer() {
+    if (endingRef.current || advanceLockRef.current) {
+      return;
+    }
+
+    advanceLockRef.current = true;
+    stop();
+    setIsListening(false);
+    void setAvatarListening(false);
+    clearFastSilencePromptTimer();
+    setFastPauseState("idle");
+
+    const finalAnswer = mergeWithAnswerPrefix(
+      getTranscriptBuffer() || candidateTranscript || answerPrefixRef.current
+    ).trim();
+
+    answerPrefixRef.current = "";
+    resetTranscriptBuffer();
+    setCandidateTranscript(finalAnswer);
+    syncCandidateMessage(finalAnswer, false);
+
+    try {
+      await next(finalAnswer, true);
+    } catch (error) {
+      console.error("Error concluding viva on timer:", error);
+    }
+
+    speakAsExaminer("Time is up. We are concluding the viva now.", async () => {
+      await endViva();
+    });
+  }
+
   async function submitCurrentAnswer(answerText: string) {
     if (ending || endingRef.current || advanceLockRef.current) {
       return;
@@ -562,6 +588,11 @@ export default function VivaVoiceAi({
 
   async function startViva() {
     try {
+      if (isFastMode) {
+        setFastTimerStarted(false);
+        setFastTimerResetKey((value) => value + 1);
+      }
+
       const data = await next("");
 
       if (!data?.question) {
@@ -579,11 +610,11 @@ export default function VivaVoiceAi({
 
       setThinking(false);
       applyApiResponse(data);
+      setVivaStarted(true);
       if (isFastMode) {
         setFastTimerStarted(true);
       }
       speakAsExaminer(question, () => {
-        setVivaStarted(true);
         markSpeechEnded();
         beginListeningForAnswer();
       });
@@ -617,7 +648,7 @@ export default function VivaVoiceAi({
         void setAvatarListening(false);
         setThinking(true);
 
-        speakAsExaminer("Thank you. Audio is ready. Starting the viva now.", async () => {
+        speakAsExaminer("Thank you. Let us begin.", async () => {
           await new Promise((res) => setTimeout(res, 400));
           await startViva();
         });
@@ -739,15 +770,18 @@ export default function VivaVoiceAi({
       <div className="border-b border-white/10 bg-slate-950/70 px-3 py-3 backdrop-blur-xl sm:px-5 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300">
+            <div className="hidden sm:block">
+              <UrologicsBrand compact product="AI Viva" tag={vivaCase.case.title} />
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300 sm:hidden">
               <ShieldCheck size={18} />
             </div>
             <div className="min-w-0">
               <div className="text-xs uppercase tracking-[0.22em] text-slate-500">
-                Examiner Session
+                Urologics Session
               </div>
               <div className="truncate text-sm font-semibold text-slate-100 md:text-base">
-                {selectedExaminer.name} • {selectedExaminer.title}
+                {selectedExaminer.name} · {selectedExaminer.title}
               </div>
             </div>
           </div>
@@ -839,17 +873,11 @@ export default function VivaVoiceAi({
 
           <div className="grid min-h-0 gap-4 lg:grid-rows-[auto_1fr_auto]">
             <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-              <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-slate-500">
-                <UserRound size={14} />
-                Candidate Feed
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-sm leading-6 text-slate-300 min-h-24">
-                {candidateTranscript || "Your live answer transcript will appear here while you speak."}
-              </div>
+              {/* Candidate transcript panel intentionally hidden for the branded exam-room layout. */}
 
               {isFastMode && candidateTranscript.trim() && (
                 <div
-                  className={`mt-3 rounded-2xl border px-4 py-3 text-xs backdrop-blur ${
+                  className={`rounded-2xl border px-4 py-3 text-xs backdrop-blur ${
                     fastPauseState === "detected"
                       ? "border-orange-400/30 bg-orange-500/10 text-orange-100"
                       : fastPauseState === "monitoring"
