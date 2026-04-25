@@ -126,13 +126,55 @@ export default function TodayMocksPage() {
             <div className="mt-4 text-3xl font-extrabold tracking-[-0.03em] text-white">
               {loading ? "Loading mock schedule" : `${mocks.length} live sessions now`}
             </div>
-            <p className="mt-4 text-sm leading-7 text-slate-200">
-              Pick a session and continue.
-            </p>
+            <div className="urologics-thin-scrollbar mt-5 max-h-[272px] space-y-3 overflow-y-auto pr-2">
+              {loading ? (
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.05] p-4 text-sm text-slate-200">
+                  Loading sessions...
+                </div>
+              ) : mocks.length === 0 ? (
+                <div className="rounded-[22px] border border-white/10 bg-white/[0.05] p-4 text-sm leading-6 text-slate-200">
+                  No live sessions right now.
+                </div>
+              ) : (
+                mocks.map((mock) => {
+                  const endTime =
+                    getTimestamp(mock.endTime) ||
+                    getTimestamp(mock.startTime) + mock.durationMinutes * 60 * 1000;
+
+                  return (
+                    <button
+                      key={`session-summary-${mock.id}`}
+                      type="button"
+                      onClick={() => setSelectedMock(mock)}
+                      className="w-full rounded-[22px] border border-white/10 bg-white/[0.05] p-4 text-left transition hover:border-sky-300/25 hover:bg-white/[0.08]"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-100">
+                          <CircleDot size={9} />
+                          Live
+                        </span>
+                        <span className="text-[11px] uppercase tracking-[0.18em] text-slate-300">
+                          {mock.durationMinutes} min
+                        </span>
+                      </div>
+                      <div className="mt-3 text-sm font-bold text-white">
+                        {mock.title || "Grand Mock"}
+                      </div>
+                      <div className="mt-2 text-xs leading-5 text-slate-300">
+                        Ends {new Date(endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         </section>
 
         <section className="pb-16">
+          <div className="mb-5 text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-300">
+            All Sessions
+          </div>
           {loading ? (
             <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(145deg,rgba(9,20,38,0.98),rgba(15,35,59,0.92))] p-10 text-center text-slate-200">
               Loading scheduled mocks...
