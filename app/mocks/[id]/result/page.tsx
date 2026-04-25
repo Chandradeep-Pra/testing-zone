@@ -1,9 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import { CheckCircle2, ShieldCheck, Trophy, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import toast from "react-hot-toast";
 
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 
@@ -28,6 +28,7 @@ export default function ResultPage() {
   const [mock, setMock] = useState<MockDetail | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<string | null>(null);
+  const [submittedAttempt, setSubmittedAttempt] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -44,16 +45,87 @@ export default function ResultPage() {
     void load();
   }, [id]);
 
+  const score = mock
+    ? mock.questions.reduce(
+        (total, question) =>
+          answers[question.id] === question.correctAnswer ? total + 1 : total,
+        0
+      )
+    : 0;
+
+  useEffect(() => {
+    if (!mock || submittedAttempt) {
+      return;
+    }
+
+    const alreadySubmitted = sessionStorage.getItem(`mock-${id}-attempt-submitted`);
+    if (alreadySubmitted === "true") {
+      setSubmittedAttempt(true);
+      return;
+    }
+
+    const storedUser = localStorage.getItem("mockUser");
+    if (!storedUser) {
+      return;
+    }
+
+    const parsedUser = JSON.parse(storedUser) as { name?: string; email?: string };
+    if (!parsedUser.name || !parsedUser.email) {
+      return;
+    }
+
+    const marks = mock.questions.length > 0
+      ? Math.round((score / mock.questions.length) * 100)
+      : 0;
+
+    const submitAttempt = async () => {
+      toast.loading("Submitting mock attempt...", { id: "mock-attempt" });
+
+      try {
+        const res = await fetch(`/api/mocks/${id}/attempts`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: parsedUser.name,
+            email: parsedUser.email,
+            marks,
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to submit mock attempt");
+        }
+
+        const data = await res.json();
+        localStorage.setItem(
+          `mock-${id}-attempt-summary`,
+          JSON.stringify({
+            mockId: id,
+            title: mock.title || "Grand Mock",
+            name: parsedUser.name,
+            email: parsedUser.email,
+            marks,
+            attemptsCount: data.attemptsCount ?? null,
+            attempt: data.attempt ?? null,
+          })
+        );
+        sessionStorage.setItem(`mock-${id}-attempt-submitted`, "true");
+        setSubmittedAttempt(true);
+        toast.success("Mock submitted successfully", { id: "mock-attempt" });
+      } catch (error) {
+        console.error("Mock attempt submission failed:", error);
+        toast.error("Failed to submit mock attempt", { id: "mock-attempt" });
+      }
+    };
+
+    void submitAttempt();
+  }, [id, mock, score, submittedAttempt]);
+
   if (!mock) {
     return null;
   }
-
-  let score = 0;
-  mock.questions.forEach((question) => {
-    if (answers[question.id] === question.correctAnswer) {
-      score += 1;
-    }
-  });
 
   return (
     <>
@@ -62,11 +134,9 @@ export default function ResultPage() {
           onClick={() => setPreview(null)}
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4"
         >
-          <Image
+          <img
             src={preview}
             alt="Explanation preview"
-            width={1200}
-            height={900}
             className="max-h-[90%] max-w-[90%] object-contain"
           />
         </div>
@@ -141,11 +211,9 @@ export default function ResultPage() {
                           {question.explanation.image && (
                             <div className="mt-4 flex justify-center">
                               <button type="button" onClick={() => setPreview(question.explanation?.image || null)}>
-                                <Image
+                                <img
                                   src={question.explanation.image}
                                   alt="Explanation"
-                                  width={900}
-                                  height={600}
                                   className="max-h-[300px] rounded-2xl border border-white/10 object-contain transition hover:scale-[1.02]"
                                 />
                               </button>

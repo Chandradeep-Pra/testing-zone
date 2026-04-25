@@ -16,28 +16,18 @@ interface Mock {
   quizId: string;
   title: string;
   startTime: string | number | TimestampLike;
+  endTime?: string | number | TimestampLike;
   durationMinutes: number;
 }
 
-const getStart = (startTime: string | number | TimestampLike) => {
-  if (typeof startTime === "object" && startTime?._seconds) {
-    return startTime._seconds * 1000;
+const getTimestamp = (value?: string | number | TimestampLike) => {
+  if (typeof value === "object" && value?._seconds) {
+    return value._seconds * 1000;
   }
 
-  return typeof startTime === "string" || typeof startTime === "number"
-    ? new Date(startTime).getTime()
+  return typeof value === "string" || typeof value === "number"
+    ? new Date(value).getTime()
     : 0;
-};
-
-const isToday = (timestamp: number) => {
-  const d = new Date(timestamp);
-  const now = new Date();
-
-  return (
-    d.getDate() === now.getDate() &&
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear()
-  );
 };
 
 export default function TodayMocksPage() {
@@ -55,9 +45,11 @@ export default function TodayMocksPage() {
         const data = (await res.json()) as { mocks?: Mock[] };
 
         const filtered = (data.mocks || []).filter((mock) => {
-          const start = getStart(mock.startTime);
-          const end = start + 7 * 24 * 60 * 60 * 1000;
-          return start && isToday(start) && Date.now() <= end;
+          const start = getTimestamp(mock.startTime);
+          const end = getTimestamp(mock.endTime) || start + mock.durationMinutes * 60 * 1000;
+          const now = Date.now();
+
+          return Boolean(start && end && now >= start && now <= end);
         });
 
         setMocks(filtered);
@@ -132,7 +124,7 @@ export default function TodayMocksPage() {
               Sessions
             </div>
             <div className="mt-4 text-3xl font-extrabold tracking-[-0.03em] text-white">
-              {loading ? "Loading mock schedule" : `${mocks.length} active sessions today`}
+              {loading ? "Loading mock schedule" : `${mocks.length} live sessions now`}
             </div>
             <p className="mt-4 text-sm leading-7 text-slate-200">
               Pick a session and continue.
@@ -150,7 +142,7 @@ export default function TodayMocksPage() {
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06] text-sky-200">
                 <CalendarClock size={20} />
               </div>
-              <div className="text-xl font-bold text-white">No sessions today</div>
+              <div className="text-xl font-bold text-white">No live sessions now</div>
               <p className="mt-3 text-sm leading-7 text-slate-200">
                 New sessions will appear here.
               </p>
@@ -180,7 +172,9 @@ export default function TodayMocksPage() {
                   <h2 className="mt-5 text-2xl font-bold text-white">{mock.title || "Grand Mock"}</h2>
                   <p className="mt-3 text-sm leading-7 text-slate-200">
                     Available until{" "}
-                    {new Date(getStart(mock.startTime) + 7 * 24 * 60 * 60 * 1000).toLocaleString()}
+                    {new Date(
+                      getTimestamp(mock.endTime) || getTimestamp(mock.startTime) + mock.durationMinutes * 60 * 1000
+                    ).toLocaleString()}
                   </p>
                   <button
                     onClick={() => setSelectedMock(mock)}

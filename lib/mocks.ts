@@ -24,6 +24,7 @@ export type MockEvent = {
   quizId: string;
   title?: string;
   startTime: string | number | TimestampLike;
+  endTime?: string | number | TimestampLike;
   durationMinutes: number;
 };
 
@@ -32,6 +33,7 @@ export type MockRecord = {
   quizId: string;
   title: string;
   startTime: string | number | TimestampLike;
+  endTime?: string | number | TimestampLike;
   durationMinutes: number;
   quiz?: Quiz;
 };
@@ -76,6 +78,12 @@ export function normalizeMock(payload: unknown): MockRecord {
       asRecord(source.startTime)
         ? (source.startTime as string | number | TimestampLike)
         : fallback.startTime,
+    endTime:
+      typeof source.endTime === "string" ||
+      typeof source.endTime === "number" ||
+      asRecord(source.endTime)
+        ? (source.endTime as string | number | TimestampLike)
+        : undefined,
     durationMinutes:
       typeof source.durationMinutes === "number"
         ? source.durationMinutes
@@ -148,10 +156,11 @@ export async function fetchMocksWithQuizzes(): Promise<MockRecord[]> {
 export function getMockStatus(mock: MockRecord): "Scheduled" | "Live" | "Completed" {
   const now = Date.now();
   const start = normalizeDate(mock.startTime);
+  const explicitEnd = normalizeDate(mock.endTime);
 
   if (!start) return "Scheduled";
 
-  const end = start + mock.durationMinutes * 60 * 1000;
+  const end = explicitEnd || start + mock.durationMinutes * 60 * 1000;
 
   if (now < start) return "Scheduled";
   if (now >= start && now <= end) return "Live";
