@@ -3,6 +3,7 @@
 import { CalendarClock, CircleDot, Mail, ShieldCheck, Sparkles, TimerReset } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import UrologicsNav from "@/components/brand/UrologicsNav";
@@ -19,6 +20,12 @@ interface Mock {
   endTime?: string | number | TimestampLike;
   durationMinutes: number;
 }
+
+type MockAttempt = {
+  candidate?: {
+    email?: string;
+  };
+};
 
 const getTimestamp = (value?: string | number | TimestampLike) => {
   if (typeof value === "object" && value?._seconds) {
@@ -70,10 +77,42 @@ export default function TodayMocksPage() {
     void load();
   }, []);
 
-  const handleContinue = () => {
-    if (!name || !email || !selectedMock) return;
-    localStorage.setItem("mockUser", JSON.stringify({ name, email }));
-    router.push(`/mocks/${selectedMock.id}/rules`);
+  const handleContinue = async () => {
+    const trimmedName = name.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!trimmedName || !normalizedEmail || !selectedMock) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/mocks/${selectedMock.id}`);
+      const data = (await res.json()) as { mock?: { attempts?: MockAttempt[] }; attempts?: MockAttempt[] };
+      const attempts = Array.isArray(data.mock?.attempts)
+        ? data.mock.attempts
+        : Array.isArray(data.attempts)
+          ? data.attempts
+          : [];
+
+      const alreadyAttempted = attempts.some(
+        (attempt) =>
+          String(attempt?.candidate?.email || "").trim().toLowerCase() === normalizedEmail
+      );
+
+      if (alreadyAttempted) {
+        toast.error("This email has already been used for this mock");
+        return;
+      }
+
+      localStorage.setItem(
+        "mockUser",
+        JSON.stringify({ name: trimmedName, email: normalizedEmail })
+      );
+      router.push(`/mocks/${selectedMock.id}/rules`);
+    } catch (error) {
+      console.error("Failed to validate mock attempt:", error);
+      toast.error("Unable to verify this mock right now");
+    }
   };
 
   return (

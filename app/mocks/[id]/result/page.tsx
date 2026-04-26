@@ -74,9 +74,7 @@ export default function ResultPage() {
       return;
     }
 
-    const marks = mock.questions.length > 0
-      ? Math.round((score / mock.questions.length) * 100)
-      : 0;
+    const marks = Math.max(0, Math.min(score, mock.questions.length));
 
     const submitAttempt = async () => {
       toast.loading("Submitting mock attempt...", { id: "mock-attempt" });
@@ -94,11 +92,13 @@ export default function ResultPage() {
           }),
         });
 
+        const data = await res.json();
         if (!res.ok) {
-          throw new Error("Failed to submit mock attempt");
+          const message =
+            typeof data?.error === "string" ? data.error : "Failed to submit mock attempt";
+          throw new Error(message);
         }
 
-        const data = await res.json();
         localStorage.setItem(
           `mock-${id}-attempt-summary`,
           JSON.stringify({
@@ -116,7 +116,10 @@ export default function ResultPage() {
         toast.success("Mock submitted successfully", { id: "mock-attempt" });
       } catch (error) {
         console.error("Mock attempt submission failed:", error);
-        toast.error("Failed to submit mock attempt", { id: "mock-attempt" });
+        toast.error(
+          error instanceof Error ? error.message : "Failed to submit mock attempt",
+          { id: "mock-attempt" }
+        );
       }
     };
 
