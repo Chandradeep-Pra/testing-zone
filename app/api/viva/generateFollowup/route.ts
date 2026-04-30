@@ -8,6 +8,10 @@ type FollowupRequest = {
   exit?: boolean;
   shownExhibitIds?: string[];
   vivaCase?: VivaCaseRecord;
+  vivaSummary?: string;
+  currentStage?: string;
+  coveredTopics?: string[];
+  weakAreas?: string[];
 };
 
 type ExhibitSelection = {
@@ -52,7 +56,7 @@ function cleanResponse(text: string) {
 
 function formatRecentQA(previousQA: Array<{ question: string; answer: string }>) {
   return previousQA
-    .slice(-4)
+    .slice(-2)
     .map(
       ({ question, answer }, index) =>
         `Q${index + 1}: ${question}\nA${index + 1}: ${answer || "[no answer yet]"}`
@@ -78,6 +82,10 @@ export async function POST(req: NextRequest) {
     exit,
     shownExhibitIds = [],
     vivaCase: rawVivaCase,
+    vivaSummary = "",
+    currentStage = "initial_assessment",
+    coveredTopics = [],
+    weakAreas = [],
   } = (await req.json()) as FollowupRequest;
 
   const vivaCase = rawVivaCase ? normalizeVivaCase(rawVivaCase) : getDefaultVivaCase();
@@ -140,26 +148,35 @@ Return JSON only.
   const availableExhibits = formatAvailableExhibits(vivaCase, shownExhibitIds);
 
   const prompt = `
-You are an FRCS viva examiner tasked with generating a single, concise question for the candidate. 
-Generate the next follow-up question like a viva examiner.
+You are an FRCS urology viva examiner.
+Generate exactly one concise next question.
 
-Recent conversation:
+Case:
+${vivaCase.case.stem}
+
+Hidden viva state:
+Summary: ${vivaSummary || "No prior summary yet"}
+Current stage: ${currentStage}
+Covered topics: ${coveredTopics.join(", ") || "none"}
+Weak areas: ${weakAreas.join(", ") || "none"}
+
+Recent exchange:
 ${recentQA}
 
-If a candidate cannot completely answer a question on a particular topic , please move on to the next question from a different topic related to the case
-
-If a candidate is requesting or enquiring about any investigation , provide the report findings most suitable to the case stem . 
-The objective of the viva is to start from basic questions in management , discuss alternative treatment options , complications of the treatment.
-
-Generate a single, focused follow-up question. Write only the question without any greetings, explanations, or additional context.
-Make sure we stick to case of question while we generate a follow up questions which is -> ${vivaCase.case.stem}
+Examiner rules:
+- Ask like an FRCS viva examiner.
+- Stay strictly within this case.
+- Prefer the current stage, but move on if the candidate has already struggled there.
+- Progress through assessment, investigations, interpretation, management, alternatives, complications, and follow up.
+- If the candidate asks for or implies an investigation, provide suitable report findings through the next question.
+- Ask only one focused question.
+- No greetings, explanations, teaching, or extra context.
 
 Available exhibits:
 ${availableExhibits || "- none remaining"}
 
-If the question asked seems to be from an exhibit description, set imageUsed true and return that exhibit link.
-For image questions, ask the candidate to explain the findings from the image.
-(Description should not be visible or mentioned to user it is for you to verify)
+Use an exhibit only if it naturally fits the next FRCS question.
+For image questions, ask the candidate to interpret the image. Do not reveal the exhibit description.
 
 You MUST follow this exact output format.
 

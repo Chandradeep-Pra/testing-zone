@@ -7,6 +7,21 @@ import type { VivaCaseRecord, VivaModeQuestion } from "@/lib/viva-case";
 
 type QA = { question: string; answer: string };
 type VivaMode = "calm" | "fast";
+type VivaStage =
+  | "initial_assessment"
+  | "investigations"
+  | "interpretation"
+  | "management"
+  | "alternatives"
+  | "complications"
+  | "follow_up";
+
+type VivaTurnState = {
+  summary: string;
+  currentStage: VivaStage;
+  coveredTopics: string[];
+  weakAreas: string[];
+};
 
 export type VivaApiResponse = {
   question?: string;
@@ -104,6 +119,14 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   const previousQARef = useRef<QA[]>([]);
   const shownExhibitIdsRef = useRef<Set<string>>(new Set());
   const fastQuestionIndexRef = useRef(0);
+  const summaryUpdateInFlightRef = useRef(false);
+  const pendingSummaryQARef = useRef<QA | null>(null);
+  const vivaTurnStateRef = useRef<VivaTurnState>({
+    summary: "",
+    currentStage: "initial_assessment",
+    coveredTopics: [],
+    weakAreas: [],
+  });
   const router = useRouter();
 
   function getCurrentFastQuestionIndex() {
@@ -201,10 +224,20 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
 
   async function nextCalm(userAnswer: string, exit = false): Promise<VivaApiResponse> {
     const history = previousQARef.current;
-    const recentHistory = exit ? history : history.slice(-2);
 
     if (history.length > 0 && userAnswer) {
       history[history.length - 1].answer = userAnswer;
+    }
+
+    const latestAnsweredQA =
+      !exit && history.length > 0 && userAnswer
+        ? { ...history[history.length - 1] }
+        : null;
+    const currentTurnState = vivaTurnStateRef.current;
+    const recentHistory = exit ? history : history.slice(-1);
+
+    if (latestAnsweredQA) {
+      updateVivaSummaryInBackground(latestAnsweredQA, currentTurnState);
     }
 
     const res = await fetch("/api/viva/generateFollowup", {
@@ -215,6 +248,10 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
         shownExhibitIds: Array.from(shownExhibitIdsRef.current),
         vivaCase,
         exit,
+        vivaSummary: currentTurnState.summary,
+        currentStage: currentTurnState.currentStage,
+        coveredTopics: currentTurnState.coveredTopics,
+        weakAreas: currentTurnState.weakAreas,
       }),
     });
 
@@ -236,6 +273,63 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     }
 
     return data;
+  }
+
+  function updateVivaSummaryInBackground(latestQA: QA, stateSnapshot: VivaTurnState) {
+    if (summaryUpdateInFlightRef.current) {
+      pendingSummaryQARef.current = latestQA;
+      return;
+    }
+
+    summaryUpdateInFlightRef.current = true;
+
+    void fetch("/api/viva/updateSummary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        previousSummary: stateSnapshot.summary,
+        currentStage: stateSnapshot.currentStage,
+        coveredTopics: stateSnapshot.coveredTopics,
+        weakAreas: stateSnapshot.weakAreas,
+        latestQA,
+        vivaCase,
+      }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error("Summary API failed");
+        }
+
+        const data = (await res.json()) as Partial<VivaTurnState>;
+        vivaTurnStateRef.current = {
+          summary:
+            typeof data.summary === "string"
+              ? data.summary
+              : vivaTurnStateRef.current.summary,
+          currentStage:
+            typeof data.currentStage === "string"
+              ? (data.currentStage as VivaStage)
+              : vivaTurnStateRef.current.currentStage,
+          coveredTopics: Array.isArray(data.coveredTopics)
+            ? data.coveredTopics.filter((item): item is string => typeof item === "string")
+            : vivaTurnStateRef.current.coveredTopics,
+          weakAreas: Array.isArray(data.weakAreas)
+            ? data.weakAreas.filter((item): item is string => typeof item === "string")
+            : vivaTurnStateRef.current.weakAreas,
+        };
+      })
+      .catch((error) => {
+        console.warn("Viva summary update skipped:", error);
+      })
+      .finally(() => {
+        summaryUpdateInFlightRef.current = false;
+
+        const pendingQA = pendingSummaryQARef.current;
+        if (pendingQA) {
+          pendingSummaryQARef.current = null;
+          updateVivaSummaryInBackground(pendingQA, vivaTurnStateRef.current);
+        }
+      });
   }
 
   async function next(userAnswer: string, exit = false): Promise<VivaApiResponse> {
@@ -290,6 +384,14 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     previousQARef.current = [];
     shownExhibitIdsRef.current = new Set();
     fastQuestionIndexRef.current = 0;
+    summaryUpdateInFlightRef.current = false;
+    pendingSummaryQARef.current = null;
+    vivaTurnStateRef.current = {
+      summary: "",
+      currentStage: "initial_assessment",
+      coveredTopics: [],
+      weakAreas: [],
+    };
   }
 
   function getHistory() {
