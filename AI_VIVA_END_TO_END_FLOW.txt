@@ -1,0 +1,653 @@
+UROLOGICS AI VIVA
+End-to-End Flow Document
+
+This document explains the full AI Viva flow in this project, for both:
+- Calm mode
+- Fast mode
+
+It also explains:
+- how audio is captured
+- how speech is processed
+- how the examiner speaks
+- how questions advance
+- how scoring is generated
+
+
+========================================
+1. OVERVIEW
+========================================
+
+The viva session has 4 main moving parts:
+
+1. Case data
+- loaded from the viva case APIs
+
+2. Candidate speech input
+- microphone audio streamed over websocket to STT
+
+3. Examiner speech output
+- question text converted to MP3 using Google TTS
+
+4. Viva engine
+- decides the next question
+- tracks history
+- ends the viva
+- generates scoring
+
+
+========================================
+2. MAIN DATA SOURCES
+========================================
+
+Case list
+- GET /api/viva-cases
+
+Single case
+- GET /api/viva-cases/:id
+
+Calm mode next-question generation
+- POST /api/viva/generateFollowup
+
+Final score generation
+- POST /api/viva/generateScore
+
+Examiner TTS
+- POST /api/viva/tts
+
+Speech-to-text websocket
+- wss://testing-zone-hx7q.onrender.com
+
+
+========================================
+3. SESSION ENTRY FLOW
+========================================
+
+When the user starts a viva:
+
+1. User selects case
+2. User selects mode
+   - calm
+   - fast
+3. User selects examiner
+4. User enters viva room
+5. App checks microphone permission
+6. App optionally checks camera permission
+7. Examiner greeting is played
+8. Warmup question is played
+9. Candidate speaks for warmup
+10. Real viva starts
+
+Important:
+- The greeting and warmup are not the real viva.
+- In fast mode, the 10 minute timer starts only when the first real case question is asked.
+
+
+========================================
+4. PRE-VIVA SPEECH FLOW
+========================================
+
+The current pre-viva sequence is:
+
+1. Greeting
+- "Hello {candidateName}, welcome to the Urologics AI Examiner viva. Please wait while we prepare your session."
+
+2. Warmup prompt
+- "Hi {candidateName}, how are you feeling today?"
+
+3. Candidate microphone is opened
+
+4. Candidate speaks for a short warmup window
+
+5. Examiner says
+- "Thank you. Let us begin."
+
+6. First actual viva question is asked
+
+
+========================================
+5. AUDIO INPUT FLOW
+========================================
+
+Candidate audio is handled through the speech input hook.
+
+High-level flow:
+
+1. Open websocket connection
+- wss://testing-zone-hx7q.onrender.com
+
+2. Request microphone
+- navigator.mediaDevices.getUserMedia({ audio: true })
+
+3. Create audio context
+- sample rate: 16000
+
+4. Load audio worklet
+- /audio-processor.js
+
+5. Stream audio frames to websocket
+
+6. Receive transcript events from websocket
+
+
+Websocket incoming message shape:
+
+{
+  transcript?: string,
+  final?: boolean,
+  speechEnded?: boolean
+}
+
+
+How incoming transcript data is processed:
+
+If transcript exists and final is false:
+- this is treated as interim text
+- live transcript is updated
+
+If transcript exists and final is true:
+- this is appended to the transcript buffer
+
+If speechEnded is true:
+- transcriptBuffer + current interim transcript are merged
+- this becomes the final spoken answer segment
+- the viva engine then decides what to do next
+
+
+Why speechEnded matters:
+- This is the real pause boundary used by the app
+- Calm mode depends on it
+- Fast mode also uses it when keywords are not already complete
+
+
+========================================
+6. AUDIO OUTPUT FLOW
+========================================
+
+Examiner speech is produced by Google TTS through:
+- POST /api/viva/tts
+
+Request body:
+
+{
+  "text": "Question text",
+  "voiceName": "en-GB-Chirp3-HD-Leda",
+  "languageCode": "en-GB"
+}
+
+Server behavior:
+
+1. Receives examiner text
+2. Uses Google Cloud Text-to-Speech
+3. Synthesizes MP3 audio
+4. Returns audio/mpeg
+
+Client behavior:
+
+1. Calls /api/viva/tts
+2. Receives MP3 blob
+3. Creates audio element
+4. Plays audio
+5. Tracks audio amplitude for UI animation
+6. When audio ends, candidate listening begins
+
+
+Important rule:
+- Candidate listening starts only after examiner speech ends
+- We do not keep candidate mic actively answering while examiner is still talking
+
+
+========================================
+7. EXAMINER VOICES
+========================================
+
+Calm mode voices:
+- Dr. Leda
+  voiceName: en-GB-Chirp3-HD-Leda
+- Mr. Achird
+  voiceName: en-GB-Chirp3-HD-Achird
+
+Fast mode voices:
+- Mr. Charon
+  voiceName: en-GB-Chirp3-HD-Charon
+- Ms. Zephyr
+  voiceName: en-GB-Chirp3-HD-Zephyr
+
+All current voices use:
+- languageCode: en-GB
+
+
+========================================
+8. VIVA ENGINE RESPONSIBILITY
+========================================
+
+The viva engine handles:
+- question progression
+- QA history
+- exhibit tracking
+- fast-mode keyword matching
+- score generation trigger
+
+Internally it maintains:
+- previousQARef
+- shownExhibitIdsRef
+- fastQuestionIndexRef
+
+
+========================================
+9. CALM MODE END-TO-END FLOW
+========================================
+
+Calm mode is AI-driven.
+
+Question source:
+- POST /api/viva/generateFollowup
+
+
+Step-by-step calm mode flow:
+
+1. Start viva
+- app calls next("")
+
+2. If no previous QA exists
+- backend returns first question:
+  "{case.stem} How would you evaluate this patient?"
+
+3. Examiner speaks question
+- /api/viva/tts is called
+
+4. After examiner audio ends
+- mic capture starts
+- websocket streaming starts
+
+5. Candidate speaks
+- interim transcript updates live
+- final transcript chunks accumulate in buffer
+
+6. Websocket sends speechEnded
+- current answer is finalized
+
+7. App submits answer to:
+- POST /api/viva/generateFollowup
+
+Request body:
+
+{
+  "previousQA": [
+    {
+      "question": "previous question",
+      "answer": "candidate answer"
+    }
+  ],
+  "shownExhibitIds": [],
+  "vivaCase": { full case object },
+  "exit": false
+}
+
+8. Backend returns next question
+
+9. If response includes imageUsed = true and imageLink
+- exhibit is displayed
+
+10. Examiner speaks next question
+
+11. Repeat until viva ends
+
+
+Calm mode exhibit behavior:
+- Backend may choose exhibit-based questions
+- When an exhibit is used, it is tracked so it is not repeated unnecessarily
+
+
+Calm mode timer behavior:
+- total time uses vivaCase.viva_rules.max_duration_minutes
+- UI shows countdown
+- when 20 seconds remain, web app begins concluding the viva
+
+
+========================================
+10. FAST MODE END-TO-END FLOW
+========================================
+
+Fast mode is fixed-question based.
+
+Question source:
+- vivaCase.modes.fastAndFurious.questions
+
+Each fast question contains:
+- question
+- answerKeywords[]
+- linkedExhibitIds[]
+
+
+Step-by-step fast mode flow:
+
+1. Start viva
+- app calls next("")
+
+2. Engine returns first fixed fast question
+
+3. If the question has linkedExhibitIds
+- first linked exhibit is displayed
+
+4. App marks viva as started
+
+5. 10 minute total countdown starts
+- only when first real case question is asked
+
+6. Examiner speaks question
+
+7. After examiner audio ends
+- candidate mic starts
+- websocket streaming starts
+
+8. Candidate speaks
+- interim transcript updates live
+- keyword tracker can update in real time
+
+9. If all answer keywords are matched before pause
+- submit answer immediately
+- advance to next question immediately
+
+10. If all keywords are not matched
+- wait for websocket speechEnded
+- submit whatever answer was spoken
+- advance to next question
+
+11. Repeat until:
+- fixed fast questions finish
+or
+- 10 minute timer ends
+
+
+Fast mode ending conditions:
+
+Case 1: all questions completed
+- viva ends immediately
+
+Case 2: timer ends first
+- current transcript is finalized
+- current answer is saved
+- viva ends immediately
+
+
+Important:
+- Fast mode no longer asks:
+  "Do you want to add anything else?"
+- Pause now simply submits the current answer and moves on
+
+
+========================================
+11. FAST MODE KEYWORD MATCHING
+========================================
+
+Fast mode uses answerKeywords from the selected fast question.
+
+Matching logic:
+
+1. Lowercase text
+2. Remove punctuation
+3. Normalize spaces
+4. Tokenize words
+5. Stem simple endings:
+- ing
+- ed
+- es
+- s
+
+6. Support keyword alternatives split by:
+- /
+- |
+- or
+- comma
+
+
+A keyword is treated as matched if:
+- full normalized keyword is included in the normalized answer
+or
+- all tokens of the keyword are found in the answer token set
+
+
+Why this matters:
+- spoken answers are messy
+- exact phrase matching would fail too often
+- this looser matching is what allows fast mode to advance correctly
+
+
+========================================
+12. EXHIBIT FLOW
+========================================
+
+Exhibits can be shown in both modes.
+
+Calm mode
+- exhibit comes from AI response:
+  - imageUsed
+  - imageLink
+  - imageId
+
+Fast mode
+- exhibit comes from:
+  - linkedExhibitIds on current fixed question
+
+Display behavior:
+- if imageUsed is true and imageLink exists, show exhibit
+- exhibit remains on screen until:
+  - next question replaces it
+  - or user closes it manually
+
+
+========================================
+13. QA HISTORY FLOW
+========================================
+
+The app stores question and answer history as:
+
+{
+  question: string,
+  answer: string
+}
+
+How it is built:
+
+1. When a question is asked
+- push:
+  {
+    question: currentQuestion,
+    answer: ""
+  }
+
+2. When candidate answer finalizes
+- fill answer on the latest history item
+
+This history is later used for:
+- calm follow-up generation
+- final score generation
+- session persistence
+
+
+========================================
+14. TIMER FLOW
+========================================
+
+Calm mode timer
+- duration comes from vivaCase.viva_rules.max_duration_minutes
+- countdown starts when viva starts
+- near the end, the app concludes the session
+
+Fast mode timer
+- fixed total duration: 10 minutes
+- countdown starts when the first real case question is asked
+- not during greeting
+- not during warmup
+
+When fast timer ends:
+- current transcript is captured
+- answer is finalized
+- viva ends
+
+
+========================================
+15. SESSION END FLOW
+========================================
+
+The viva ends when:
+- calm mode reaches its end condition
+- fast mode finishes all fixed questions
+- or timer end triggers conclusion
+- or user manually ends viva
+
+When ending:
+
+1. stop microphone capture
+2. stop websocket use
+3. stop avatar/listening state if applicable
+4. store final QA history
+5. call score generation
+
+
+========================================
+16. SCORE GENERATION FLOW
+========================================
+
+When viva ends:
+- POST /api/viva/generateScore
+
+Request body:
+
+{
+  "previousQA": [
+    {
+      "question": "Question asked",
+      "answer": "Candidate answer"
+    }
+  ],
+  "vivaCase": { full case object }
+}
+
+Backend scoring behavior:
+- sends transcript and case details to Gemini
+- asks for 4 domains scored from 1 to 8
+
+Domains:
+- basic_knowledge
+- higher_order_processing
+- clinical_skills
+- professionalism
+
+Returned result includes:
+- caseTitle
+- score for each domain
+- summary for each domain
+- reason for each domain
+- strengthsOverall
+- weaknessesOverall
+- improvementPlan
+
+
+========================================
+17. LOCAL SESSION STATE
+========================================
+
+The app stores session-related data like:
+- candidate name
+- candidate email
+- selected examiner
+- selected case
+- selected mode
+- conversation messages
+- qaHistory
+
+Important runtime state during the viva includes:
+- transcript
+- speaking
+- thinking
+- exhibit
+- isListening
+- candidateTranscript
+- current fast keyword progress
+- timer state
+
+
+========================================
+18. FULL FLOW SUMMARY
+========================================
+
+Complete session sequence:
+
+1. Load case
+2. Select mode
+3. Select examiner
+4. Enter viva room
+5. Check mic
+6. Play greeting
+7. Play warmup prompt
+8. Capture warmup speech
+9. Play "Thank you. Let us begin."
+10. Ask first real question
+
+Then:
+
+Calm mode
+- AI generates next question after every finalized answer
+
+Fast mode
+- local fixed question bank drives next question
+- keyword completion can advance immediately
+
+For both modes:
+- examiner speech comes from /api/viva/tts
+- candidate speech goes to websocket STT
+- speechEnded marks the answer boundary
+- final QA history is sent to /api/viva/generateScore
+
+
+========================================
+19. MOST IMPORTANT INTEGRATION RULES
+========================================
+
+If another app needs to reproduce this viva exactly, these are the key rules:
+
+1. Use websocket speechEnded as the real pause boundary
+2. Start listening only after examiner audio ends
+3. Calm mode gets questions from /api/viva/generateFollowup
+4. Fast mode gets questions from case.modes.fastAndFurious.questions
+5. Fast mode advances immediately if all keywords are matched
+6. Otherwise fast mode advances on speechEnded
+7. Fast mode timer is total 10 minutes
+8. Fast timer starts on first real case question
+9. Final score comes only from /api/viva/generateScore
+
+
+========================================
+20. FILES THAT DEFINE THE CURRENT FLOW
+========================================
+
+Main session UI and orchestration
+- components/ai-viva/VivaVoiceAi.tsx
+
+Speech input
+- components/ai-viva/useSpeechInput.ts
+
+Speech output
+- components/ai-viva/useSpeechOutput.ts
+
+Viva engine
+- components/ai-viva/useVivaEngine.ts
+
+Question/exhibit session state
+- components/ai-viva/useVivaSession.ts
+
+Follow-up question API
+- app/api/viva/generateFollowup/route.ts
+
+Score generation API
+- app/api/viva/generateScore/route.ts
+
+TTS API
+- app/api/viva/tts/route.ts
+
+Case schema
+- lib/viva-case.ts
+
+Examiner voices
+- lib/examiner-voices.ts

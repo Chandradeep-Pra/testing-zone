@@ -1,0 +1,284 @@
+React Native Voice Input Integration
+Websocket + Speech Input Notes
+
+This note explains only the candidate voice input side of the AI Viva flow:
+- microphone capture
+- websocket connection
+- transcript buffering
+- pause detection
+
+
+1. Websocket Endpoint
+
+Use this websocket for speech-to-text:
+- wss://testing-zone-hx7q.onrender.com
+
+
+2. What the Web App Does
+
+Current web flow:
+
+1. Open websocket
+2. Ask microphone permission
+3. Start audio capture
+4. Convert microphone audio into streamable chunks
+5. Send chunks to websocket
+6. Receive transcript updates
+7. When backend sends `speechEnded`, treat that as answer completion
+
+
+3. Incoming Websocket Message Shape
+
+The app expects messages like:
+
+{
+  transcript?: string,
+  final?: boolean,
+  speechEnded?: boolean
+}
+
+Meaning:
+
+- `transcript`
+  partial or final recognized text
+
+- `final: false`
+  interim transcript
+
+- `final: true`
+  finalized transcript chunk
+
+- `speechEnded: true`
+  backend-detected pause/end of current spoken segment
+
+
+4. Important Behavior
+
+The app does not rely on a local silence timer as the main answer boundary.
+
+The real answer boundary is:
+- `speechEnded === true`
+
+So in RN:
+- keep listening while user is speaking
+- keep updating transcript
+- only finalize the answer when websocket says `speechEnded`
+
+
+5. Transcript Buffering Logic
+
+You should maintain 2 strings:
+
+1. `transcriptBuffer`
+- stores accumulated final transcript chunks
+
+2. `interimTranscript`
+- stores the latest interim chunk
+
+Recommended behavior:
+
+If message has:
+- `transcript` and `final === false`
+  set `interimTranscript = transcript.trim()`
+
+- `transcript` and `final === true`
+  append it into `transcriptBuffer`
+  clear `interimTranscript`
+
+- `speechEnded === true`
+  finalAnswer = [transcriptBuffer, interimTranscript].join(" ").trim()
+  submit/finalize this answer
+  then clear both buffers
+
+
+6. Equivalent Pseudocode
+
+```ts
+let transcriptBuffer = "";
+let interimTranscript = "";
+
+socket.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+
+  if (data.transcript) {
+    if (data.final) {
+      const finalChunk = data.transcript.trim();
+      if (finalChunk) {
+        transcriptBuffer = [transcriptBuffer, finalChunk]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+      }
+      interimTranscript = "";
+      onInterim([transcriptBuffer, interimTranscript].filter(Boolean).join(" ").trim());
+    } else {
+      interimTranscript = data.transcript.trim();
+      const combined = [transcriptBuffer, interimTranscript]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      onInterim(combined);
+    }
+  }
+
+  if (data.speechEnded) {
+    const finalAnswer = [transcriptBuffer, interimTranscript]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    onFinal(finalAnswer);
+
+    transcriptBuffer = "";
+    interimTranscript = "";
+  }
+};
+```
+
+
+7. Audio Capture Requirements
+
+The web app captures audio with:
+- sample rate: 16000
+
+RN should match this as closely as possible.
+
+Recommended RN setup:
+- mono audio
+- PCM streamable chunks
+- 16 kHz if supported directly
+
+You will need an RN recording/streaming library that can:
+- open the microphone
+- stream raw audio chunks continuously
+- send binary frames through websocket
+
+
+8. Websocket Sending Behavior
+
+The web app sends binary audio frames directly:
+- `ws.send(audioChunk)`
+
+So in RN, once you get each PCM/audio chunk:
+- send it immediately to the websocket
+
+Example:
+
+```ts
+socket.send(audioChunk);
+```
+
+Where `audioChunk` is binary data from the mic recorder.
+
+
+9. Start / Stop Flow
+
+Start listening:
+
+1. Open websocket if not already open
+2. Request mic permission
+3. Start recorder/stream
+4. Send chunks continuously
+
+Stop listening:
+
+1. Stop recorder
+2. Stop mic track/session
+3. Optionally keep websocket open for next question
+4. Or close websocket at end of viva
+
+
+10. Recommended RN Hook Shape
+
+Something like:
+
+```ts
+type UseSpeechInputResult = {
+  start: () => Promise<void>;
+  stop: () => void;
+  closeSocket: () => void;
+  getTranscriptBuffer: () => string;
+  resetTranscriptBuffer: () => void;
+};
+```
+
+Callbacks:
+
+```ts
+useSpeechInput(
+  onInterim: (text: string) => void,
+  onFinal: (text: string) => void,
+  onSpeechEndedWithoutFinal?: () => void
+)
+```
+
+
+11. UI Behavior to Match Current App
+
+While candidate is speaking:
+- keep updating live transcript
+
+When examiner is speaking:
+- candidate mic should not be actively answering
+
+When websocket sends `speechEnded`:
+- finalize the current answer
+- hand it to the viva engine
+
+
+12. Fast Mode Note
+
+In fast mode:
+- you can also inspect the live combined transcript during `onInterim`
+- if all answer keywords are matched, advance immediately
+
+If keywords are not fully matched:
+- still wait for `speechEnded`
+- then submit current answer
+
+
+13. Calm Mode Note
+
+In calm mode:
+- simply wait for `speechEnded`
+- then submit the final spoken answer to the follow-up API
+
+
+14. Error Handling
+
+Handle these cases:
+
+- websocket open fails
+- websocket disconnects mid-answer
+- microphone permission denied
+- recorder starts but no audio chunks are produced
+- `speechEnded` arrives with empty transcript
+
+Suggested behavior:
+
+- show a simple mic/websocket error
+- allow retry
+- do not auto-advance on empty transcript unless your session logic explicitly wants that
+
+
+15. Final Summary
+
+To match this web app in RN:
+
+1. Connect to:
+- wss://testing-zone-hx7q.onrender.com
+
+2. Stream microphone audio as binary chunks
+
+3. Maintain:
+- `transcriptBuffer`
+- `interimTranscript`
+
+4. Update live text from interim transcript
+
+5. Treat `speechEnded` as the real pause/finalization signal
+
+6. Finalize answer from:
+- buffered final text + current interim text
+
+That is the core voice-input contract used by the current AI Viva flow.

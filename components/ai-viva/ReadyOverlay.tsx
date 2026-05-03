@@ -127,12 +127,12 @@ export default function ReadyOverlay({
   const canStart = micAllowed;
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.2),_transparent_35%),rgba(2,6,23,0.86)] backdrop-blur-xl p-4">
+    <div className="absolute inset-0 z-50 overflow-y-auto bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.2),_transparent_35%),rgba(2,6,23,0.86)] p-3 backdrop-blur-xl sm:p-4">
 
-      <div className="w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/90 shadow-[0_30px_120px_rgba(2,6,23,0.65)]">
+      <div className="mx-auto my-4 w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/90 shadow-[0_30px_120px_rgba(2,6,23,0.65)] lg:my-6">
         <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="border-b border-white/10 p-8 lg:border-b-0 lg:border-r">
-            <div className="mb-8 space-y-4">
+          <div className="border-b border-white/10 p-5 sm:p-6 lg:border-b-0 lg:border-r lg:p-8">
+            <div className="mb-6 space-y-4 lg:mb-8">
               <UrologicsBrand
                 product="AI Viva"
                 tag={selectedMode === "fast" ? "Fast and Furious session" : "Calm and Composed session"}
@@ -160,7 +160,7 @@ export default function ReadyOverlay({
               </p>
             </div>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:mt-8 lg:gap-4">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
                   <TimerReset size={18} />
@@ -196,49 +196,10 @@ export default function ReadyOverlay({
               </div>
             </div>
 
-            <div className="mt-8">
-              <div className="mb-4 text-left">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Choose Examiner</p>
-                <p className="mt-2 text-sm text-slate-400">
-                  Select the voice and examiner temperament you want for this viva.
-                </p>
-              </div>
-
-              <div className="grid gap-3">
-                {examiners.map((examiner) => {
-                  const active = examiner.id === selectedExaminerId;
-
-                  return (
-                    <button
-                      key={examiner.id}
-                      type="button"
-                      onClick={() => setSelectedExaminerId(examiner.id)}
-                      className={`rounded-2xl border px-4 py-4 text-left transition-all ${
-                        active
-                          ? "border-emerald-400/40 bg-emerald-400/10 shadow-[0_0_0_1px_rgba(52,211,153,0.18)]"
-                          : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <div className="text-sm font-semibold text-white">{examiner.name}</div>
-                          <div className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">
-                            {examiner.title}
-                          </div>
-                        </div>
-                        {active && <CheckCircle2 size={18} className="text-emerald-300" />}
-                      </div>
-                      <p className="mt-3 text-sm leading-6 text-slate-400">
-                        {examiner.personality}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            
           </div>
 
-          <div className="p-8">
+          <div className="p-5 sm:p-6 lg:p-8">
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
               <div className="mb-6">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">System Check</p>
@@ -316,6 +277,46 @@ export default function ReadyOverlay({
                   Microphone access is required to start the viva.
                 </p>
               )}
+            </div>
+            <div className="mt-6 lg:mt-8">
+              <div className="mb-4 text-left">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Choose Examiner</p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Select the voice and examiner temperament you want for this viva.
+                </p>
+              </div>
+
+              <div className="grid max-h-[38vh] gap-3 overflow-y-auto pr-1 lg:max-h-none lg:overflow-visible lg:pr-0">
+                {examiners.map((examiner) => {
+                  const active = examiner.id === selectedExaminerId;
+
+                  return (
+                    <button
+                      key={examiner.id}
+                      type="button"
+                      onClick={() => setSelectedExaminerId(examiner.id)}
+                      className={`rounded-2xl border px-4 py-4 text-left transition-all ${
+                        active
+                          ? "border-emerald-400/40 bg-emerald-400/10 shadow-[0_0_0_1px_rgba(52,211,153,0.18)]"
+                          : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-semibold text-white">{examiner.name}</div>
+                          <div className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">
+                            {examiner.title}
+                          </div>
+                        </div>
+                        {active && <CheckCircle2 size={18} className="text-emerald-300" />}
+                      </div>
+                      <p className="mt-3 text-sm leading-6 text-slate-400">
+                        {examiner.personality}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

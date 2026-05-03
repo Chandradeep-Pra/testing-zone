@@ -1,0 +1,599 @@
+UROLOGICS AI VIVA
+React Native Integration Guide
+
+This document describes how the current AI Viva works in this project so the same flow can be reproduced inside the React Native app.
+
+Scope covered here:
+- case loading
+- candidate setup
+- calm mode flow
+- fast mode flow
+- examiner voice output
+- candidate speech input
+- timers
+- exhibits
+- scoring
+- data that should be stored locally in RN
+
+
+1. Base Services
+
+Web app base URL
+- Use your deployed app base URL for all HTTPS API calls.
+- The URL shared for this project was: https://testing-zon=five.vercel.app
+- If that was a typo, replace it with the correct deployed Vercel domain before wiring RN.
+
+Speech-to-text websocket
+- wss://testing-zone-hx7q.onrender.com
+
+Important app APIs used by AI Viva
+- GET /api/viva-cases
+- GET /api/viva-cases/:id
+- POST /api/viva/generateFollowup
+- POST /api/viva/generateScore
+- POST /api/viva/tts
+
+
+2. Core Data Model
+
+The viva case shape used by the app is effectively:
+
+{
+  id: string,
+  case: {
+    title: string,
+    level: string,
+    stem: string,
+    objectives: string[]
+  },
+  exhibits: [
+    {
+      id: string,
+      kind: string,
+      label: string,
+      url?: string,
+      file?: string,
+      description: string
+    }
+  ],
+  marking_criteria: {
+    must_mention: string[],
+    critical_fail: string[]
+  },
+  viva_rules: {
+    max_duration_minutes: number,
+    max_questions: number,
+    question_style: string,
+    allow_candidate_request: boolean,
+    examiner_tone: string,
+    progression: string
+  },
+  modes?: {
+    calmAndComposed?: {
+      enabled?: boolean
+    },
+    fastAndFurious?: {
+      enabled?: boolean,
+      questionCount?: number,
+      questions?: [
+        {
+          id: string,
+          question: string,
+          answerKeywords: string[],
+          linkedExhibitIds: string[]
+        }
+      ]
+    }
+  }
+}
+
+
+3. Examiner Voice Setup
+
+The current web app uses Google Cloud Text-to-Speech via:
+- POST /api/viva/tts
+
+Request body:
+{
+  "text": "Question text here",
+  "voiceName": "en-GB-Chirp3-HD-Leda",
+  "languageCode": "en-GB"
+}
+
+Response:
+- audio/mpeg
+
+Current examiner voices:
+
+Calm mode
+- Dr. Leda
+  voiceName: en-GB-Chirp3-HD-Leda
+  languageCode: en-GB
+- Mr. Achird
+  voiceName: en-GB-Chirp3-HD-Achird
+  languageCode: en-GB
+
+Fast mode
+- Mr. Charon
+  voiceName: en-GB-Chirp3-HD-Charon
+  languageCode: en-GB
+- Ms. Zephyr
+  voiceName: en-GB-Chirp3-HD-Zephyr
+  languageCode: en-GB
+
+RN recommendation
+- When the examiner needs to speak, call POST /api/viva/tts
+- Play the returned MP3 immediately
+- Do not keep candidate mic streaming while examiner audio is playing
+- Resume mic capture only after examiner audio ends
+
+
+4. Candidate Speech Input
+
+The current web app sends live audio to:
+- wss://testing-zone-hx7q.onrender.com
+
+Web app behavior
+- microphone is captured
+- audio context sample rate is 16000
+- audio is streamed continuously to the websocket as binary frames
+- websocket sends back interim and final transcript events
+
+Incoming websocket message shape:
+{
+  transcript?: string,
+  final?: boolean,
+  speechEnded?: boolean
+}
+
+How the web app interprets websocket messages:
+
+If transcript exists and final is false:
+- treat as interim transcript
+- show/update live candidate transcript
+
+If transcript exists and final is true:
+- append it into the accumulated transcript buffer
+
+If speechEnded is true:
+- combine buffered final text + latest interim text
+- treat that as the completed spoken answer segment
+
+RN implementation requirement
+- Stream audio at 16 kHz mono PCM, matching the web behavior
+- Keep a transcript buffer in RN exactly the same way:
+  - transcriptBuffer for accumulated final text
+  - interimTranscript for latest non-final text
+  - on speechEnded, combine both
+
+This speechEnded event is the key pause signal currently used by the viva flow.
+
+
+5. Session Start Flow
+
+The current app has this startup sequence:
+
+1. Candidate selects:
+   - case
+   - mode: calm or fast
+   - examiner voice
+   - optional camera preference
+
+2. App asks for mic permission before entering the viva room.
+
+3. Examiner greeting:
+   - "Hello {candidateName}, welcome to the Urologics AI Examiner viva. Please wait while we prepare your session."
+
+4. Warmup prompt:
+   - "Hi {candidateName}, how are you feeling today?"
+
+5. Candidate speaks for a short warmup window.
+
+6. Examiner says:
+   - "Thank you. Let us begin."
+
+7. First real case question is asked.
+
+Important:
+- The fast-mode 10 minute timer starts when the first real case question is asked by the system.
+- It does NOT start on greeting or warmup.
+
+
+6. Calm Mode Logic
+
+Calm mode is AI-driven follow-up questioning.
+
+First question
+- If there is no previous QA, the backend returns:
+  "{case.stem} How would you evaluate this patient?"
+
+After each candidate answer
+- Wait for websocket speechEnded
+- Submit the answer to POST /api/viva/generateFollowup
+
+Request body:
+{
+  "previousQA": [
+    {
+      "question": "previous question",
+      "answer": "candidate answer"
+    }
+  ],
+  "shownExhibitIds": ["exhibit-id-1"],
+  "vivaCase": { full case object },
+  "exit": false
+}
+
+Response shape:
+{
+  "question": "next viva question",
+  "imageUsed": true,
+  "imageLink": "https://...",
+  "imageDescription": null,
+  "imageId": "exhibit-1"
+}
+
+Calm mode loop
+- examiner asks question
+- RN plays TTS
+- candidate mic starts after examiner audio ends
+- websocket streams transcript
+- when speechEnded arrives, submit answer
+- backend returns next question
+- if imageUsed is true, show exhibit
+- repeat
+
+Calm mode timer
+- Uses vivaCase.viva_rules.max_duration_minutes
+- Current UI counts down live
+- When 20 seconds remain, the web app begins wrap-up and ends the viva
+
+
+7. Fast Mode Logic
+
+Fast mode is NOT AI-generated follow-up.
+It uses pre-authored fixed questions already stored inside:
+- vivaCase.modes.fastAndFurious.questions
+
+Each fast question has:
+- question
+- answerKeywords[]
+- linkedExhibitIds[]
+
+How fast mode works in the current app:
+
+1. On session start, call next("") internally.
+2. The first fast question is returned from the fixed question list.
+3. If the question has linked exhibits, the first linked exhibit is shown immediately.
+4. Start the 10 minute total countdown when this first real case question is asked.
+
+Answer completion rule in fast mode
+- If all keywords for the current fast question are matched, advance immediately.
+- If the user pauses and speechEnded arrives before all keywords are matched, submit the current answer anyway and move to next question.
+- There is no longer any "Do you want to add anything else?" prompt in the current flow.
+
+Fast mode timing behavior
+- total viva timer is fixed at 10 minutes
+- no per-question timer
+- if all fast questions are exhausted before 10 minutes, viva ends immediately
+- if 10 minutes ends first, current answer is captured and viva ends
+
+Keyword matching behavior
+- matching is case-insensitive
+- punctuation is stripped
+- token stems are matched loosely
+- alternatives inside a keyword are supported using:
+  - /
+  - |
+  - or
+  - comma
+
+Example:
+- "ct urogram / upper tract imaging" can match either phrase variant
+
+Fast mode loop
+- examiner asks fixed question
+- optional linked exhibit shown
+- candidate speaks
+- websocket interim updates can drive a visible keyword tracker if desired
+- if all keywords matched before pause, submit immediately and go next
+- else wait for websocket speechEnded and submit current answer
+- move to next fixed question
+
+
+8. How Keyword Detection Works
+
+The web app normalizes and matches keywords like this:
+- lowercase everything
+- replace non-alphanumeric characters with spaces
+- trim
+- tokenize by spaces
+- stem tokens by removing common endings:
+  - ing
+  - ed
+  - es
+  - s
+
+Keyword is considered matched if either:
+- normalized full keyword is included in normalized answer
+or
+- all normalized/stemmed tokens of the keyword are present in answer tokens
+
+In RN, use the same logic so fast mode behavior stays identical to web.
+
+
+9. Exhibits
+
+Exhibits can come from:
+- calm mode follow-up API response
+- fast mode linkedExhibitIds on the current question
+
+Display rule
+- If imageUsed is true and imageLink exists, show the exhibit
+- Exhibit remains visible for the candidate until replaced by the next question or manually closed
+
+Image source rule
+- Use exhibit.url if present
+- Else use /exhibits/{file}
+
+RN note
+- If your RN app is not serving local web paths like /exhibits/..., prefer using remote exhibit URLs from CMS
+- If files are only relative, you may need to transform them to absolute URLs in your RN adapter layer
+
+
+10. Scoring Flow
+
+When viva ends, the app calls:
+- POST /api/viva/generateScore
+
+Request body:
+{
+  "previousQA": [
+    {
+      "question": "question asked",
+      "answer": "candidate answer"
+    }
+  ],
+  "vivaCase": { full case object }
+}
+
+Response shape:
+{
+  "caseTitle": "Visible hematuria case",
+  "basic_knowledge": {
+    "score": 6,
+    "summary": "...",
+    "reason": "..."
+  },
+  "higher_order_processing": {
+    "score": 5,
+    "summary": "...",
+    "reason": "..."
+  },
+  "clinical_skills": {
+    "score": 6,
+    "summary": "...",
+    "reason": "..."
+  },
+  "professionalism": {
+    "score": 7,
+    "summary": "...",
+    "reason": "..."
+  },
+  "strengthsOverall": [],
+  "weaknessesOverall": [],
+  "improvementPlan": []
+}
+
+Scoring rule
+- Each domain is scored from 1 to 8
+- This viva scoring is out of 8 per domain
+
+RN recommendation
+- After receiving score response, store it locally and navigate to your result screen
+
+
+11. Local State You Should Mirror In RN
+
+The web app stores and carries session data similar to this:
+
+candidateInfo
+- name
+- email
+- selectedExaminer
+- selectedExaminerId
+- selectedCaseId
+- selectedCaseTitle
+- selectedCase
+- selectedMode
+- conversation
+- qaHistory
+
+Recommended RN local session state
+- candidateName
+- candidateEmail
+- selectedMode
+- selectedExaminer
+- selectedCase
+- qaHistory: [{ question, answer }]
+- shownExhibitIds: string[]
+- currentTranscriptInterim
+- currentTranscriptBuffered
+- currentFastQuestionIndex
+- countdownStarted
+- countdownRemaining
+- finalScore
+
+
+12. Exact RN Implementation Sequence
+
+Recommended high-level RN sequence:
+
+A. Case list screen
+- GET /api/viva-cases
+- render cases
+- choose mode per case
+
+B. Pre-session setup screen
+- collect candidate name and email
+- choose examiner voice
+- request microphone permission
+- optional camera permission if you want camera parity
+
+C. Session bootstrap
+- show greeting TTS
+- show warmup prompt TTS
+- capture short warmup speech
+- play "Thank you. Let us begin."
+- request first actual question
+
+D. Calm mode main loop
+- get first question from /api/viva/generateFollowup with empty previousQA
+- play TTS
+- start mic websocket after audio end
+- on speechEnded, submit answer and fetch next question
+- continue until your end condition
+
+E. Fast mode main loop
+- use local fastAndFurious question list from the selected case
+- ask first question
+- start 10 minute countdown immediately when first real question begins
+- stream candidate audio
+- if all keywords matched, submit immediately and move next
+- else on speechEnded submit current answer and move next
+- if no more questions remain, end viva
+- if timer ends, end viva
+
+F. End viva
+- stop microphone capture
+- close websocket
+- POST /api/viva/generateScore
+- show result screen
+
+
+13. Suggested RN Interfaces
+
+Candidate message
+{
+  id: string,
+  role: "ai" | "candidate",
+  text: string,
+  live?: boolean
+}
+
+QA history
+{
+  question: string,
+  answer: string
+}
+
+Examiner voice
+{
+  id: string,
+  name: string,
+  title: string,
+  personality: string,
+  languageCode: string,
+  voiceName: string
+}
+
+
+14. Important Behavioral Notes
+
+- In calm mode, pause detection is driven by websocket speechEnded, not by local silence timers.
+- Fast mode now also relies on that same speechEnded boundary when keywords were not fully matched.
+- The transcript visible in UI should update before or while the examiner audio is playing for the question.
+- Candidate microphone should not remain active while the examiner is speaking.
+- Fast mode should advance the moment all required keywords are matched.
+- Fast mode should not ask follow-up clarification prompts anymore.
+- If the fixed fast question list finishes early, end the viva immediately instead of waiting for the 10 minute timer.
+
+
+15. Minimal API Payload Examples
+
+Load cases
+GET /api/viva-cases
+
+Get single case
+GET /api/viva-cases/:id
+
+Generate calm follow-up
+POST /api/viva/generateFollowup
+{
+  "previousQA": [
+    {
+      "question": "How would you evaluate this patient?",
+      "answer": "I would begin with history and examination..."
+    }
+  ],
+  "shownExhibitIds": [],
+  "vivaCase": { ...fullCase },
+  "exit": false
+}
+
+Generate final score
+POST /api/viva/generateScore
+{
+  "previousQA": [
+    {
+      "question": "How would you evaluate this patient?",
+      "answer": "I would begin with history and examination..."
+    }
+  ],
+  "vivaCase": { ...fullCase }
+}
+
+Generate examiner TTS
+POST /api/viva/tts
+{
+  "text": "How would you evaluate this patient?",
+  "voiceName": "en-GB-Chirp3-HD-Leda",
+  "languageCode": "en-GB"
+}
+
+
+16. Practical RN Notes
+
+- Replace browser localStorage/sessionStorage with AsyncStorage or your chosen local store.
+- Replace browser WebSocket with RN WebSocket.
+- Replace browser audio worklet capture with an RN audio-recording module that can stream PCM chunks.
+- Replace HTML audio playback with RN audio playback for MP3 blobs or temp files.
+- Keep all viva state in one controller or hook so the logic stays deterministic.
+
+
+17. Recommended RN Build Strategy
+
+To stay closest to the current web behavior:
+
+Phase 1
+- integrate case loading
+- integrate examiner TTS
+- integrate websocket STT
+- integrate calm mode
+
+Phase 2
+- integrate fast keyword tracker
+- integrate fixed fast question progression
+- integrate exhibits
+
+Phase 3
+- integrate scoring screen
+- polish resume/retry/error handling
+
+
+18. Final Summary
+
+Current source of truth for viva behavior in this project:
+- calm mode uses POST /api/viva/generateFollowup
+- fast mode uses local case.modes.fastAndFurious.questions
+- both modes use websocket speechEnded as the answer boundary
+- examiner audio comes from POST /api/viva/tts using Google Chirp voices
+- final result comes from POST /api/viva/generateScore
+
+If the RN app reproduces those same four pieces faithfully:
+- case loading
+- speech websocket
+- examiner TTS
+- session state machine
+
+then the mobile AI Viva should behave the same as this web implementation.

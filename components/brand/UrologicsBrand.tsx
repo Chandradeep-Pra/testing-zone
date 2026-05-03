@@ -17,10 +17,11 @@ export default function UrologicsBrand({
 }: UrologicsBrandProps) {
   const content = (
     <div className="flex items-center gap-3">
-      <div className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-teal-300/25 bg-[linear-gradient(135deg,rgba(45,212,191,0.28),rgba(8,17,31,0.9))] text-sm font-semibold text-white shadow-[0_14px_30px_rgba(45,212,191,0.16)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.24),transparent_55%)]" />
-        <span className="relative">U</span>
-      </div>
+      <img
+        src="/logo.png"
+        alt="Urologics"
+        className="h-11 w-11 object-contain"
+      />
       <div className="min-w-0">
         <div className="text-[10px] uppercase tracking-[0.28em] text-teal-300/90">
           Urologics

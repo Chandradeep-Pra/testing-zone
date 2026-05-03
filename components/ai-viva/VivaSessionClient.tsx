@@ -147,8 +147,13 @@ export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseReco
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_transparent_40%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-neutral-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md border-white/10 bg-slate-950/85 shadow-[0_24px_80px_rgba(2,6,23,0.55)] backdrop-blur-xl">
         <CardHeader>
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300">
-            AI
+          <img
+            src="/logo.png"
+            alt="Urologics"
+            className="mx-auto mb-3 h-16 w-16 object-contain"
+          />
+          <div className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+            Urologics AI
           </div>
           <CardTitle className="text-center text-slate-100">Candidate Information</CardTitle>
           <p className="text-center text-sm text-slate-400">{vivaCase.case.title}</p>

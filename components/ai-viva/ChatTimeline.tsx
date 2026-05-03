@@ -9,7 +9,9 @@ type ChatMessage =
 
 export default function ChatTimeline({ messages }: { messages: ChatMessage[] }) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const questionMessages = messages.filter((message) => message.role === "ai");
+  const questionMessages = messages.filter(
+    (message) => message.role === "ai" || message.role === "image"
+  );
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
@@ -19,7 +21,7 @@ export default function ChatTimeline({ messages }: { messages: ChatMessage[] }) 
   }, [questionMessages]);
 
   return (
-    <div className="flex-1 overflow-y-scroll p-4 space-y-4 bg-[linear-gradient(180deg,rgba(15,23,42,0.18),rgba(2,6,23,0.08))]">
+    <div className="h-full overflow-y-auto p-4 space-y-4 bg-[linear-gradient(180deg,rgba(15,23,42,0.18),rgba(2,6,23,0.08))]">
 
       {questionMessages.map((msg) => {
         if (msg.role === "ai") {
@@ -50,19 +52,20 @@ export default function ChatTimeline({ messages }: { messages: ChatMessage[] }) 
 
         if (msg.role === "image") {
           return (
-            <div key={msg.id} className="space-y-2">
+            <div key={msg.id} className="space-y-2 rounded-2xl border border-white/10 bg-slate-950/70 p-3">
 
-              <div className="text-xs text-slate-400">
-                Exhibit
+              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                Image shown
               </div>
 
               <img
                 src={msg.src}
                 alt="Exhibit"
                 className="
-                  rounded-lg
+                  rounded-xl
                   border border-slate-800
-                  max-h-[300px]
+                  max-h-[240px]
+                  w-full
                   object-contain
                 "
               />

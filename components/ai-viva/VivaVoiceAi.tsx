@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, PhoneOff, Camera, CameraOff, Sparkles, ShieldCheck } from "lucide-react";
+import { Clock, PhoneOff, Camera, CameraOff, Sparkles, ShieldCheck, History, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CandidatePanel } from "./CandidatePanel";
@@ -20,12 +20,19 @@ import type { VivaCaseRecord } from "@/lib/viva-case";
 
 type VivaMode = "calm" | "fast";
 type QaHistoryItem = { question?: string; answer?: string };
-type CandidateConversationMessage = {
-  id: string;
-  role: "ai" | "candidate";
-  text: string;
-  live?: boolean;
-};
+type CandidateConversationMessage =
+  | {
+      id: string;
+      role: "ai" | "candidate";
+      text: string;
+      live?: boolean;
+    }
+  | {
+      id: string;
+      role: "image";
+      src: string;
+      description?: string;
+    };
 type FastPauseState = "idle" | "monitoring" | "detected";
 type StoredCandidateInfo = {
   name?: string;
@@ -85,7 +92,6 @@ export default function VivaVoiceAi({
     generateScore,
     next,
     doesAnswerMatchCurrentFastQuestion,
-    getCurrentFastQuestion,
     getCurrentFastQuestionKeywordProgress,
     getHistory,
   } = useVivaEngine(vivaCase, selectedMode);
@@ -147,17 +153,11 @@ export default function VivaVoiceAi({
   const [fastPauseState, setFastPauseState] = useState<FastPauseState>("idle");
   const [fastTimerStarted, setFastTimerStarted] = useState(false);
   const [fastTimerResetKey, setFastTimerResetKey] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
-  const currentFastQuestion = isFastMode ? getCurrentFastQuestion() : null;
   const fastKeywordProgress = isFastMode
     ? getCurrentFastQuestionKeywordProgress(candidateTranscript)
     : { matchedKeywords: [], totalKeywords: 0, allMatched: false };
-  const fastPauseLabel =
-    fastPauseState === "monitoring"
-      ? "Listening for speech to end before submitting this answer."
-      : fastPauseState === "detected"
-        ? "Pause detected. Submitting the current answer."
-          : "Pause detection idle.";
 
   const vivaDurationSec = vivaCase.viva_rules.max_duration_minutes * 60;
   const countdownRunning = (isFastMode ? fastTimerStarted : vivaStarted) && !ending;
@@ -228,7 +228,6 @@ export default function VivaVoiceAi({
   const fillers = [
     "Okay, let us continue further",
     "Let us move on to the next question",
-    "Let us continue further with the same case",
     "That is alright, let us continue",
     "",
   ];
@@ -503,6 +502,16 @@ export default function VivaVoiceAi({
         role: "ai",
         text: question,
       },
+      ...(data.imageUsed && data.imageLink
+        ? [
+            {
+              id: crypto.randomUUID(),
+              role: "image" as const,
+              src: data.imageLink,
+              description: data.imageDescription || undefined,
+            },
+          ]
+        : []),
     ]);
 
     setThinking(false);
@@ -606,6 +615,16 @@ export default function VivaVoiceAi({
           role: "ai",
           text: question,
         },
+        ...(data.imageUsed && data.imageLink
+          ? [
+              {
+                id: crypto.randomUUID(),
+                role: "image" as const,
+                src: data.imageLink,
+                description: data.imageDescription || undefined,
+              },
+            ]
+          : []),
       ]);
 
       setThinking(false);
@@ -767,6 +786,34 @@ export default function VivaVoiceAi({
         </div>
       )}
 
+      {historyOpen && (
+        <div className="pointer-events-none absolute bottom-[64px] right-0 top-[73px] z-40 flex w-full justify-end sm:bottom-[68px] md:top-[77px]">
+          <div className="pointer-events-auto flex h-full w-full max-w-md flex-col overflow-hidden border-l border-white/10 bg-slate-950/95 shadow-[0_28px_90px_rgba(2,6,23,0.62)] backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.24em] text-emerald-300">
+                  Question History
+                </div>
+                <div className="mt-1 text-base font-semibold text-white">
+                  Questions asked by the examiner
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-slate-200 transition hover:bg-white/[0.1]"
+                aria-label="Close history"
+              >
+                <X size={17} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1">
+              <ChatTimeline messages={messages} />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="border-b border-white/10 bg-slate-950/70 px-3 py-3 backdrop-blur-xl sm:px-5 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -804,9 +851,9 @@ export default function VivaVoiceAi({
         </div>
       </div>
 
-      <div className="flex-1 p-3 sm:p-4 md:p-5 min-h-0">
-        <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-          <div className="relative min-h-[380px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
+      <div className="min-h-0 flex-1 p-3 sm:p-4 md:p-5">
+        <div className="h-full min-h-0">
+          <div className="relative h-full min-h-0 overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
           <AiPanel
             amplitude={amplitude}
             speaking={examinerSpeaking}
@@ -852,106 +899,18 @@ export default function VivaVoiceAi({
               }
             />
 
-            <div className="absolute left-4 top-4 z-30 flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs text-slate-300 backdrop-blur">
+            {/* <div className="absolute left-4 top-4 z-30 flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs text-slate-300 backdrop-blur">
               <Sparkles size={13} className="text-emerald-300" />
               <span>{selectedExaminer.personality}</span>
-            </div>
+            </div> */}
 
-            {!liveAvatar.isReady && liveAvatar.error && (
-              <div className="absolute bottom-24 left-4 right-4 z-30 rounded-2xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-xs text-amber-100 backdrop-blur">
-                LiveAvatar did not connect, so the app is using fallback TTS. Error: {liveAvatar.error}
-              </div>
-            )}
+          
 
             <div className="absolute right-2 top-2 h-24 w-20 overflow-hidden rounded-2xl md:right-4 md:top-4 md:h-auto md:w-[260px] md:aspect-video">
               <CandidatePanel
                 cameraOn={cameraOn}
                 listening={isListening}
               />
-            </div>
-          </div>
-
-          <div className="grid min-h-0 gap-4 lg:grid-rows-[auto_1fr_auto]">
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-              {/* Candidate transcript panel intentionally hidden for the branded exam-room layout. */}
-
-              {isFastMode && candidateTranscript.trim() && (
-                <div
-                  className={`rounded-2xl border px-4 py-3 text-xs backdrop-blur ${
-                    fastPauseState === "detected"
-                      ? "border-orange-400/30 bg-orange-500/10 text-orange-100"
-                      : fastPauseState === "monitoring"
-                        ? "border-sky-400/30 bg-sky-500/10 text-sky-100"
-                        : "border-white/10 bg-white/[0.03] text-slate-400"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="uppercase tracking-[0.22em]">
-                      Fast Pause Status
-                    </span>
-                    <span className="text-[11px] uppercase tracking-[0.18em]">
-                      {fastPauseState}
-                    </span>
-                  </div>
-                  <p className="mt-2 normal-case tracking-normal text-sm leading-5">
-                    {fastPauseLabel}
-                  </p>
-                </div>
-              )}
-
-              {isFastMode &&
-                currentFastQuestion &&
-                currentFastQuestion.answerKeywords.length > 0 && (
-                  <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                        Keyword Tracker
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {fastKeywordProgress.matchedKeywords.length}/{fastKeywordProgress.totalKeywords}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {currentFastQuestion.answerKeywords.map((keyword, index) => {
-                        const matched = fastKeywordProgress.matchedKeywords.includes(keyword);
-
-                        return (
-                          <div
-                            key={`${keyword}-${index}`}
-                            className={`rounded-full border px-3 py-1.5 text-xs transition-all ${
-                              matched
-                                ? "border-emerald-400/30 bg-emerald-400/12 text-emerald-200"
-                                : "border-white/10 bg-white/[0.04] text-slate-400"
-                            }`}
-                          >
-                            {matched ? "Heard: " : ""}
-                            {keyword}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-            </div>
-
-            <div className="min-h-0 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.04]">
-              <div className="border-b border-white/10 px-4 py-3 text-xs uppercase tracking-[0.22em] text-slate-500">
-                Session Timeline
-              </div>
-              <ChatTimeline messages={messages} />
-            </div>
-
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">
-              {isFastMode ? (
-                <p>
-                  Fast mode stays on a total 10 minute clock. Once the first case question is asked, a pause submits the current answer immediately, the same way calm mode does.
-                </p>
-              ) : (
-                <p>
-                  Calm mode follows a more natural viva pace with adaptive follow-up questioning and a professional conversational cadence.
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -979,6 +938,17 @@ export default function VivaVoiceAi({
               <span className="hidden sm:inline">Camera On</span>
             </>
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setHistoryOpen(true)}
+          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border border-slate-700 bg-slate-800 transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0 hover:bg-slate-700"
+          title="Show question history"
+        >
+          <History size={14} className="sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">Show History</span>
+          <span className="inline sm:hidden">History</span>
         </button>
 
         <button
