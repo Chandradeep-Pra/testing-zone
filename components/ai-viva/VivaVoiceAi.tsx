@@ -767,7 +767,7 @@ export default function VivaVoiceAi({
   }
 
   return (
-    <main className="h-screen w-full bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.16),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_38%,_#020617_100%)] text-slate-100 flex flex-col relative overflow-hidden">
+    <main className="relative flex h-screen w-full flex-col overflow-hidden bg-white text-[#071014]">
       {readyVisible && (
         <ReadyOverlay
           onBegin={handleBegin}
@@ -788,20 +788,20 @@ export default function VivaVoiceAi({
 
       {historyOpen && (
         <div className="pointer-events-none absolute bottom-[64px] right-0 top-[73px] z-40 flex w-full justify-end sm:bottom-[68px] md:top-[77px]">
-          <div className="pointer-events-auto flex h-full w-full max-w-md flex-col overflow-hidden border-l border-white/10 bg-slate-950/95 shadow-[0_28px_90px_rgba(2,6,23,0.62)] backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
+          <div className="pointer-events-auto flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.16)]">
+            <div className="flex items-center justify-between gap-4 border-b border-[#0f7896]/12 px-5 py-4">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.24em] text-emerald-300">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-[#0f7896]">
                   Question History
                 </div>
-                <div className="mt-1 text-base font-semibold text-white">
+                <div className="mt-1 text-base font-semibold text-[#071014]">
                   Questions asked by the examiner
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setHistoryOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-slate-200 transition hover:bg-white/[0.1]"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#0f7896]/12 bg-white text-[#071014] transition hover:bg-cyan-50"
                 aria-label="Close history"
               >
                 <X size={17} />
@@ -814,36 +814,36 @@ export default function VivaVoiceAi({
         </div>
       )}
 
-      <div className="border-b border-white/10 bg-slate-950/70 px-3 py-3 backdrop-blur-xl sm:px-5 md:px-8">
+      <div className="border-b border-[#0f7896]/12 bg-white px-3 py-3 shadow-[0_8px_24px_rgba(15,120,150,0.07)] sm:px-5 md:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="hidden sm:block">
               <UrologicsBrand compact product="AI Viva" tag={vivaCase.case.title} />
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-300 sm:hidden">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896] sm:hidden">
               <ShieldCheck size={18} />
             </div>
             <div className="min-w-0">
-              <div className="text-xs uppercase tracking-[0.22em] text-slate-500">
+              <div className="text-xs uppercase tracking-[0.22em] text-[#0f7896]">
                 Urologics Session
               </div>
-              <div className="truncate text-sm font-semibold text-slate-100 md:text-base">
+              <div className="truncate text-sm font-semibold text-[#071014] md:text-base">
                 {selectedExaminer.name} · {selectedExaminer.title}
               </div>
             </div>
           </div>
 
           <div className="hidden flex-1 justify-center md:flex">
-            <div className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-300">
+            <div className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-4 py-2 text-sm text-[#071014]/65">
               {vivaCase.case.title}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs uppercase tracking-[0.18em] text-slate-400">
+            <span className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-1 text-xs uppercase tracking-[0.18em] text-[#071014]/65">
             {isFastMode ? "Fast and Furious" : "Live Viva"}
             </span>
-            <div className="flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-sm font-semibold text-emerald-300">
+            <div className="flex items-center gap-2 rounded-full bg-[#0f7896] px-3 py-1.5 text-sm font-semibold text-white">
               <Clock size={14} />
               <span>{minutes}:{seconds.toString().padStart(2, "0")}</span>
             </div>
@@ -853,7 +853,7 @@ export default function VivaVoiceAi({
 
       <div className="min-h-0 flex-1 p-3 sm:p-4 md:p-5">
         <div className="h-full min-h-0">
-          <div className="relative h-full min-h-0 overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
+          <div className="relative h-full min-h-0 overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
           <AiPanel
             amplitude={amplitude}
             speaking={examinerSpeaking}
@@ -916,14 +916,14 @@ export default function VivaVoiceAi({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 bg-slate-950/70 px-3 py-3 backdrop-blur-xl sm:gap-3 md:gap-6">
+      <div className="flex flex-wrap items-center justify-center gap-2 border-t border-[#0f7896]/12 bg-white px-3 py-3 shadow-[0_-8px_24px_rgba(15,120,150,0.07)] sm:gap-3 md:gap-6">
         <button
           onClick={() => setCameraOn((v) => !v)}
           disabled={!cameraEnabled}
           className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
             cameraEnabled
-              ? "bg-slate-800 border-slate-700 hover:bg-slate-700 cursor-pointer"
-              : "bg-slate-800/50 border-slate-700/50 opacity-50 cursor-not-allowed"
+              ? "bg-white border-[#0f7896]/12 text-[#071014] hover:bg-cyan-50 cursor-pointer"
+              : "bg-white border-[#0f7896]/12 text-[#071014]/35 opacity-50 cursor-not-allowed"
           }`}
           title={cameraEnabled ? "Toggle camera" : "Camera not enabled in system check"}
         >
@@ -943,7 +943,7 @@ export default function VivaVoiceAi({
         <button
           type="button"
           onClick={() => setHistoryOpen(true)}
-          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border border-slate-700 bg-slate-800 transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0 hover:bg-slate-700"
+          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border border-[#0f7896]/12 bg-white text-[#071014] transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0 hover:bg-cyan-50"
           title="Show question history"
         >
           <History size={14} className="sm:h-4 sm:w-4" />

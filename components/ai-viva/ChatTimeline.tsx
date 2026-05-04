@@ -21,7 +21,7 @@ export default function ChatTimeline({ messages }: { messages: ChatMessage[] }) 
   }, [questionMessages]);
 
   return (
-    <div className="h-full overflow-y-auto p-4 space-y-4 bg-[linear-gradient(180deg,rgba(15,23,42,0.18),rgba(2,6,23,0.08))]">
+    <div className="h-full space-y-4 overflow-y-auto bg-white p-4">
 
       {questionMessages.map((msg) => {
         if (msg.role === "ai") {
@@ -29,17 +29,18 @@ export default function ChatTimeline({ messages }: { messages: ChatMessage[] }) 
             <div key={msg.id} className="flex gap-3 items-start">
 
               <div className="mt-1">
-                <Bot size={18} className="text-emerald-400" />
+                <Bot size={18} className="text-[#0f7896]" />
               </div>
 
               <div
                 className="
-                  bg-slate-950/80
-                  border border-white/10
+                  bg-cyan-50
+                  border border-[#0f7896]/12
                   rounded-2xl
                   px-4 py-3
                   text-sm
                   leading-relaxed
+                  text-[#071014]
                   max-w-[85%]
                 "
               >
@@ -52,9 +53,9 @@ export default function ChatTimeline({ messages }: { messages: ChatMessage[] }) 
 
         if (msg.role === "image") {
           return (
-            <div key={msg.id} className="space-y-2 rounded-2xl border border-white/10 bg-slate-950/70 p-3">
+            <div key={msg.id} className="space-y-2 rounded-2xl border border-[#0f7896]/12 bg-white p-3">
 
-              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+              <div className="text-[11px] uppercase tracking-[0.22em] text-[#0f7896]">
                 Image shown
               </div>
 
@@ -63,7 +64,6 @@ export default function ChatTimeline({ messages }: { messages: ChatMessage[] }) 
                 alt="Exhibit"
                 className="
                   rounded-xl
-                  border border-slate-800
                   max-h-[240px]
                   w-full
                   object-contain

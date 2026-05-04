@@ -31,7 +31,7 @@ Objectives: ${vivaCase.case.objectives.join("; ")}
 Must mention: ${vivaCase.marking_criteria.must_mention.join("; ")}
 Critical fail: ${vivaCase.marking_criteria.critical_fail.join("; ")}
 
-Score each domain from 1-8.
+Score each domain from 4-8.
 
 Domains:
 1. basic_knowledge
@@ -41,7 +41,8 @@ Domains:
 
 Provide:
 
-- score (1-8)
+- score (4-8)
+- little linient scoring
 - use whole numbers only
 - short summary
 - detailed reasoning

@@ -116,134 +116,166 @@ export default function Page() {
       )}
 
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xl">
-          <div className="urologics-panel w-full max-w-md p-8 text-center">
-            <div className="text-2xl font-semibold text-white">Submit mock?</div>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              This will end the current Urologics mock session and move you to the results page.
-            </p>
-            <div className="mt-8 flex gap-3">
-              <button onClick={() => setShowConfirm(false)} className="urologics-button-secondary flex-1">
-                Cancel
-              </button>
-              <button onClick={submit} className="urologics-button-primary flex-1">
-                Submit
-              </button>
-            </div>
-          </div>
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div className="w-full max-w-md rounded-[28px] border border-[#0f7896]/12 bg-white p-8 text-center shadow-[0_24px_60px_rgba(15,120,150,0.18)]">
+      
+      {/* Title */}
+      <div className="text-2xl font-semibold text-[#071014]">
+        Submit mock?
+      </div>
+
+      {/* Description */}
+      <p className="mt-3 text-sm leading-6 text-[#071014]/65">
+        This will end the current Urologics mock session and move you to the results page.
+      </p>
+
+      {/* Buttons */}
+      <div className="mt-8 flex gap-3">
+        <button
+          onClick={() => setShowConfirm(false)}
+          className="flex-1 rounded-full border border-[#0f7896]/20 px-4 py-2 text-sm font-semibold text-[#0f7896] transition hover:bg-[#0f7896] hover:text-white"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={submit}
+          className="flex-1 rounded-full bg-[#0f7896] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0b647d]"
+        >
+          Submit
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+      <main className="flex min-h-screen gap-4 bg-cyan-50 p-4 text-[#071014]">
+  <aside className="flex w-[300px] shrink-0 flex-col rounded-[28px] border border-[#0f7896]/12 bg-white p-5 shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
+    <div className="flex items-center gap-3">
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0f7896]/10 text-[#0f7896]">
+        <ShieldCheck size={18} />
+      </div>
+
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#0f7896]">
+          Urologics Grand Mocks
         </div>
+        <div className="mt-1 text-sm font-semibold text-[#071014]">
+          {mock.title}
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-6 rounded-[24px] border border-[#0f7896]/12 bg-cyan-50 p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#0f7896]">
+        <AlarmClock size={14} />
+        Session Timer
+      </div>
+
+      <div className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-[#0f7896]">
+        {format(isBreak ? breakLeft : timeLeft)}
+      </div>
+
+      <div className="mt-2 text-sm text-[#071014]/60">
+        Question {currentQ + 1} of {mock.questions.length}
+      </div>
+    </div>
+
+    <div className="mt-6 grid grid-cols-5 gap-2">
+      {mock.questions.map((question, index) => (
+        <button
+          key={question.id}
+          onClick={() => setCurrentQ(index)}
+          className={`rounded-xl px-0 py-2 text-sm font-semibold transition ${
+            index === currentQ
+              ? "bg-[#0f7896] text-white shadow-[0_8px_20px_rgba(15,120,150,0.22)]"
+              : answers[question.id] !== undefined
+                ? "bg-[#0f7896]/10 text-[#0f7896]"
+                : "bg-cyan-50 text-[#071014]/45 hover:bg-[#0f7896]/10 hover:text-[#0f7896]"
+          }`}
+        >
+          {index + 1}
+        </button>
+      ))}
+    </div>
+
+    <div className="mt-auto space-y-3 pt-6">
+      {!breakUsed && (
+        <button
+          onClick={() => {
+            setIsBreak(true);
+            setBreakUsed(true);
+          }}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#0f7896]/20 px-5 py-3 text-sm font-semibold text-[#0f7896] transition hover:bg-[#0f7896] hover:text-white"
+        >
+          <Coffee size={16} />
+          Take Break
+        </button>
       )}
 
-      <main className="urologics-shell flex min-h-screen gap-4 p-4">
-        <aside className="urologics-panel flex w-[300px] shrink-0 flex-col p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-400/10 text-teal-300">
-              <ShieldCheck size={18} />
-            </div>
-            <div>
-              <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Urologics Grand Mocks</div>
-              <div className="text-sm font-semibold text-white">{mock.title}</div>
-            </div>
+      <button
+        onClick={() => setShowConfirm(true)}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0f7896] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0b647d]"
+      >
+        <Send size={16} />
+        Submit Mock
+      </button>
+    </div>
+  </aside>
+
+  <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
+    <div className="flex flex-1 flex-col lg:flex-row">
+      <div className="flex flex-1 flex-col justify-between p-8 md:p-10">
+        <div>
+          <div className="inline-flex rounded-full border border-[#0f7896]/18 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#0f7896]">
+            Assessment Screen
           </div>
 
-          <div className="urologics-subpanel mt-6 p-4">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500">
-              <AlarmClock size={14} />
-              Session Timer
-            </div>
-            <div className="mt-3 text-4xl font-semibold text-teal-300">
-              {format(isBreak ? breakLeft : timeLeft)}
-            </div>
-            <div className="mt-2 text-sm text-slate-400">
-              Question {currentQ + 1} of {mock.questions.length}
-            </div>
-          </div>
+          <h1 className="mt-6 text-3xl font-semibold leading-tight tracking-[-0.03em] text-[#071014] md:text-4xl">
+            {q.questionText}
+          </h1>
 
-          <div className="mt-6 grid grid-cols-5 gap-2">
-            {mock.questions.map((question, index) => (
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            {q.options.map((opt, i) => (
               <button
-                key={question.id}
-                onClick={() => setCurrentQ(index)}
-                className={`rounded-xl px-0 py-2 text-sm transition ${
-                  index === currentQ
-                    ? "bg-teal-400 text-slate-950"
-                    : answers[question.id] !== undefined
-                      ? "bg-teal-400/15 text-teal-200"
-                      : "bg-white/[0.04] text-slate-400 hover:bg-white/[0.08]"
+                key={i}
+                onClick={() => select(q.id, i)}
+                className={`rounded-2xl border px-5 py-5 text-left text-sm font-medium leading-6 transition ${
+                  answers[q.id] === i
+                    ? "border-[#0f7896] bg-[#0f7896] text-white shadow-[0_12px_28px_rgba(15,120,150,0.20)]"
+                    : "border-[#0f7896]/12 bg-cyan-50 text-[#071014]/75 hover:border-[#0f7896]/30 hover:bg-white"
                 }`}
               >
-                {index + 1}
+                {opt}
               </button>
             ))}
           </div>
+        </div>
 
-          <div className="mt-auto space-y-3 pt-6">
-            {!breakUsed && (
-              <button
-                onClick={() => {
-                  setIsBreak(true);
-                  setBreakUsed(true);
-                }}
-                className="urologics-button-secondary w-full gap-2"
-              >
-                <Coffee size={16} />
-                Take Break
-              </button>
-            )}
-            <button onClick={() => setShowConfirm(true)} className="urologics-button-primary w-full gap-2">
-              <Send size={16} />
-              Submit Mock
-            </button>
+        <div className="mt-10 h-2 overflow-hidden rounded-full bg-cyan-50">
+          <div
+            className="h-full rounded-full bg-[#0f7896] transition-all duration-300"
+            style={{
+              width: `${((currentQ + 1) / mock.questions.length) * 100}%`,
+            }}
+          />
+        </div>
+      </div>
+
+      {q.questionImage && (
+        <div className="border-t border-[#0f7896]/10 p-6 lg:w-[42%] lg:border-l lg:border-t-0">
+          <div className="flex h-full min-h-[280px] items-center justify-center rounded-[24px] border border-[#0f7896]/12 bg-cyan-50 p-5">
+            <img
+              src={q.questionImage}
+              alt="Question exhibit"
+              className="max-h-[70vh] rounded-2xl object-contain"
+            />
           </div>
-        </aside>
-
-        <section className="urologics-panel flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex flex-1 flex-col lg:flex-row">
-            <div className="flex flex-1 flex-col justify-between p-8 md:p-10">
-              <div>
-                <div className="urologics-chip">Assessment Screen</div>
-                <h1 className="mt-6 text-3xl font-semibold leading-tight text-white md:text-4xl">
-                  {q.questionText}
-                </h1>
-                <div className="mt-8 grid gap-4 md:grid-cols-2">
-                  {q.options.map((opt, i) => (
-                    <button
-                      key={i}
-                      onClick={() => select(q.id, i)}
-                      className={`rounded-2xl border px-5 py-5 text-left text-sm leading-6 transition ${
-                        answers[q.id] === i
-                          ? "border-teal-300/35 bg-teal-400 text-slate-950"
-                          : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]"
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-10 h-2 overflow-hidden rounded-full bg-white/[0.05]">
-                <div
-                  className="h-full rounded-full bg-teal-300"
-                  style={{ width: `${((currentQ + 1) / mock.questions.length) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            {q.questionImage && (
-              <div className="border-t border-white/10 p-6 lg:w-[42%] lg:border-l lg:border-t-0">
-                <div className="urologics-subpanel flex h-full min-h-[280px] items-center justify-center p-5">
-                  <img
-                    src={q.questionImage}
-                    alt="Question exhibit"
-                    className="max-h-[70vh] rounded-2xl object-contain"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      </main>
+        </div>
+      )}
+    </div>
+  </section>
+</main>
     </>
   );
 }

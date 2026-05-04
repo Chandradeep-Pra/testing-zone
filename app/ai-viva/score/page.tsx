@@ -144,15 +144,17 @@ export default function ReviewPage() {
   if (!report) {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
-        <div className="urologics-panel px-8 py-6 text-slate-300">Loading Urologics AI Viva score...</div>
+        <div className="urologics-panel px-8 py-6 text-[#071014]/65">
+          Loading Urologics AI Viva score...
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="urologics-shell px-4 py-6 md:px-6 md:py-8">
+    <main className="urologics-shell px-6 py-6">
       <div className="mx-auto max-w-6xl space-y-8">
-        <header className="urologics-panel flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+        <header className="urologics-header flex flex-wrap items-center justify-between gap-4 px-6 py-5">
           <UrologicsBrand product="AI Viva" tag="Performance report" />
           <div className="urologics-chip">Scored Out Of 8</div>
         </header>
@@ -160,40 +162,40 @@ export default function ReviewPage() {
         <section className="grid gap-6 lg:grid-cols-[1fr_0.42fr]">
           <div className="urologics-panel p-8">
             <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-400/10 text-teal-300">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
                 <Trophy size={22} />
               </div>
               <div>
-                <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                <div className="text-xs uppercase tracking-[0.22em] text-[#0f7896]">
                   Urologics AI Viva Report
                 </div>
-                <h1 className="mt-3 text-3xl font-semibold text-white md:text-4xl">
+                <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[#071014] md:text-4xl">
                   {report.caseTitle}
                 </h1>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-400">
-                  A branded performance summary covering domain scores, strengths, weaknesses, and next-step focus areas.
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-[#071014]/65">
+                  Domain scores, key feedback, and focused next steps.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="urologics-panel flex flex-col items-center justify-center p-8 text-center">
-            <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Overall Score</div>
-            <div className="mt-4 text-6xl font-semibold text-teal-300">{report.overallScore}</div>
-            <div className="mt-2 text-sm text-slate-400">out of 8</div>
+          <div className="flex flex-col items-center justify-center rounded-[28px] border border-[#0f7896]/12 bg-[#0f7896] p-8 text-center text-white shadow-[0_24px_60px_rgba(15,120,150,0.25)]">
+            <div className="text-xs uppercase tracking-[0.22em] text-white/80">Overall Score</div>
+            <div className="mt-4 text-6xl font-semibold text-white">{report.overallScore}</div>
+            <div className="mt-2 text-sm text-white/75">out of 8</div>
           </div>
         </section>
 
         {(report.strengthsOverall.length > 0 || report.weaknessesOverall.length > 0) && (
           <section className="grid gap-6 md:grid-cols-2">
             <div className="urologics-panel p-6">
-              <div className="flex items-center gap-2 text-teal-300">
+              <div className="flex items-center gap-2 text-[#0f7896]">
                 <CheckCircle2 size={16} />
                 <h2 className="text-xs uppercase tracking-[0.24em]">Strengths</h2>
               </div>
               <div className="mt-5 space-y-3">
                 {report.strengthsOverall.map((item, i) => (
-                  <div key={i} className="urologics-subpanel p-4 text-sm leading-6 text-slate-200">
+                  <div key={i} className="urologics-subpanel p-4 text-sm leading-6 text-[#071014]/75">
                     {item}
                   </div>
                 ))}
@@ -201,13 +203,13 @@ export default function ReviewPage() {
             </div>
 
             <div className="urologics-panel p-6">
-              <div className="flex items-center gap-2 text-amber-300">
+              <div className="flex items-center gap-2 text-[#0f7896]">
                 <AlertTriangle size={16} />
                 <h2 className="text-xs uppercase tracking-[0.24em]">Weaknesses</h2>
               </div>
               <div className="mt-5 space-y-3">
                 {report.weaknessesOverall.map((item, i) => (
-                  <div key={i} className="urologics-subpanel p-4 text-sm leading-6 text-slate-200">
+                  <div key={i} className="urologics-subpanel p-4 text-sm leading-6 text-[#071014]/75">
                     {item}
                   </div>
                 ))}
@@ -217,7 +219,7 @@ export default function ReviewPage() {
         )}
 
         <section className="urologics-panel p-6">
-          <div className="flex items-center gap-2 text-slate-400">
+          <div className="flex items-center gap-2 text-[#0f7896]">
             <Activity size={16} />
             <h2 className="text-xs uppercase tracking-[0.24em]">Domain Performance</h2>
           </div>
@@ -229,22 +231,22 @@ export default function ReviewPage() {
                 <div key={index} className="urologics-subpanel p-4">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="max-w-3xl">
-                      <div className="text-lg font-semibold text-white">{domain.name}</div>
-                      <p className="mt-2 text-sm leading-6 text-slate-400">{domain.summary}</p>
+                      <div className="text-lg font-semibold text-[#071014]">{domain.name}</div>
+                      <p className="mt-2 text-sm leading-6 text-[#071014]/65">{domain.summary}</p>
                     </div>
-                    <div className="text-3xl font-semibold text-teal-300">{domain.score}/8</div>
+                    <div className="text-3xl font-semibold text-[#0f7896]">{domain.score}/8</div>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="mt-3 px-0 text-slate-400 hover:text-white"
+                    className="mt-3 px-0 text-[#0f7896] hover:text-[#0b6078]"
                     onClick={() => setExpanded(isOpen ? null : index)}
                   >
                     {isOpen ? "Hide detailed review" : "View detailed review"}
                     {isOpen ? <ChevronUp size={14} className="ml-1" /> : <ChevronDown size={14} className="ml-1" />}
                   </Button>
                   {isOpen && (
-                    <div className="mt-3 rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-sm leading-7 text-slate-300">
+                    <div className="mt-3 rounded-2xl border border-[#0f7896]/12 bg-cyan-50 p-4 text-sm leading-7 text-[#071014]/75">
                       {domain.reasoning}
                     </div>
                   )}
@@ -256,13 +258,13 @@ export default function ReviewPage() {
 
         {report.improvementPlan.length > 0 && (
           <section className="urologics-panel p-6">
-            <div className="flex items-center gap-2 text-slate-400">
+            <div className="flex items-center gap-2 text-[#0f7896]">
               <Target size={16} />
               <h2 className="text-xs uppercase tracking-[0.24em]">Next Focus Areas</h2>
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               {report.improvementPlan.map((item, i) => (
-                <Badge key={i} className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-slate-200">
+                <Badge key={i} className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-4 py-2 text-[#071014]">
                   {item}
                 </Badge>
               ))}
@@ -271,12 +273,12 @@ export default function ReviewPage() {
         )}
 
         <section className="urologics-panel flex items-center gap-4 p-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05] text-slate-300">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
             <ShieldCheck size={20} />
           </div>
           <div>
-            <div className="text-sm font-semibold text-white">Report delivery is automatic</div>
-            <div className="mt-1 text-sm text-slate-400">
+            <div className="text-sm font-semibold text-[#071014]">Report delivery is automatic</div>
+            <div className="mt-1 text-sm text-[#071014]/65">
               Your branded Urologics report is sent to the candidate email on file.
             </div>
           </div>

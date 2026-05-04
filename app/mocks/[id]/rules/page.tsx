@@ -39,7 +39,7 @@ export default function MockRulesPage() {
   if (loading) {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
-        <div className="urologics-panel px-8 py-6 text-slate-300">Loading mock briefing...</div>
+        <div className="urologics-panel px-8 py-6 text-[#071014]/65">Loading mock briefing...</div>
       </main>
     );
   }
@@ -47,7 +47,7 @@ export default function MockRulesPage() {
   if (!mock) {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
-        <div className="urologics-panel px-8 py-6 text-slate-400">Mock not found.</div>
+        <div className="urologics-panel px-8 py-6 text-[#071014]/65">Mock not found.</div>
       </main>
     );
   }
@@ -63,35 +63,49 @@ export default function MockRulesPage() {
 
         <section className="urologics-panel p-8 md:p-10">
           <div className="urologics-chip">Session Rules</div>
-          <h1 className="mt-6 text-4xl font-semibold text-white">{mock.title || "Grand Mock"}</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400">
+          <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.04em] text-[#071014] sm:text-5xl">{mock.title || "Grand Mock"}</h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-[#071014]/65">
             Review the mock conditions before you enter the timed session. The visual design mirrors the rest of the Urologics product line so the transition feels like one complete platform.
           </p>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             <div className="urologics-subpanel p-5">
-              <TimerReset className="text-teal-300" size={18} />
-              <div className="mt-3 text-sm font-semibold text-white">Main timer</div>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+              <TimerReset className="text-[#0f7896]" size={18} />
+              <div className="mt-3 text-sm font-semibold text-[#071014]">Main timer</div>
+              <p className="mt-2 text-sm leading-6 text-[#071014]/65">
                 You have {mock.durationMinutes} minutes for the test, with one optional 10 minute break.
               </p>
             </div>
             <div className="urologics-subpanel p-5">
-              <ClipboardCheck className="text-sky-300" size={18} />
-              <div className="mt-3 text-sm font-semibold text-white">Exam conditions</div>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+              <ClipboardCheck className="text-[#0f7896]" size={18} />
+              <div className="mt-3 text-sm font-semibold text-[#071014]">Exam conditions</div>
+              <p className="mt-2 text-sm leading-6 text-[#071014]/65">
                 The timer continues once started, so use a stable connection and a distraction-free environment.
               </p>
             </div>
           </div>
 
-          <div className="mt-8 space-y-3 text-sm leading-7 text-slate-300">
-            <p>You have <strong>{mock.durationMinutes} minutes</strong> to complete the mock.</p>
-            <p>You may take <strong>one break of 10 minutes</strong> during the session.</p>
-            <p>Total available time including the break is <strong>{totalTime} minutes</strong>.</p>
-            <p>Do not refresh or close the browser while the mock is active.</p>
-            <p>Your responses are stored locally during the session and used for the result screen.</p>
-          </div>
+          <div className="mt-8 space-y-3">
+  {[
+    `You have ${mock.durationMinutes} minutes to complete the mock.`,
+    `You may take one break of 10 minutes during the session.`,
+    `Total available time including the break is ${totalTime} minutes.`,
+    `Do not refresh or close the browser while the mock is active.`,
+  ].map((text, index) => (
+    <div
+      key={index}
+      className="flex items-start gap-3 rounded-xl border border-[#0f7896]/10 bg-cyan-50 px-4 py-3"
+    >
+      {/* Pointer */}
+      <div className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[#0f7896]" />
+
+      {/* Text */}
+      <p className="text-sm leading-7 text-[#071014]/75">
+        {text}
+      </p>
+    </div>
+  ))}
+</div>
 
           <button
             onClick={() => router.push(`/mocks/${id}`)}

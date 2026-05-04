@@ -147,7 +147,7 @@ export default function ResultPage() {
 
       <main className="urologics-shell px-6 py-8">
         <div className="mx-auto max-w-6xl space-y-6">
-          <header className="urologics-panel flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+          <header className="urologics-header flex flex-wrap items-center justify-between gap-4 px-6 py-5">
             <UrologicsBrand product="Grand Mocks" tag="Session results" />
             <div className="urologics-chip">Completed Review</div>
           </header>
@@ -155,13 +155,13 @@ export default function ResultPage() {
           <section className="grid gap-6 lg:grid-cols-[1fr_0.38fr]">
             <div className="urologics-panel p-8">
               <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-400/10 text-teal-300">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
                   <ShieldCheck size={22} />
                 </div>
                 <div>
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Urologics Mock Review</div>
-                  <h1 className="mt-3 text-3xl font-semibold text-white">{mock.title || "Grand Mock"}</h1>
-                  <p className="mt-3 text-sm leading-7 text-slate-400">
+                  <div className="text-xs uppercase tracking-[0.22em] text-[#0f7896]">Urologics Mock Review</div>
+                  <h1 className="mt-3 text-3xl font-semibold text-[#071014]">{mock.title || "Grand Mock"}</h1>
+                  <p className="mt-3 text-sm leading-7 text-[#071014]/65">
                     A cleaner, branded answer review screen for post-session analysis.
                   </p>
                 </div>
@@ -169,11 +169,11 @@ export default function ResultPage() {
             </div>
 
             <div className="urologics-panel flex flex-col items-center justify-center p-8 text-center">
-              <Trophy className="text-teal-300" size={22} />
-              <div className="mt-4 text-5xl font-semibold text-teal-300">
+              <Trophy className="text-[#0f7896]" size={22} />
+              <div className="mt-4 text-5xl font-semibold text-[#0f7896]">
                 {score}/{mock.questions.length}
               </div>
-              <div className="mt-2 text-sm text-slate-400">Final mock score</div>
+              <div className="mt-2 text-sm text-[#071014]/65">Final mock score</div>
             </div>
           </section>
 
@@ -186,29 +186,29 @@ export default function ResultPage() {
               return (
                 <article key={question.id} className="urologics-panel p-6">
                   <div className="flex items-start gap-3">
-                    <div className={`mt-1 rounded-full p-2 ${isCorrect ? "bg-teal-400/10 text-teal-300" : "bg-rose-400/10 text-rose-300"}`}>
+                    <div className={`mt-1 rounded-full p-2 ${isCorrect ? "bg-cyan-50 text-[#0f7896]" : "bg-rose-50 text-rose-600"}`}>
                       {isCorrect ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                     </div>
                     <div className="flex-1">
-                      <div className="text-lg font-semibold leading-8 text-white">
+                      <div className="text-lg font-semibold leading-8 text-[#071014]">
                         {index + 1}. {question.questionText}
                       </div>
                       <div className="mt-4 space-y-2 text-sm leading-6">
-                        <p className="text-slate-400">
+                        <p className="text-[#071014]/65">
                           Your answer:{" "}
-                          <span className={isCorrect ? "text-teal-300" : "text-rose-300"}>
+                          <span className={isCorrect ? "text-[#0f7896]" : "text-rose-600"}>
                             {question.options[selected] || "Not answered"}
                           </span>
                         </p>
-                        <p className="text-slate-300">
-                          Correct answer: <span className="text-teal-300">{question.options[correct]}</span>
+                        <p className="text-[#071014]/70">
+                          Correct answer: <span className="text-[#0f7896]">{question.options[correct]}</span>
                         </p>
                       </div>
 
                       {question.explanation && (
                         <div className="urologics-subpanel mt-5 p-4">
                           {question.explanation.text && (
-                            <p className="text-sm leading-7 text-slate-300">{question.explanation.text}</p>
+                            <p className="text-sm leading-7 text-[#071014]/75">{question.explanation.text}</p>
                           )}
 
                           {question.explanation.image && (
@@ -217,7 +217,7 @@ export default function ResultPage() {
                                 <img
                                   src={question.explanation.image}
                                   alt="Explanation"
-                                  className="max-h-[300px] rounded-2xl border border-white/10 object-contain transition hover:scale-[1.02]"
+                                  className="max-h-[300px] rounded-[28px] object-contain transition hover:scale-[1.02]"
                                 />
                               </button>
                             </div>

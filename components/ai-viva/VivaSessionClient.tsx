@@ -137,34 +137,34 @@ export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseReco
 
   if (submitted) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-neutral-100">
+      <main className="min-h-screen bg-white text-[#071014]">
         <VivaVoiceAi vivaCase={vivaCase} selectedMode={selectedModeFromUrl} />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.18),_transparent_40%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-neutral-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md border-white/10 bg-slate-950/85 shadow-[0_24px_80px_rgba(2,6,23,0.55)] backdrop-blur-xl">
+    <main className="flex min-h-screen items-center justify-center bg-white p-4 text-[#071014]">
+      <Card className="w-full max-w-md rounded-[28px] border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
         <CardHeader>
           <img
             src="/logo.png"
             alt="Urologics"
             className="mx-auto mb-3 h-16 w-16 object-contain"
           />
-          <div className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.24em] text-emerald-300">
+          <div className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
             Urologics AI
           </div>
-          <CardTitle className="text-center text-slate-100">Candidate Information</CardTitle>
-          <p className="text-center text-sm text-slate-400">{vivaCase.case.title}</p>
-          <p className="text-center text-xs uppercase tracking-[0.24em] text-emerald-400">
+          <CardTitle className="text-center text-[#071014]">Candidate Information</CardTitle>
+          <p className="text-center text-sm text-[#071014]/65">{vivaCase.case.title}</p>
+          <p className="text-center text-xs uppercase tracking-[0.22em] text-[#0f7896]">
             {selectedModeFromUrl === "fast" ? "Fast and Furious" : "Calm and Composed"}
           </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-1">
+              <label htmlFor="name" className="mb-1 block text-sm font-medium text-[#071014]/65">
                 Full Name
               </label>
               <input
@@ -172,13 +172,13 @@ export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseReco
                 type="text"
                 value={candidate.name}
                 onChange={(e) => setCandidate({ ...candidate, name: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="urologics-input"
                 placeholder="Enter your full name"
                 required
               />
             </div>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
+              <label htmlFor="email" className="mb-1 block text-sm font-medium text-[#071014]/65">
                 Email Address
               </label>
               <input
@@ -186,12 +186,12 @@ export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseReco
                 type="email"
                 value={candidate.email}
                 onChange={(e) => setCandidate({ ...candidate, email: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="urologics-input"
                 placeholder="Enter your email"
                 required
               />
             </div>
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+            <Button type="submit" className="w-full rounded-full bg-[#0f7896] text-white hover:bg-[#0b6078]">
               Start Viva
             </Button>
           </form>
