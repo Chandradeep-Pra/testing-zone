@@ -231,7 +231,7 @@ export default function Page() {
             Question : {currentQ + 1}
           </div>
 
-          <h1 className="mt-6 text-2xl font-semibold   text-[#071014]">
+          <h1 className="mt-6 text-xl font-semibold   text-[#071014]">
             {q.questionText}
           </h1>
 
