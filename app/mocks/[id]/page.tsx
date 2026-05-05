@@ -228,7 +228,7 @@ export default function Page() {
       <div className="flex flex-1 flex-col justify-between p-8 md:p-10">
         <div>
           <div className="inline-flex rounded-full border border-[#0f7896]/18 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#0f7896]">
-            Assessment Screen
+            Question : {currentQ + 1}
           </div>
 
           <h1 className="mt-6 text-2xl font-semibold   text-[#071014]">
