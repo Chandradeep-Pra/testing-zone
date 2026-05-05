@@ -162,7 +162,7 @@ export default function ResultPage() {
                   <div className="text-xs uppercase tracking-[0.22em] text-[#0f7896]">Urologics Mock Review</div>
                   <h1 className="mt-3 text-3xl font-semibold text-[#071014]">{mock.title || "Grand Mock"}</h1>
                   <p className="mt-3 text-sm leading-7 text-[#071014]/65">
-                    A cleaner, branded answer review screen for post-session analysis.
+                    Analysis of your performance in this mock session, along with explanations for each question. 
                   </p>
                 </div>
               </div>
