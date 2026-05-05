@@ -231,7 +231,7 @@ export default function Page() {
             Assessment Screen
           </div>
 
-          <h1 className="mt-6 text-3xl font-semibold leading-tight tracking-[-0.03em] text-[#071014] md:text-4xl">
+          <h1 className="mt-6 text-2xl font-semibold   text-[#071014]">
             {q.questionText}
           </h1>
 
