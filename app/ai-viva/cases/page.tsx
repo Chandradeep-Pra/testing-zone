@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { ArrowRight, Filter, Search, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { Switch } from "@/components/ui/switch";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import UrologicsNav from "@/components/brand/UrologicsNav";
@@ -23,7 +22,7 @@ const VivaCasesPage: React.FC = () => {
   useEffect(() => {
     const fetchCases = async () => {
       try {
-        const res = await fetch("/api/viva-cases");
+        const res = await fetch("/api/public/viva-cases");
         if (!res.ok) throw new Error("Failed to fetch cases");
         const data = await res.json();
         setCases(data.cases || []);
@@ -51,7 +50,7 @@ const VivaCasesPage: React.FC = () => {
 
   function openCase(viva: VivaCaseRecord) {
     const selectedMode = getSelectedMode(viva);
-    router.push(`/ai-viva/session/${viva.id}?mode=${selectedMode}`);
+    router.push(`/public-viva/${viva.id}?mode=${selectedMode}&source=ai-viva-cases`);
   }
 
   const levels = Array.from(new Set(cases.map((c) => c.case.level)));

@@ -330,6 +330,25 @@ export async function fetchRemoteVivaCases(): Promise<VivaCaseRecord[]> {
   return cases.map((item) => normalizeVivaCase(item));
 }
 
+export async function fetchRemotePublicVivaCases(): Promise<VivaCaseRecord[]> {
+  const res = await fetch(REMOTE_PUBLIC_VIVA_CASES_URL, {
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch public viva cases");
+  }
+
+  const data = (await res.json()) as { cases?: unknown[] } | unknown[];
+  const cases = Array.isArray((data as { cases?: unknown[] })?.cases)
+    ? ((data as { cases?: unknown[] }).cases ?? [])
+    : Array.isArray(data)
+      ? data
+      : [];
+
+  return cases.map((item) => normalizeVivaCase(item));
+}
+
 export async function fetchRemoteVivaCaseById(
   id: string,
 ): Promise<VivaCaseRecord | null> {
