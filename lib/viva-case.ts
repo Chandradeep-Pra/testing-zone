@@ -1,6 +1,6 @@
 import { vivaContext } from "@/ai-viva-data/vivaContext";
 
-const REMOTE_API_BASE = process.env.VIVA_API_BASE || "https://urocms.vercel.app";
+const REMOTE_API_BASE = process.env.VIVA_API_BASE || "https://urologics.co.uk";
 const REMOTE_VIVA_CASES_URL = `${REMOTE_API_BASE}/api/viva-cases`;
 const REMOTE_PUBLIC_VIVA_CASES_URL = `${REMOTE_API_BASE}/api/public/viva-cases`;
 
@@ -93,11 +93,15 @@ export type StartPublicVivaResult = {
 type UnknownRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): UnknownRecord | null {
-  return typeof value === "object" && value !== null ? (value as UnknownRecord) : null;
+  return typeof value === "object" && value !== null
+    ? (value as UnknownRecord)
+    : null;
 }
 
 function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function toSlug(value: string) {
@@ -111,21 +115,29 @@ function toSlug(value: string) {
 
 function normalizeExhibit(exhibit: unknown, index: number) {
   const source = asRecord(exhibit);
-  const label = typeof source?.label === "string" ? source.label : `Exhibit ${index + 1}`;
+  const label =
+    typeof source?.label === "string" ? source.label : `Exhibit ${index + 1}`;
   const file = typeof source?.file === "string" ? source.file : undefined;
   const url = typeof source?.url === "string" ? source.url : undefined;
 
   return {
-    id: typeof source?.id === "string" ? source.id : `${toSlug(label)}-${index + 1}`,
+    id:
+      typeof source?.id === "string"
+        ? source.id
+        : `${toSlug(label)}-${index + 1}`,
     kind: typeof source?.kind === "string" ? source.kind : "image",
     label,
     url,
     file,
-    description: typeof source?.description === "string" ? source.description : "",
+    description:
+      typeof source?.description === "string" ? source.description : "",
   };
 }
 
-function normalizeModeQuestion(question: unknown, index: number): VivaModeQuestion {
+function normalizeModeQuestion(
+  question: unknown,
+  index: number,
+): VivaModeQuestion {
   const source = asRecord(question);
 
   return {
@@ -160,7 +172,7 @@ function normalizeModes(modes: unknown): VivaCaseModes | undefined {
               : undefined,
           questions: Array.isArray(fastAndFurious.questions)
             ? fastAndFurious.questions.map((question, index) =>
-                normalizeModeQuestion(question, index)
+                normalizeModeQuestion(question, index),
               )
             : [],
         }
@@ -178,7 +190,7 @@ export function getDefaultVivaCase(): VivaCaseRecord {
       objectives: vivaContext.case.objectives || [],
     },
     exhibits: (vivaContext.exhibits || []).map((exhibit, index) =>
-      normalizeExhibit(exhibit, index)
+      normalizeExhibit(exhibit, index),
     ),
     marking_criteria: {
       must_mention: vivaContext.marking_criteria?.must_mention || [],
@@ -208,36 +220,40 @@ export function normalizeVivaCase(payload: unknown): VivaCaseRecord {
   return {
     id: typeof source.id === "string" ? source.id : fallback.id,
     folderId: typeof source.folderId === "string" ? source.folderId : undefined,
-    folderName: typeof source.folderName === "string" ? source.folderName : undefined,
-    accessType: typeof source.accessType === "string" ? source.accessType : undefined,
+    folderName:
+      typeof source.folderName === "string" ? source.folderName : undefined,
+    accessType:
+      typeof source.accessType === "string" ? source.accessType : undefined,
     case: {
       title:
         typeof sourceCase?.title === "string"
           ? sourceCase.title
           : typeof source.title === "string"
-          ? source.title
-          : fallback.case.title,
+            ? source.title
+            : fallback.case.title,
       level:
         typeof sourceCase?.level === "string"
           ? sourceCase.level
           : typeof source.level === "string"
-          ? source.level
-          : fallback.case.level,
+            ? source.level
+            : fallback.case.level,
       stem:
         typeof sourceCase?.stem === "string"
           ? sourceCase.stem
           : typeof source.stem === "string"
-          ? source.stem
-          : fallback.case.stem,
+            ? source.stem
+            : fallback.case.stem,
       objectives:
         asStringArray(sourceCase?.objectives).length > 0
           ? asStringArray(sourceCase?.objectives)
           : asStringArray(source.objectives).length > 0
-          ? asStringArray(source.objectives)
-          : fallback.case.objectives,
+            ? asStringArray(source.objectives)
+            : fallback.case.objectives,
     },
     exhibits: Array.isArray(source.exhibits)
-      ? source.exhibits.map((exhibit, index) => normalizeExhibit(exhibit, index))
+      ? source.exhibits.map((exhibit, index) =>
+          normalizeExhibit(exhibit, index),
+        )
       : fallback.exhibits,
     marking_criteria: {
       must_mention:
@@ -258,22 +274,29 @@ export function normalizeVivaCase(payload: unknown): VivaCaseRecord {
         : {}),
     },
     attemptsCount:
-      typeof source.attemptsCount === "number" ? source.attemptsCount : undefined,
+      typeof source.attemptsCount === "number"
+        ? source.attemptsCount
+        : undefined,
     attempts: Array.isArray(source.attempts)
       ? (source.attempts as VivaCaseAttempt[])
       : undefined,
     allowedUser: asStringArray(source.allowedUser),
     modes: normalizeModes(source.modes),
-    isActive: typeof source.isActive === "boolean" ? source.isActive : undefined,
+    isActive:
+      typeof source.isActive === "boolean" ? source.isActive : undefined,
     publicParticipants: Array.isArray(source.publicParticipants)
       ? source.publicParticipants
           .map((participant) => normalizePublicParticipant(participant))
-          .filter((participant): participant is PublicVivaParticipant => Boolean(participant))
+          .filter((participant): participant is PublicVivaParticipant =>
+            Boolean(participant),
+          )
       : undefined,
   };
 }
 
-function normalizePublicParticipant(participant: unknown): PublicVivaParticipant | null {
+function normalizePublicParticipant(
+  participant: unknown,
+): PublicVivaParticipant | null {
   const source = asRecord(participant);
   if (!source) {
     return null;
@@ -301,13 +324,15 @@ export async function fetchRemoteVivaCases(): Promise<VivaCaseRecord[]> {
   const cases = Array.isArray((data as { cases?: unknown[] })?.cases)
     ? ((data as { cases?: unknown[] }).cases ?? [])
     : Array.isArray(data)
-    ? data
-    : [];
+      ? data
+      : [];
 
   return cases.map((item) => normalizeVivaCase(item));
 }
 
-export async function fetchRemoteVivaCaseById(id: string): Promise<VivaCaseRecord | null> {
+export async function fetchRemoteVivaCaseById(
+  id: string,
+): Promise<VivaCaseRecord | null> {
   const res = await fetch(`${REMOTE_VIVA_CASES_URL}/${id}`, {
     cache: "no-store",
   });
@@ -324,10 +349,15 @@ export async function fetchRemoteVivaCaseById(id: string): Promise<VivaCaseRecor
   return normalizeVivaCase(asRecord(data)?.case ?? data);
 }
 
-export async function fetchRemotePublicVivaCaseById(id: string): Promise<VivaCaseRecord | null> {
-  const res = await fetch(`${REMOTE_PUBLIC_VIVA_CASES_URL}/${encodeURIComponent(id)}`, {
-    cache: "no-store",
-  });
+export async function fetchRemotePublicVivaCaseById(
+  id: string,
+): Promise<VivaCaseRecord | null> {
+  const res = await fetch(
+    `${REMOTE_PUBLIC_VIVA_CASES_URL}/${encodeURIComponent(id)}`,
+    {
+      cache: "no-store",
+    },
+  );
 
   if (res.status === 404) {
     return null;
@@ -343,22 +373,27 @@ export async function fetchRemotePublicVivaCaseById(id: string): Promise<VivaCas
 
 export async function startRemotePublicViva(
   id: string,
-  payload: StartPublicVivaPayload
+  payload: StartPublicVivaPayload,
 ): Promise<StartPublicVivaResult> {
-  const res = await fetch(`${REMOTE_PUBLIC_VIVA_CASES_URL}/${encodeURIComponent(id)}/start`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+  const res = await fetch(
+    `${REMOTE_PUBLIC_VIVA_CASES_URL}/${encodeURIComponent(id)}/start`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: payload.name,
+        email: payload.email,
+        source: payload.source || "external-web",
+      }),
     },
-    body: JSON.stringify({
-      name: payload.name,
-      email: payload.email,
-      source: payload.source || "external-web",
-    }),
-  });
+  );
 
   if (!res.ok) {
-    const error = new Error("Failed to start public viva") as Error & { status?: number };
+    const error = new Error("Failed to start public viva") as Error & {
+      status?: number;
+    };
     error.status = res.status;
     throw error;
   }

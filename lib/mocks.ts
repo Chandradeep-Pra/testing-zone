@@ -1,5 +1,5 @@
-const REMOTE_MOCKS_URL = "https://urocms.vercel.app/api/mocks";
-const REMOTE_QUIZZES_URL = "https://urocms.vercel.app/api/quizzes";
+const REMOTE_MOCKS_URL = "https://urologics.co.uk/api/mocks";
+const REMOTE_QUIZZES_URL = "https://urologics.co.uk/api/quizzes";
 
 type TimestampLike = {
   _seconds?: number;
@@ -8,7 +8,9 @@ type TimestampLike = {
 type UnknownRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): UnknownRecord | null {
-  return typeof value === "object" && value !== null ? (value as UnknownRecord) : null;
+  return typeof value === "object" && value !== null
+    ? (value as UnknownRecord)
+    : null;
 }
 
 export type Quiz = {
@@ -104,13 +106,15 @@ export async function fetchRemoteMocks(): Promise<MockRecord[]> {
   const mocks = Array.isArray((data as { mocks?: unknown[] })?.mocks)
     ? ((data as { mocks?: unknown[] }).mocks ?? [])
     : Array.isArray(data)
-    ? data
-    : [];
+      ? data
+      : [];
 
   return mocks.map((mock) => normalizeMock(mock));
 }
 
-export async function fetchRemoteMockById(id: string): Promise<MockRecord | null> {
+export async function fetchRemoteMockById(
+  id: string,
+): Promise<MockRecord | null> {
   const res = await fetch(`${REMOTE_MOCKS_URL}/${id}`, {
     cache: "no-store",
   });
@@ -140,12 +144,15 @@ export async function fetchRemoteQuizzes(): Promise<Quiz[]> {
   return Array.isArray((data as { quizzes?: Quiz[] })?.quizzes)
     ? ((data as { quizzes?: Quiz[] }).quizzes ?? [])
     : Array.isArray(data)
-    ? data
-    : [];
+      ? data
+      : [];
 }
 
 export async function fetchMocksWithQuizzes(): Promise<MockRecord[]> {
-  const [mocks, quizzes] = await Promise.all([fetchRemoteMocks(), fetchRemoteQuizzes()]);
+  const [mocks, quizzes] = await Promise.all([
+    fetchRemoteMocks(),
+    fetchRemoteQuizzes(),
+  ]);
 
   return mocks.map((mock) => ({
     ...mock,
@@ -153,7 +160,9 @@ export async function fetchMocksWithQuizzes(): Promise<MockRecord[]> {
   }));
 }
 
-export function getMockStatus(mock: MockRecord): "Scheduled" | "Live" | "Completed" {
+export function getMockStatus(
+  mock: MockRecord,
+): "Scheduled" | "Live" | "Completed" {
   const now = Date.now();
   const start = normalizeDate(mock.startTime);
   const explicitEnd = normalizeDate(mock.endTime);
