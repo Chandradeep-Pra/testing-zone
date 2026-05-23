@@ -1,18 +1,6 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Sora } from "next/font/google";
 import "./globals.css";
 import ToasterProvider from "@/components/ToastProvider";
-
-const sora = Sora({
-  variable: "--font-sora",
-  subsets: ["latin"],
-});
-
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  weight: ["400", "500"],
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: {
@@ -30,9 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${sora.variable} ${plexMono.variable} dark antialiased`}
-      >
+      <body className="dark antialiased">
         {children}
         <ToasterProvider />
       </body>

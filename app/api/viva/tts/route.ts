@@ -1,11 +1,5 @@
 import textToSpeech from "@google-cloud/text-to-speech";
 
-const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-
-if (!raw) {
-  throw new Error("Missing GOOGLE_APPLICATION_CREDENTIALS_JSON");
-}
-
 type GoogleCredentials = {
   client_email: string;
   private_key: string;
@@ -18,29 +12,44 @@ type TtsRequestBody = {
   languageCode?: string;
 };
 
-const creds = JSON.parse(raw) as GoogleCredentials;
+function createTtsClient() {
+  const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
 
-const projectId =
-  process.env.GCP_PROJECT_ID || creds.project_id || process.env.GOOGLE_CLOUD_PROJECT;
+  if (!raw) {
+    throw new Error("Missing GOOGLE_APPLICATION_CREDENTIALS_JSON");
+  }
 
-if (!projectId) {
-  throw new Error(
-    "Missing GCP project id. Set GCP_PROJECT_ID, GOOGLE_CLOUD_PROJECT, or include project_id in GOOGLE_APPLICATION_CREDENTIALS_JSON"
-  );
+  const creds = JSON.parse(raw) as GoogleCredentials;
+
+  const projectId =
+    process.env.GCP_PROJECT_ID || creds.project_id || process.env.GOOGLE_CLOUD_PROJECT;
+
+  if (!projectId) {
+    throw new Error(
+      "Missing GCP project id. Set GCP_PROJECT_ID, GOOGLE_CLOUD_PROJECT, or include project_id in GOOGLE_APPLICATION_CREDENTIALS_JSON"
+    );
+  }
+
+  return new textToSpeech.TextToSpeechClient({
+    credentials: {
+      client_email: creds.client_email,
+      private_key: creds.private_key.replace(/\\n/g, "\n"),
+    },
+    projectId,
+  });
 }
 
-const ttsClient = new textToSpeech.TextToSpeechClient({
-  credentials: {
-    client_email: creds.client_email,
-    private_key: creds.private_key.replace(/\\n/g, "\n"),
-  },
-  projectId,
-});
+let cachedTtsClient: ReturnType<typeof createTtsClient> | null = null;
+
+function getTtsClient() {
+  cachedTtsClient ||= createTtsClient();
+  return cachedTtsClient;
+}
 
 export async function POST(req: Request) {
   const { text, voiceName, languageCode } = (await req.json()) as TtsRequestBody;
 
-  const [response] = await ttsClient.synthesizeSpeech({
+  const [response] = await getTtsClient().synthesizeSpeech({
     input: { text },
     voice: {
       languageCode: languageCode || "en-GB",
