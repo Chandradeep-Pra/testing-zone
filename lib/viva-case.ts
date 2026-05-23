@@ -1,6 +1,8 @@
 import { vivaContext } from "@/ai-viva-data/vivaContext";
 
-const REMOTE_VIVA_CASES_URL = "https://urocms.vercel.app/api/viva-cases";
+const REMOTE_API_BASE = process.env.VIVA_API_BASE || "https://urocms.vercel.app";
+const REMOTE_VIVA_CASES_URL = `${REMOTE_API_BASE}/api/viva-cases`;
+const REMOTE_PUBLIC_VIVA_CASES_URL = `${REMOTE_API_BASE}/api/public/viva-cases`;
 
 export type VivaCaseAttempt = {
   candidate?: {
@@ -32,6 +34,9 @@ export type VivaCaseModes = {
 
 export type VivaCaseRecord = {
   id: string;
+  folderId?: string;
+  folderName?: string;
+  accessType?: "private" | "public" | string;
   case: {
     title: string;
     level: string;
@@ -62,6 +67,27 @@ export type VivaCaseRecord = {
   attempts?: VivaCaseAttempt[];
   allowedUser?: string[];
   modes?: VivaCaseModes;
+  isActive?: boolean;
+  publicParticipants?: PublicVivaParticipant[];
+};
+
+export type PublicVivaParticipant = {
+  name: string;
+  email: string;
+  source: string;
+  status: string;
+  startedAt: string;
+};
+
+export type StartPublicVivaPayload = {
+  name: string;
+  email: string;
+  source?: string;
+};
+
+export type StartPublicVivaResult = {
+  success: boolean;
+  participant: PublicVivaParticipant;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -181,6 +207,9 @@ export function normalizeVivaCase(payload: unknown): VivaCaseRecord {
 
   return {
     id: typeof source.id === "string" ? source.id : fallback.id,
+    folderId: typeof source.folderId === "string" ? source.folderId : undefined,
+    folderName: typeof source.folderName === "string" ? source.folderName : undefined,
+    accessType: typeof source.accessType === "string" ? source.accessType : undefined,
     case: {
       title:
         typeof sourceCase?.title === "string"
@@ -235,6 +264,27 @@ export function normalizeVivaCase(payload: unknown): VivaCaseRecord {
       : undefined,
     allowedUser: asStringArray(source.allowedUser),
     modes: normalizeModes(source.modes),
+    isActive: typeof source.isActive === "boolean" ? source.isActive : undefined,
+    publicParticipants: Array.isArray(source.publicParticipants)
+      ? source.publicParticipants
+          .map((participant) => normalizePublicParticipant(participant))
+          .filter((participant): participant is PublicVivaParticipant => Boolean(participant))
+      : undefined,
+  };
+}
+
+function normalizePublicParticipant(participant: unknown): PublicVivaParticipant | null {
+  const source = asRecord(participant);
+  if (!source) {
+    return null;
+  }
+
+  return {
+    name: typeof source.name === "string" ? source.name : "",
+    email: typeof source.email === "string" ? source.email : "",
+    source: typeof source.source === "string" ? source.source : "external-web",
+    status: typeof source.status === "string" ? source.status : "started",
+    startedAt: typeof source.startedAt === "string" ? source.startedAt : "",
   };
 }
 
@@ -272,4 +322,46 @@ export async function fetchRemoteVivaCaseById(id: string): Promise<VivaCaseRecor
 
   const data = (await res.json()) as { case?: unknown } | unknown;
   return normalizeVivaCase(asRecord(data)?.case ?? data);
+}
+
+export async function fetchRemotePublicVivaCaseById(id: string): Promise<VivaCaseRecord | null> {
+  const res = await fetch(`${REMOTE_PUBLIC_VIVA_CASES_URL}/${encodeURIComponent(id)}`, {
+    cache: "no-store",
+  });
+
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch public viva case");
+  }
+
+  const data = (await res.json()) as { case?: unknown } | unknown;
+  return normalizeVivaCase(asRecord(data)?.case ?? data);
+}
+
+export async function startRemotePublicViva(
+  id: string,
+  payload: StartPublicVivaPayload
+): Promise<StartPublicVivaResult> {
+  const res = await fetch(`${REMOTE_PUBLIC_VIVA_CASES_URL}/${encodeURIComponent(id)}/start`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
+      source: payload.source || "external-web",
+    }),
+  });
+
+  if (!res.ok) {
+    const error = new Error("Failed to start public viva") as Error & { status?: number };
+    error.status = res.status;
+    throw error;
+  }
+
+  return (await res.json()) as StartPublicVivaResult;
 }
