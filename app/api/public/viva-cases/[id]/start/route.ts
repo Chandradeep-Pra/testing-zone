@@ -4,17 +4,25 @@ import { startRemotePublicViva } from "@/lib/viva-case";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+async function readJsonBody(request: Request) {
+  try {
+    return (await request.json()) as {
+      name?: unknown;
+      email?: unknown;
+      source?: unknown;
+    };
+  } catch {
+    return {};
+  }
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const body = (await request.json()) as {
-      name?: unknown;
-      email?: unknown;
-      source?: unknown;
-    };
+    const body = await readJsonBody(request);
 
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
