@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { fetchRemoteVivaCases } from "@/lib/viva-case";
+import { fetchRemoteVivaCases, getDefaultVivaCase } from "@/lib/viva-case";
 
 export async function GET() {
   try {
@@ -8,9 +8,9 @@ export async function GET() {
     return NextResponse.json({ cases });
   } catch (error) {
     console.error("Failed to load viva cases:", error);
-    return NextResponse.json(
-      { error: "Failed to load viva cases" },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      cases: [getDefaultVivaCase()],
+      warning: "Remote viva cases are unavailable. Showing the default case.",
+    });
   }
 }

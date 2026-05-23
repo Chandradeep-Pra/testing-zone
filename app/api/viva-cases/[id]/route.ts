@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { fetchRemoteVivaCaseById } from "@/lib/viva-case";
+import { fetchRemoteVivaCaseById, getDefaultVivaCase } from "@/lib/viva-case";
 
 export async function GET(
   _request: Request,
@@ -17,9 +17,16 @@ export async function GET(
     return NextResponse.json({ case: vivaCase });
   } catch (error) {
     console.error("Failed to load viva case:", error);
-    return NextResponse.json(
-      { error: "Failed to load viva case" },
-      { status: 500 }
-    );
+    const { id } = await params;
+    const fallback = getDefaultVivaCase();
+
+    if (id === fallback.id) {
+      return NextResponse.json({
+        case: fallback,
+        warning: "Remote viva case is unavailable. Showing the default case.",
+      });
+    }
+
+    return NextResponse.json({ error: "Case not found" }, { status: 404 });
   }
 }
