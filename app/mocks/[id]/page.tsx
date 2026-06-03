@@ -296,7 +296,18 @@ export default function Page() {
                     : "border-[#0f7896]/12 bg-cyan-50 text-[#071014]/75 hover:border-[#0f7896]/30 hover:bg-white"
                 }`}
               >
-                {opt}
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                      answers[q.id] === i
+                        ? "bg-white/20 text-white"
+                        : "bg-[#0f7896]/10 text-[#0f7896]"
+                    }`}
+                  >
+                    {getOptionLabel(i)}
+                  </span>
+                  <span className="flex-1">{opt}</span>
+                </div>
               </button>
             ))}
           </div>
@@ -329,6 +340,7 @@ export default function Page() {
     </>
   );
 }
+
 
 
 
