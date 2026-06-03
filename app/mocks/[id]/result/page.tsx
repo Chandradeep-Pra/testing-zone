@@ -24,6 +24,38 @@ type MockDetail = {
   questions: MockQuestion[];
 };
 
+function normalizeQuestion(question: unknown, index: number): MockQuestion {
+  const source = (question && typeof question === "object" ? question : {}) as Record<string, any>;
+  return {
+    id: typeof source.id === "string" ? source.id : `question-${index + 1}`,
+    questionText: typeof source.questionText === "string" ? source.questionText : "",
+    options: source.options && typeof source.options === "object" ? source.options : {},
+    correctAnswer:
+      typeof source.correctAnswer === "string"
+        ? source.correctAnswer
+        : String(source.correctAnswer ?? ""),
+    explanation:
+      source.explanation && typeof source.explanation === "object"
+        ? {
+            text: typeof source.explanation.text === "string" ? source.explanation.text : undefined,
+            image: typeof source.explanation.image === "string" ? source.explanation.image : undefined,
+          }
+        : undefined,
+  };
+}
+
+function normalizeMock(payload: unknown): MockDetail | null {
+  if (!payload || typeof payload !== "object") return null;
+  const source = payload as Record<string, any>;
+  return {
+    title: typeof source.title === "string" ? source.title : "Grand Mock",
+    accessType: source.accessType === "public" ? "public" : "private",
+    questions: Array.isArray(source.questions)
+      ? source.questions.map(normalizeQuestion)
+      : [],
+  };
+}
+
 export default function ResultPage() {
   const { id } = useParams<{ id: string }>();
   const [mock, setMock] = useState<MockDetail | null>(null);
@@ -36,11 +68,11 @@ export default function ResultPage() {
       const publicRes = await fetch(`/api/public/mocks/${id}`);
       if (publicRes.ok) {
         const publicData = (await publicRes.json()) as { mock?: MockDetail };
-        setMock(publicData.mock || null);
+        setMock(normalizeMock(publicData.mock));
       } else {
         const res = await fetch(`/api/mocks/${id}`);
         const data = (await res.json()) as { mock?: MockDetail };
-        setMock(data.mock || null);
+        setMock(normalizeMock(data.mock));
       }
 
       const saved = localStorage.getItem(`mock-${id}-final`);
@@ -208,11 +240,11 @@ export default function ResultPage() {
                         <p className="text-[#071014]/65">
                           Your answer:{" "}
                           <span className={isCorrect ? "text-[#0f7896]" : "text-rose-600"}>
-                            {question.options[selected] || "Not answered"}
+                          {(question.options as Record<string, string>)[selected] || "Not answered"}
                           </span>
                         </p>
                         <p className="text-[#071014]/70">
-                          Correct answer: <span className="text-[#0f7896]">{question.options[correct]}</span>
+                          Correct answer: <span className="text-[#0f7896]">{(question.options as Record<string, string>)[correct]}</span>
                         </p>
                       </div>
 

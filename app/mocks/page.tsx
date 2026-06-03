@@ -172,7 +172,7 @@ export default function TodayMocksPage() {
             <div className="urologics-thin-scrollbar mt-5 max-h-[272px] space-y-3 overflow-y-auto pr-2">
               {loading ? (
                 <div className="rounded-[22px] border border-[#0f7896]/12 bg-cyan-50 p-4 text-sm text-[#071014]/65">
-                  Loading sessions...
+                  Starting the test
                 </div>
               ) : mocks.length === 0 ? (
                 <div className="rounded-[22px] border border-[#0f7896]/12 bg-cyan-50 p-4 text-sm leading-6 text-[#071014]/65">

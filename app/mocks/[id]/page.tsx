@@ -19,6 +19,38 @@ interface Mock {
   questions: Question[];
 }
 
+function normalizeQuestion(question: unknown, index: number): Question {
+  const source = (question && typeof question === "object" ? question : {}) as Record<string, any>;
+  return {
+    id: typeof source.id === "string" ? source.id : `question-${index + 1}`,
+    questionText: typeof source.questionText === "string" ? source.questionText : "",
+    options: Array.isArray(source.options) ? source.options.map((item) => String(item)) : [],
+    correctAnswer:
+      typeof source.correctAnswer === "number"
+        ? source.correctAnswer
+        : Number.isFinite(Number(source.correctAnswer))
+          ? Number(source.correctAnswer)
+          : 0,
+    questionImage: typeof source.questionImage === "string" ? source.questionImage : undefined,
+  };
+}
+
+function normalizeMock(payload: unknown): Mock | null {
+  if (!payload || typeof payload !== "object") return null;
+  const source = payload as Record<string, any>;
+  return {
+    id: typeof source.id === "string" ? source.id : "",
+    title: typeof source.title === "string" ? source.title : "Grand Mock",
+    durationMinutes:
+      typeof source.durationMinutes === "number"
+        ? source.durationMinutes
+        : Number(source.durationMinutes || 0),
+    questions: Array.isArray(source.questions)
+      ? source.questions.map(normalizeQuestion)
+      : [],
+  };
+}
+
 export default function Page() {
   const { id } = useParams();
   const router = useRouter();
@@ -36,13 +68,15 @@ export default function Page() {
       const publicRes = await fetch(`/api/public/mocks/${id}`);
       if (publicRes.ok) {
         const publicData = await publicRes.json();
-        setMock(publicData.mock);
-        setTimeLeft(publicData.mock.durationMinutes * 60);
+        const nextMock = normalizeMock(publicData.mock);
+        setMock(nextMock);
+        setTimeLeft((nextMock?.durationMinutes || 0) * 60);
       } else {
         const res = await fetch(`/api/mocks/${id}`);
         const data = await res.json();
-        setMock(data.mock);
-        setTimeLeft(data.mock.durationMinutes * 60);
+        const nextMock = normalizeMock(data.mock);
+        setMock(nextMock);
+        setTimeLeft((nextMock?.durationMinutes || 0) * 60);
       }
 
       const saved = localStorage.getItem(`mock-${id}-answers`);
@@ -109,6 +143,7 @@ export default function Page() {
   }
 
   const q = mock.questions[currentQ];
+  const options = Array.isArray(q?.options) ? q.options : [];
 
   return (
     <>
@@ -243,7 +278,7 @@ export default function Page() {
           </h1>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2">
-            {q.options.map((opt, i) => (
+            {options.map((opt, i) => (
               <button
                 key={i}
                 onClick={() => select(q.id, i)}
@@ -269,10 +304,10 @@ export default function Page() {
         </div>
       </div>
 
-      {q.questionImage && (
-        <div className="border-t border-[#0f7896]/10 p-6 lg:w-[42%] lg:border-l lg:border-t-0">
-          <div className="flex h-full min-h-[280px] items-center justify-center rounded-[24px] border border-[#0f7896]/12 bg-cyan-50 p-5">
-            <img
+        {q?.questionImage && (
+          <div className="border-t border-[#0f7896]/10 p-6 lg:w-[42%] lg:border-l lg:border-t-0">
+            <div className="flex h-full min-h-[280px] items-center justify-center rounded-[24px] border border-[#0f7896]/12 bg-cyan-50 p-5">
+              <img
               src={q.questionImage}
               alt="Question exhibit"
               className="max-h-[70vh] rounded-2xl object-contain"
