@@ -21,6 +21,13 @@ export default function MockRulesPage() {
   useEffect(() => {
     const load = async () => {
       try {
+        const publicRes = await fetch(`/api/public/mocks/${id}`);
+        if (publicRes.ok) {
+          const publicData = await publicRes.json();
+          setMock(publicData.mock);
+          return;
+        }
+
         const res = await fetch(`/api/mocks/${id}`);
         const data = await res.json();
         setMock(data.mock);

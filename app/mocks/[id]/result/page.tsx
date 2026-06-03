@@ -32,9 +32,15 @@ export default function ResultPage() {
 
   useEffect(() => {
     const load = async () => {
-      const res = await fetch(`/api/mocks/${id}`);
-      const data = (await res.json()) as { mock?: MockDetail };
-      setMock(data.mock || null);
+      const publicRes = await fetch(`/api/public/mocks/${id}`);
+      if (publicRes.ok) {
+        const publicData = (await publicRes.json()) as { mock?: MockDetail };
+        setMock(publicData.mock || null);
+      } else {
+        const res = await fetch(`/api/mocks/${id}`);
+        const data = (await res.json()) as { mock?: MockDetail };
+        setMock(data.mock || null);
+      }
 
       const saved = localStorage.getItem(`mock-${id}-final`);
       if (saved) {

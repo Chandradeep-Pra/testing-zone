@@ -89,7 +89,7 @@ export default function PublicMockPage() {
     try {
       setSubmitting(true);
 
-      const res = await fetch(`/api/mocks/${mock.id}`);
+      const res = await fetch(`/api/public/mocks/${mock.id}`);
       const data = (await res.json()) as { mock?: { attempts?: MockAttempt[] }; attempts?: MockAttempt[] };
       const attempts = Array.isArray(data.mock?.attempts)
         ? data.mock.attempts

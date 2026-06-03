@@ -30,9 +30,18 @@ export async function POST(
       );
     }
 
-    const mockRes = await fetch(`https://urologics.co.uk/api/mocks/${id}`, {
-      cache: "no-store",
-    });
+    const publicMockRes = await fetch(
+      `https://urologics.co.uk/api/public/mocks/${id}`,
+      {
+        cache: "no-store",
+      },
+    );
+
+    const mockRes = publicMockRes.ok
+      ? publicMockRes
+      : await fetch(`https://urologics.co.uk/api/mocks/${id}`, {
+          cache: "no-store",
+        });
 
     if (!mockRes.ok) {
       throw new Error(
@@ -67,21 +76,18 @@ export async function POST(
       );
     }
 
-    const res = await fetch(
-      `https://urologics.co.uk/api/mocks/${id}/attempts`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: body.name,
-          email: normalizedEmail,
-          marks: body.marks,
-        }),
-        cache: "no-store",
+    const res = await fetch(`https://urologics.co.uk/api/mocks/${id}/attempts`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify({
+        name: body.name,
+        email: normalizedEmail,
+        marks: body.marks,
+      }),
+      cache: "no-store",
+    });
 
     const data = await res.json();
 

@@ -38,6 +38,13 @@ export type MockRecord = {
   startTime: string | number | TimestampLike;
   endTime?: string | number | TimestampLike;
   durationMinutes: number;
+  attempts?: Array<{
+    candidate?: {
+      email?: string;
+      name?: string;
+    };
+    marks?: number;
+  }>;
   quiz?: Quiz;
 };
 
@@ -94,6 +101,7 @@ export function normalizeMock(payload: unknown): MockRecord {
       typeof source.durationMinutes === "number"
         ? source.durationMinutes
         : fallback.durationMinutes,
+    attempts: Array.isArray(source.attempts) ? source.attempts : [],
   };
 }
 
@@ -137,7 +145,8 @@ export async function fetchRemoteMockById(
 export async function fetchRemotePublicMockById(
   id: string,
 ): Promise<MockRecord | null> {
-  const mock = await fetchRemoteMockById(id);
+  const mocks = await fetchRemoteMocks();
+  const mock = mocks.find((item) => item.id === id);
 
   if (!mock || mock.accessType !== "public") {
     return null;
