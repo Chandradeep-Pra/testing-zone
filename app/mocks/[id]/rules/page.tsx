@@ -71,8 +71,8 @@ export default function MockRulesPage() {
         <section className="urologics-panel p-8 md:p-10">
           <div className="urologics-chip">Session Rules</div>
           <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.04em] text-[#071014] sm:text-5xl">{mock.title || "Grand Mock"}</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-[#071014]/65">
-            Review the mock conditions before you enter the timed session. The visual design mirrors the rest of the Urologics product line so the transition feels like one complete platform.
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-orange-600/65">
+            No Part of this mock test is intended for copying.
           </p>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2">
