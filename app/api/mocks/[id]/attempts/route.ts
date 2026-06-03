@@ -30,12 +30,9 @@ export async function POST(
       );
     }
 
-    const publicMockRes = await fetch(
-      `https://urologics.co.uk/api/public/mocks/${id}`,
-      {
-        cache: "no-store",
-      },
-    );
+    const publicMockRes = await fetch(`https://urologics.co.uk/api/public/mocks/${id}`, {
+      cache: "no-store",
+    });
 
     const mockRes = publicMockRes.ok
       ? publicMockRes
@@ -76,7 +73,7 @@ export async function POST(
       );
     }
 
-    const res = await fetch(`https://urologics.co.uk/api/mocks/${id}/attempts`, {
+    const res = await fetch(`https://urologics.co.uk/api/public/mocks/${id}/attempts`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -1,4 +1,4 @@
-const REMOTE_MOCKS_URL = "https://urologics.co.uk/api/mocks";
+const REMOTE_MOCKS_URL = "https://urologics.co.uk/api/public/mocks";
 const REMOTE_QUIZZES_URL = "https://urologics.co.uk/api/quizzes";
 
 type TimestampLike = {
@@ -145,8 +145,7 @@ export async function fetchRemoteMockById(
 export async function fetchRemotePublicMockById(
   id: string,
 ): Promise<MockRecord | null> {
-  const mocks = await fetchRemoteMocks();
-  const mock = mocks.find((item) => item.id === id);
+  const mock = await fetchRemoteMockById(id);
 
   if (!mock || mock.accessType !== "public") {
     return null;
