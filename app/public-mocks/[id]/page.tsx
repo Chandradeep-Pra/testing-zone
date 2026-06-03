@@ -124,7 +124,7 @@ export default function PublicMockPage() {
   if (loading) {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
-        <div className="urologics-panel px-8 py-6 text-[#071014]/65">Loading mock...</div>
+        <div className="urologics-panel px-8 py-6 text-black font-semibold">Loading mock...</div>
       </main>
     );
   }

@@ -20,6 +20,7 @@ type MockQuestion = {
 
 type MockDetail = {
   title?: string;
+  accessType?: "private" | "public" | string;
   questions: MockQuestion[];
 };
 
@@ -86,7 +87,11 @@ export default function ResultPage() {
       toast.loading("Submitting mock attempt...", { id: "mock-attempt" });
 
       try {
-        const res = await fetch(`/api/mocks/${id}/attempts`, {
+        const attemptEndpoint =
+          mock?.accessType === "public"
+            ? `/api/public/mocks/${id}/attempts`
+            : `/api/mocks/${id}/attempts`;
+        const res = await fetch(attemptEndpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

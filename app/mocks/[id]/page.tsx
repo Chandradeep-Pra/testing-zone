@@ -33,10 +33,17 @@ export default function Page() {
 
   useEffect(() => {
     const load = async () => {
-      const res = await fetch(`/api/mocks/${id}`);
-      const data = await res.json();
-      setMock(data.mock);
-      setTimeLeft(data.mock.durationMinutes * 60);
+      const publicRes = await fetch(`/api/public/mocks/${id}`);
+      if (publicRes.ok) {
+        const publicData = await publicRes.json();
+        setMock(publicData.mock);
+        setTimeLeft(publicData.mock.durationMinutes * 60);
+      } else {
+        const res = await fetch(`/api/mocks/${id}`);
+        const data = await res.json();
+        setMock(data.mock);
+        setTimeLeft(data.mock.durationMinutes * 60);
+      }
 
       const saved = localStorage.getItem(`mock-${id}-answers`);
       if (saved) {
