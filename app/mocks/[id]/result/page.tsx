@@ -216,22 +216,24 @@ export default function ResultPage() {
         </div>
       )}
 
-      <main className="urologics-shell px-6 py-8">
-        <div className="mx-auto max-w-6xl space-y-6">
-          <header className="urologics-header flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+      <main className="urologics-shell px-4 py-4 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6">
+          <header className="urologics-header flex flex-col items-start gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
             <UrologicsBrand product="Grand Mocks" tag="Session results" />
             <div className="urologics-chip">Completed Review</div>
           </header>
 
-          <section className="grid gap-6 lg:grid-cols-[1fr_0.38fr]">
-            <div className="urologics-panel p-8">
+          <section className="grid gap-4 lg:grid-cols-[1fr_0.38fr]">
+            <div className="urologics-panel p-5 sm:p-8">
               <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896] sm:h-14 sm:w-14">
                   <ShieldCheck size={22} />
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-[0.22em] text-[#0f7896]">Urologics Mock Review</div>
-                  <h1 className="mt-3 text-3xl font-semibold text-[#071014]">{mock.title || "Grand Mock"}</h1>
+                  <h1 className="mt-2 text-2xl font-semibold text-[#071014] sm:mt-3 sm:text-3xl">
+                    {mock.title || "Grand Mock"}
+                  </h1>
                   <p className="mt-3 text-sm leading-7 text-[#071014]/65">
                     Analysis of your performance in this mock session, along with explanations for each question.
                   </p>
@@ -239,9 +241,9 @@ export default function ResultPage() {
               </div>
             </div>
 
-            <div className="urologics-panel flex flex-col items-center justify-center p-8 text-center">
+            <div className="urologics-panel flex flex-col items-center justify-center p-6 text-center sm:p-8">
               <Trophy className="text-[#0f7896]" size={22} />
-              <div className="mt-4 text-5xl font-semibold text-[#0f7896]">
+              <div className="mt-4 text-4xl font-semibold text-[#0f7896] sm:text-5xl">
                 {score}/{mock.questions.length}
               </div>
               <div className="mt-2 text-sm text-[#071014]/65">Final mock score</div>
@@ -263,7 +265,7 @@ export default function ResultPage() {
               const isCorrect = selectedIndex === correctIndex && correctAnswer !== null;
 
               return (
-                <article key={question.id} className="urologics-panel p-6">
+                <article key={question.id} className="urologics-panel p-5 sm:p-6">
                   <div className="flex items-start gap-3">
                     <div className={`mt-1 rounded-full p-2 ${isCorrect ? "bg-cyan-50 text-[#0f7896]" : "bg-rose-50 text-rose-600"}`}>
                       {isCorrect ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
@@ -345,7 +347,7 @@ export default function ResultPage() {
                                 <img
                                   src={question.explanation.image}
                                   alt="Explanation"
-                                  className="max-h-[300px] rounded-[28px] object-contain transition hover:scale-[1.02]"
+                                  className="max-h-[220px] rounded-[28px] object-contain transition hover:scale-[1.02] sm:max-h-[300px]"
                                 />
                               </button>
                             </div>

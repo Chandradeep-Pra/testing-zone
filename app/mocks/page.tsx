@@ -123,38 +123,40 @@ export default function TodayMocksPage() {
 
   return (
     <main className="urologics-shell overflow-hidden">
-      <div className="mx-auto max-w-7xl px-6 py-6">
-        <header className="urologics-header flex flex-wrap items-center justify-between gap-4 px-5 py-4 md:px-6">
+      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
+        <header className="urologics-header flex flex-col items-start gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 md:px-6">
           <UrologicsBrand product="Grand Mocks" tag="Timed practice with premium exam-day polish" />
-          <UrologicsNav current="Mocks" />
+          <div className="w-full sm:w-auto">
+            <UrologicsNav current="Mocks" />
+          </div>
         </header>
 
-        <section className="grid gap-8 py-24 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="urologics-panel p-7 md:p-10">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#0f7896]/12 bg-cyan-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
+        <section className="grid gap-6 py-10 sm:gap-8 md:py-24 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="urologics-panel p-5 sm:p-7 md:p-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7896] sm:px-4 sm:text-[11px] sm:tracking-[0.22em]">
               <Sparkles size={14} />
               Mocks
             </div>
 
-            <h1 className="mt-7 max-w-3xl text-4xl font-semibold tracking-[-0.04em] text-[#071014] sm:text-5xl">
+            <h1 className="mt-6 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[#071014] sm:mt-7 sm:text-4xl md:text-5xl">
               Timed mock sessions.
             </h1>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-[#071014]/65 md:text-lg">
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-[#071014]/65 sm:mt-5 sm:text-base sm:leading-8 md:text-lg">
               Join today&apos;s mock or grand mock.
             </p>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <div className="urologics-subpanel p-5">
+            <div className="mt-7 grid gap-3 md:grid-cols-3 md:gap-4">
+              <div className="urologics-subpanel p-4 sm:p-5">
                 <CalendarClock className="text-[#0f7896]" size={18} />
                 <div className="mt-3 text-sm font-semibold text-[#071014]">Today</div>
                 <p className="mt-2 text-sm leading-6 text-[#071014]/65">Active sessions only.</p>
               </div>
-              <div className="urologics-subpanel p-5">
+              <div className="urologics-subpanel p-4 sm:p-5">
                 <TimerReset className="text-[#0f7896]" size={18} />
                 <div className="mt-3 text-sm font-semibold text-[#071014]">Timed</div>
                 <p className="mt-2 text-sm leading-6 text-[#071014]/65">Simple timed flow.</p>
               </div>
-              <div className="urologics-subpanel p-5">
+              <div className="urologics-subpanel p-4 sm:p-5">
                 <ShieldCheck className="text-[#0f7896]" size={18} />
                 <div className="mt-3 text-sm font-semibold text-[#071014]">Ready</div>
                 <p className="mt-2 text-sm leading-6 text-[#071014]/65">Built for exam prep.</p>
@@ -162,14 +164,14 @@ export default function TodayMocksPage() {
             </div>
           </div>
 
-          <div className="urologics-panel p-7 md:p-8">
+          <div className="urologics-panel p-5 sm:p-7 md:p-8">
             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
               Sessions
             </div>
-            <div className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-[#071014]">
+            <div className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#071014] sm:mt-4 sm:text-3xl">
               {loading ? "Loading mock schedule" : `${mocks.length} live sessions now`}
             </div>
-            <div className="urologics-thin-scrollbar mt-5 max-h-[272px] space-y-3 overflow-y-auto pr-2">
+            <div className="urologics-thin-scrollbar mt-4 max-h-[272px] space-y-3 overflow-y-auto pr-1 sm:mt-5 sm:pr-2">
               {loading ? (
                 <div className="rounded-[22px] border border-[#0f7896]/12 bg-cyan-50 p-4 text-sm text-[#071014]/65">
                   Starting the test
@@ -220,15 +222,15 @@ export default function TodayMocksPage() {
         </section>
 
         <section className="pb-16">
-          <div className="mb-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
+          <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896] sm:mb-5">
             All Sessions
           </div>
           {loading ? (
-            <div className="urologics-panel p-10 text-center text-[#071014]/65">
+            <div className="urologics-panel p-8 text-center text-[#071014]/65 sm:p-10">
               Loading scheduled mocks...
             </div>
           ) : mocks.length === 0 ? (
-            <div className="urologics-panel p-10 text-center">
+            <div className="urologics-panel p-8 text-center sm:p-10">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
                 <CalendarClock size={20} />
               </div>
@@ -238,11 +240,11 @@ export default function TodayMocksPage() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
               {mocks.map((mock) => (
                 <div
                   key={mock.id}
-                  className="urologics-panel p-6"
+                  className="urologics-panel p-5 sm:p-6"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="inline-flex items-center gap-2 rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
@@ -253,7 +255,7 @@ export default function TodayMocksPage() {
                       {mock.durationMinutes} min
                     </span>
                   </div>
-                  <h2 className="mt-5 text-2xl font-semibold text-[#071014]">{mock.title || "Grand Mock"}</h2>
+                  <h2 className="mt-4 text-xl font-semibold text-[#071014] sm:mt-5 sm:text-2xl">{mock.title || "Grand Mock"}</h2>
                   <div className="mt-3 inline-flex rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#0f7896]">
                     {mock.accessType === "public" ? "Public access" : "Members only"}
                   </div>
@@ -265,7 +267,7 @@ export default function TodayMocksPage() {
                   </p>
                   <button
                     onClick={() => setSelectedMock(mock)}
-                    className="urologics-button-primary mt-8 w-full"
+                    className="urologics-button-primary mt-7 w-full sm:mt-8"
                   >
                     Register For Session
                   </button>
@@ -277,10 +279,10 @@ export default function TodayMocksPage() {
       </div>
 
       {selectedMock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#071014]/35 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-[28px] border border-[#0f7896]/12 bg-white p-8 shadow-[0_24px_60px_rgba(15,120,150,0.18)]">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#071014]/35 p-3 backdrop-blur-sm sm:items-center sm:p-4">
+          <div className="w-full max-w-lg rounded-t-[28px] border border-[#0f7896]/12 bg-white p-6 shadow-[0_24px_60px_rgba(15,120,150,0.18)] sm:rounded-[28px] sm:p-8">
             <UrologicsBrand compact product="Grand Mocks" tag="Candidate registration" />
-            <div className="mt-6 text-2xl font-semibold text-[#071014]">{selectedMock.title}</div>
+            <div className="mt-5 text-2xl font-semibold text-[#071014]">{selectedMock.title}</div>
             <p className="mt-3 text-sm leading-7 text-[#071014]/65">
               Enter your details to continue.
             </p>
@@ -300,7 +302,7 @@ export default function TodayMocksPage() {
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email" className="urologics-input" />
               </div>
             </div>
-            <div className="mt-8 flex gap-3">
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <button onClick={() => setSelectedMock(null)} className="urologics-button-secondary flex-1">
                 Cancel
               </button>

@@ -156,10 +156,10 @@ export default function Page() {
   return (
     <>
       {isBreak && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-xl">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 px-4 backdrop-blur-xl">
           <div className="urologics-chip">Break Active</div>
-          <h2 className="mt-6 text-6xl font-semibold text-teal-300">{format(breakLeft)}</h2>
-          <button onClick={() => setIsBreak(false)} className="urologics-button-primary mt-8">
+          <h2 className="mt-6 text-5xl font-semibold text-teal-300 sm:text-6xl">{format(breakLeft)}</h2>
+          <button onClick={() => setIsBreak(false)} className="urologics-button-primary mt-8 w-full sm:w-auto">
             Resume Mock
           </button>
         </div>
@@ -167,12 +167,12 @@ export default function Page() {
 
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[28px] border border-[#0f7896]/12 bg-white p-8 text-center shadow-[0_24px_60px_rgba(15,120,150,0.18)]">
+          <div className="w-full max-w-md rounded-[28px] border border-[#0f7896]/12 bg-white p-6 text-center shadow-[0_24px_60px_rgba(15,120,150,0.18)] sm:p-8">
             <div className="text-2xl font-semibold text-[#071014]">Submit mock?</div>
             <p className="mt-3 text-sm leading-6 text-[#071014]/65">
               This will end the current Urologics mock session and move you to the results page.
             </p>
-            <div className="mt-8 flex gap-3">
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <button
                 onClick={() => setShowConfirm(false)}
                 className="flex-1 rounded-full border border-[#0f7896]/20 px-4 py-2 text-sm font-semibold text-[#0f7896] transition hover:bg-[#0f7896] hover:text-white"
@@ -191,10 +191,10 @@ export default function Page() {
         </div>
       )}
 
-      <main className="flex min-h-screen gap-4 bg-cyan-50 p-4 text-[#071014]">
-        <aside className="flex w-[300px] shrink-0 flex-col rounded-[28px] border border-[#0f7896]/12 bg-white p-5 shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0f7896]/10 text-[#0f7896]">
+      <main className="flex min-h-screen flex-col gap-3 bg-cyan-50 p-3 text-[#071014] sm:p-4 lg:flex-row">
+        <aside className="order-1 flex w-full shrink-0 flex-col rounded-[28px] border border-[#0f7896]/12 bg-white p-4 shadow-[0_16px_40px_rgba(15,120,150,0.09)] lg:w-[300px] lg:p-5">
+          <div className="flex items-start gap-3 sm:items-center">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0f7896]/10 text-[#0f7896]">
               <ShieldCheck size={18} />
             </div>
 
@@ -206,13 +206,13 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="mt-6 rounded-[24px] border border-[#0f7896]/12 bg-cyan-50 p-4">
+          <div className="mt-5 rounded-[24px] border border-[#0f7896]/12 bg-cyan-50 p-4 sm:mt-6">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#0f7896]">
               <AlarmClock size={14} />
               Session Timer
             </div>
 
-            <div className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-[#0f7896]">
+            <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[#0f7896] sm:text-4xl">
               {format(isBreak ? breakLeft : timeLeft)}
             </div>
 
@@ -221,7 +221,7 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-5 gap-2">
+          <div className="mt-5 grid grid-cols-6 gap-2 sm:mt-6 sm:grid-cols-5">
             {mock.questions.map((question, index) => (
               <button
                 key={question.id}
@@ -239,7 +239,7 @@ export default function Page() {
             ))}
           </div>
 
-          <div className="mt-auto space-y-3 pt-6">
+          <div className="mt-6 flex flex-col gap-3 pt-0 lg:mt-auto lg:space-y-3 lg:pt-6">
             {!breakUsed && (
               <button
                 onClick={() => {
@@ -263,17 +263,19 @@ export default function Page() {
           </div>
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
+        <section className="order-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
           <div className="flex flex-1 flex-col lg:flex-row">
-            <div className="flex flex-1 flex-col justify-between p-8 md:p-10">
+            <div className="flex flex-1 flex-col justify-between p-4 sm:p-6 md:p-10">
               <div>
-                <div className="inline-flex rounded-full border border-[#0f7896]/18 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#0f7896]">
+                <div className="inline-flex rounded-full border border-[#0f7896]/18 bg-cyan-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0f7896] sm:text-xs sm:tracking-[0.18em]">
                   Question : {currentQ + 1}
                 </div>
 
-                <h1 className="mt-6 text-xl font-semibold text-[#071014]">{q.questionText}</h1>
+                <h1 className="mt-5 text-lg font-semibold leading-8 text-[#071014] sm:mt-6 sm:text-xl">
+                  {q.questionText}
+                </h1>
 
-                <div className="mt-8 grid gap-4 md:grid-cols-2">
+                <div className="mt-6 grid gap-3 sm:mt-8 md:grid-cols-2">
                   {options.map((opt, i) => {
                     const isSelected = answers[q.id] === i;
 
@@ -313,7 +315,7 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="mt-10 h-2 overflow-hidden rounded-full bg-cyan-50">
+              <div className="mt-8 h-2 overflow-hidden rounded-full bg-cyan-50 sm:mt-10">
                 <div
                   className="h-full rounded-full bg-[#0f7896] transition-all duration-300"
                   style={{
@@ -324,8 +326,8 @@ export default function Page() {
             </div>
 
             {q?.questionImage && (
-              <div className="border-t border-[#0f7896]/10 p-6 lg:w-[42%] lg:border-l lg:border-t-0">
-                <div className="flex h-full min-h-[280px] items-center justify-center rounded-[24px] border border-[#0f7896]/12 bg-cyan-50 p-5">
+              <div className="border-t border-[#0f7896]/10 p-4 sm:p-5 lg:w-[42%] lg:border-l lg:border-t-0 lg:p-6">
+                <div className="flex h-full min-h-[220px] items-center justify-center rounded-[24px] border border-[#0f7896]/12 bg-cyan-50 p-4 sm:min-h-[280px] sm:p-5">
                   <img src={q.questionImage} alt="Question exhibit" className="max-h-[70vh] rounded-2xl object-contain" />
                 </div>
               </div>

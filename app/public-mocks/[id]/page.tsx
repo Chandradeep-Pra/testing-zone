@@ -144,43 +144,45 @@ export default function PublicMockPage() {
 
   return (
     <main className="urologics-shell overflow-hidden">
-      <div className="mx-auto max-w-7xl px-6 py-6">
-        <header className="urologics-header flex flex-wrap items-center justify-between gap-4 px-5 py-4 md:px-6">
+      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
+        <header className="urologics-header flex flex-col items-start gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 md:px-6">
           <UrologicsBrand product="Grand Mocks" tag="Public candidate registration" />
-          <UrologicsNav current="Mocks" />
+          <div className="w-full sm:w-auto">
+            <UrologicsNav current="Mocks" />
+          </div>
         </header>
 
-        <section className="grid gap-8 py-24 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="urologics-panel p-7 md:p-10">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#0f7896]/12 bg-cyan-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
+        <section className="grid gap-6 py-10 sm:gap-8 md:py-24 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="urologics-panel p-5 sm:p-7 md:p-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7896] sm:px-4 sm:text-[11px] sm:tracking-[0.22em]">
               <Sparkles size={14} />
               Public Mock
             </div>
 
-            <h1 className="mt-7 max-w-3xl text-4xl font-semibold tracking-[-0.04em] text-[#071014] sm:text-5xl">
+            <h1 className="mt-6 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[#071014] sm:mt-7 sm:text-4xl md:text-5xl">
               {mock.title || "Grand Mock"}
             </h1>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-[#071014]/65 md:text-lg">
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-[#071014]/65 sm:mt-5 sm:text-base sm:leading-8 md:text-lg">
               Enter your details to continue. Your name and email are stored so we can record
               attendance and marks.
             </p>
 
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <div className="urologics-subpanel p-5">
+            <div className="mt-7 grid gap-3 md:grid-cols-3 md:gap-4">
+              <div className="urologics-subpanel p-4 sm:p-5">
                 <CalendarClock className="text-[#0f7896]" size={18} />
                 <div className="mt-3 text-sm font-semibold text-[#071014]">Ends at</div>
                 <p className="mt-2 text-sm leading-6 text-[#071014]/65">
                   {new Date(endTime).toLocaleString()}
                 </p>
               </div>
-              <div className="urologics-subpanel p-5">
+              <div className="urologics-subpanel p-4 sm:p-5">
                 <TimerReset className="text-[#0f7896]" size={18} />
                 <div className="mt-3 text-sm font-semibold text-[#071014]">Duration</div>
                 <p className="mt-2 text-sm leading-6 text-[#071014]/65">
                   {mock.durationMinutes} minutes
                 </p>
               </div>
-              <div className="urologics-subpanel p-5">
+              <div className="urologics-subpanel p-4 sm:p-5">
                 <ShieldCheck className="text-[#0f7896]" size={18} />
                 <div className="mt-3 text-sm font-semibold text-[#071014]">Access</div>
                 <p className="mt-2 text-sm leading-6 text-[#071014]/65">Public access enabled.</p>
@@ -188,14 +190,14 @@ export default function PublicMockPage() {
             </div>
           </div>
 
-          <div className="urologics-panel p-7 md:p-8">
+          <div className="urologics-panel p-5 sm:p-7 md:p-8">
             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
               Continue
             </div>
-            <div className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-[#071014]">
+            <div className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#071014] sm:mt-4 sm:text-3xl">
               Register to start
             </div>
-            <div className="mt-6 space-y-4">
+            <div className="mt-5 space-y-4 sm:mt-6">
               <div>
                 <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#071014]/65">
                   <ShieldCheck size={14} />
@@ -227,7 +229,7 @@ export default function PublicMockPage() {
             <button
               onClick={handleContinue}
               disabled={submitting}
-              className="urologics-button-primary mt-8 w-full"
+              className="urologics-button-primary mt-7 w-full sm:mt-8"
             >
               {submitting ? "Checking..." : "Continue"}
             </button>
