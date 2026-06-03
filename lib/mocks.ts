@@ -34,6 +34,7 @@ export type MockRecord = {
   id: string;
   quizId: string;
   title: string;
+  accessType?: "private" | "public" | string;
   startTime: string | number | TimestampLike;
   endTime?: string | number | TimestampLike;
   durationMinutes: number;
@@ -57,6 +58,7 @@ function getDefaultMock(): MockRecord {
     id: "fallback",
     quizId: "",
     title: "Mock Quiz",
+    accessType: "private",
     startTime: Date.now(),
     durationMinutes: 30,
   };
@@ -74,6 +76,8 @@ export function normalizeMock(payload: unknown): MockRecord {
     id: typeof source.id === "string" ? source.id : fallback.id,
     quizId: typeof source.quizId === "string" ? source.quizId : fallback.quizId,
     title: typeof source.title === "string" ? source.title : "Mock Quiz",
+    accessType:
+      typeof source.accessType === "string" ? source.accessType : fallback.accessType,
     startTime:
       typeof source.startTime === "string" ||
       typeof source.startTime === "number" ||
@@ -128,6 +132,18 @@ export async function fetchRemoteMockById(
   const data = (await res.json()) as { mock?: unknown } | unknown;
 
   return normalizeMock(asRecord(data)?.mock ?? data);
+}
+
+export async function fetchRemotePublicMockById(
+  id: string,
+): Promise<MockRecord | null> {
+  const mock = await fetchRemoteMockById(id);
+
+  if (!mock || mock.accessType !== "public") {
+    return null;
+  }
+
+  return mock;
 }
 
 export async function fetchRemoteQuizzes(): Promise<Quiz[]> {
