@@ -1,4 +1,4 @@
-const REMOTE_MOCKS_URL = "https://urologics.co.uk/api/public/mocks";
+﻿const REMOTE_MOCKS_URL = "https://urologics.co.uk/api/public/mocks";
 const REMOTE_QUIZZES_URL = "https://urologics.co.uk/api/quizzes";
 
 type TimestampLike = {
@@ -123,7 +123,9 @@ export function normalizeMock(payload: unknown): MockRecord {
                 ? questionSource.questionText
                 : "",
             options: Array.isArray(questionSource?.options)
-              ? questionSource.options.map((item) => String(item))
+              ? questionSource.options
+                  .map((item) => String(item ?? "").replace(/\s+/g, " ").trim())
+                  .filter((item) => item.length > 0)
               : [],
             correctAnswer:
               typeof questionSource?.correctAnswer === "number"
@@ -240,3 +242,4 @@ export function getMockStatus(
 export function isMockLive(mock: MockRecord): boolean {
   return getMockStatus(mock) === "Live";
 }
+

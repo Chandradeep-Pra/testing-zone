@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { AlarmClock, Coffee, Send, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -24,7 +24,11 @@ function normalizeQuestion(question: unknown, index: number): Question {
   return {
     id: typeof source.id === "string" ? source.id : `question-${index + 1}`,
     questionText: typeof source.questionText === "string" ? source.questionText : "",
-    options: Array.isArray(source.options) ? source.options.map((item) => String(item)) : [],
+    options: Array.isArray(source.options)
+      ? source.options
+          .map((item) => String(item ?? "").replace(/\s+/g, " ").trim())
+          .filter((item) => item.length > 0)
+      : [],
     correctAnswer:
       typeof source.correctAnswer === "number"
         ? source.correctAnswer
@@ -321,3 +325,4 @@ export default function Page() {
     </>
   );
 }
+

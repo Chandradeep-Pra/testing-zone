@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { CheckCircle2, ShieldCheck, Trophy, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -10,8 +10,8 @@ import UrologicsBrand from "@/components/brand/UrologicsBrand";
 type MockQuestion = {
   id: string;
   questionText: string;
-  options: Record<string, string>;
-  correctAnswer: string;
+  options: string[];
+  correctAnswer: number;
   explanation?: {
     text?: string;
     image?: string;
@@ -24,16 +24,24 @@ type MockDetail = {
   questions: MockQuestion[];
 };
 
+function normalizeOption(option: unknown) {
+  return String(option ?? "").replace(/\s+/g, " ").trim();
+}
+
 function normalizeQuestion(question: unknown, index: number): MockQuestion {
   const source = (question && typeof question === "object" ? question : {}) as Record<string, any>;
   return {
     id: typeof source.id === "string" ? source.id : `question-${index + 1}`,
     questionText: typeof source.questionText === "string" ? source.questionText : "",
-    options: source.options && typeof source.options === "object" ? source.options : {},
+    options: Array.isArray(source.options)
+      ? source.options.map(normalizeOption).filter((option) => option.length > 0)
+      : [],
     correctAnswer:
-      typeof source.correctAnswer === "string"
+      typeof source.correctAnswer === "number"
         ? source.correctAnswer
-        : String(source.correctAnswer ?? ""),
+        : Number.isFinite(Number(source.correctAnswer))
+          ? Number(source.correctAnswer)
+          : -1,
     explanation:
       source.explanation && typeof source.explanation === "object"
         ? {
@@ -56,10 +64,14 @@ function normalizeMock(payload: unknown): MockDetail | null {
   };
 }
 
+function getOptionLabel(index: number) {
+  return String.fromCharCode(65 + index);
+}
+
 export default function ResultPage() {
   const { id } = useParams<{ id: string }>();
   const [mock, setMock] = useState<MockDetail | null>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answers, setAnswers] = useState<Record<string, number>>({});
   const [preview, setPreview] = useState<string | null>(null);
   const [submittedAttempt, setSubmittedAttempt] = useState(false);
 
@@ -77,20 +89,36 @@ export default function ResultPage() {
 
       const saved = localStorage.getItem(`mock-${id}-final`);
       if (saved) {
-        setAnswers(JSON.parse(saved) as Record<string, string>);
+        const parsed = JSON.parse(saved) as Record<string, unknown>;
+        const normalizedAnswers = Object.fromEntries(
+          Object.entries(parsed).map(([questionId, value]) => [questionId, Number(value)])
+        ) as Record<string, number>;
+        setAnswers(normalizedAnswers);
       }
     };
 
     void load();
   }, [id]);
 
-  const score = mock
-    ? mock.questions.reduce(
-        (total, question) =>
-          answers[question.id] === question.correctAnswer ? total + 1 : total,
-        0
-      )
-    : 0;
+  const score = useMemo(() => {
+    if (!mock) {
+      return 0;
+    }
+
+    return mock.questions.reduce((total, question) => {
+      const selectedIndex = answers[question.id];
+      const isValidCorrectAnswer =
+        Number.isInteger(question.correctAnswer) &&
+        question.correctAnswer >= 0 &&
+        question.correctAnswer < question.options.length;
+
+      if (!isValidCorrectAnswer) {
+        return total;
+      }
+
+      return selectedIndex === question.correctAnswer ? total + 1 : total;
+    }, 0);
+  }, [answers, mock]);
 
   useEffect(() => {
     if (!mock || submittedAttempt) {
@@ -205,7 +233,7 @@ export default function ResultPage() {
                   <div className="text-xs uppercase tracking-[0.22em] text-[#0f7896]">Urologics Mock Review</div>
                   <h1 className="mt-3 text-3xl font-semibold text-[#071014]">{mock.title || "Grand Mock"}</h1>
                   <p className="mt-3 text-sm leading-7 text-[#071014]/65">
-                    Analysis of your performance in this mock session, along with explanations for each question. 
+                    Analysis of your performance in this mock session, along with explanations for each question.
                   </p>
                 </div>
               </div>
@@ -222,9 +250,17 @@ export default function ResultPage() {
 
           <section className="space-y-5">
             {mock.questions.map((question, index) => {
-              const correct = question.correctAnswer;
-              const selected = answers[question.id];
-              const isCorrect = selected === correct;
+              const selectedIndex = answers[question.id];
+              const correctIndex = question.correctAnswer;
+              const selectedAnswer =
+                Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < question.options.length
+                  ? question.options[selectedIndex]
+                  : null;
+              const correctAnswer =
+                Number.isInteger(correctIndex) && correctIndex >= 0 && correctIndex < question.options.length
+                  ? question.options[correctIndex]
+                  : null;
+              const isCorrect = selectedIndex === correctIndex && correctAnswer !== null;
 
               return (
                 <article key={question.id} className="urologics-panel p-6">
@@ -236,15 +272,42 @@ export default function ResultPage() {
                       <div className="text-lg font-semibold leading-8 text-[#071014]">
                         {index + 1}. {question.questionText}
                       </div>
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        {question.options.map((option, optionIndex) => {
+                          const isSelected = selectedIndex === optionIndex;
+                          const isCorrectOption = correctIndex === optionIndex;
+
+                          return (
+                            <div
+                              key={`${question.id}-${optionIndex}`}
+                              className={`rounded-2xl border px-4 py-3 text-sm leading-6 ${
+                                isCorrectOption
+                                  ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                                  : isSelected
+                                    ? "border-rose-200 bg-rose-50 text-rose-700"
+                                    : "border-[#0f7896]/12 bg-white text-[#071014]/75"
+                              }`}
+                            >
+                              <span className="mr-2 font-semibold text-[#0f7896]">{getOptionLabel(optionIndex)}.</span>
+                              {option}
+                            </div>
+                          );
+                        })}
+                      </div>
+
                       <div className="mt-4 space-y-2 text-sm leading-6">
                         <p className="text-[#071014]/65">
                           Your answer:{" "}
                           <span className={isCorrect ? "text-[#0f7896]" : "text-rose-600"}>
-                          {(question.options as Record<string, string>)[selected] || "Not answered"}
+                            {selectedAnswer ? `${getOptionLabel(selectedIndex)}. ${selectedAnswer}` : "Not answered"}
                           </span>
                         </p>
                         <p className="text-[#071014]/70">
-                          Correct answer: <span className="text-[#0f7896]">{(question.options as Record<string, string>)[correct]}</span>
+                          Correct answer:{" "}
+                          <span className="text-[#0f7896]">
+                            {correctAnswer ? `${getOptionLabel(correctIndex)}. ${correctAnswer}` : "Not available"}
+                          </span>
                         </p>
                       </div>
 
