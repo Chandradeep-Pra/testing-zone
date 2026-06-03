@@ -38,6 +38,14 @@ export type MockRecord = {
   startTime: string | number | TimestampLike;
   endTime?: string | number | TimestampLike;
   durationMinutes: number;
+  questions?: Array<{
+    id: string;
+    questionText: string;
+    options: string[];
+    correctAnswer: number;
+    questionImage?: string;
+    explanation?: unknown;
+  }>;
   attempts?: Array<{
     candidate?: {
       email?: string;
@@ -101,6 +109,35 @@ export function normalizeMock(payload: unknown): MockRecord {
       typeof source.durationMinutes === "number"
         ? source.durationMinutes
         : fallback.durationMinutes,
+    questions: Array.isArray(source.questions)
+      ? source.questions.map((question, index) => {
+          const questionSource = asRecord(question);
+
+          return {
+            id:
+              typeof questionSource?.id === "string"
+                ? questionSource.id
+                : `question-${index + 1}`,
+            questionText:
+              typeof questionSource?.questionText === "string"
+                ? questionSource.questionText
+                : "",
+            options: Array.isArray(questionSource?.options)
+              ? questionSource.options.map((item) => String(item))
+              : [],
+            correctAnswer:
+              typeof questionSource?.correctAnswer === "number"
+                ? questionSource.correctAnswer
+                : Number(questionSource?.correctAnswer ?? 0),
+            questionImage:
+              typeof questionSource?.questionImage === "string" &&
+              questionSource.questionImage.trim()
+                ? questionSource.questionImage
+                : undefined,
+            explanation: questionSource?.explanation,
+          };
+        })
+      : [],
     attempts: Array.isArray(source.attempts) ? source.attempts : [],
   };
 }
