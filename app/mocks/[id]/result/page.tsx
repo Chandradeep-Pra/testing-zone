@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { CheckCircle2, ShieldCheck, Trophy, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -281,16 +281,38 @@ export default function ResultPage() {
                           return (
                             <div
                               key={`${question.id}-${optionIndex}`}
-                              className={`rounded-2xl border px-4 py-3 text-sm leading-6 ${
+                              className={`rounded-[28px] border p-3 ${
                                 isCorrectOption
-                                  ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                                  ? "border-emerald-300 bg-emerald-50"
                                   : isSelected
-                                    ? "border-rose-200 bg-rose-50 text-rose-700"
-                                    : "border-[#0f7896]/12 bg-white text-[#071014]/75"
+                                    ? "border-rose-200 bg-rose-50"
+                                    : "border-[#0f7896]/12 bg-white"
                               }`}
                             >
-                              <span className="mr-2 font-semibold text-[#0f7896]">{getOptionLabel(optionIndex)}.</span>
-                              {option}
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-sm font-semibold ${
+                                    isCorrectOption
+                                      ? "border-emerald-300 bg-emerald-500 text-white"
+                                      : isSelected
+                                        ? "border-rose-200 bg-rose-500 text-white"
+                                        : "border-[#0f7896]/18 bg-cyan-50 text-[#0f7896]"
+                                  }`}
+                                >
+                                  {getOptionLabel(optionIndex)}
+                                </span>
+                                <span
+                                  className={`flex-1 rounded-[22px] px-4 py-3 text-sm font-medium leading-6 ${
+                                    isCorrectOption
+                                      ? "bg-white/80 text-emerald-900"
+                                      : isSelected
+                                        ? "bg-white/80 text-rose-700"
+                                        : "bg-cyan-50 text-[#071014]/80"
+                                  }`}
+                                >
+                                  {option}
+                                </span>
+                              </div>
                             </div>
                           );
                         })}
