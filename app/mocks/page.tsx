@@ -16,6 +16,7 @@ interface Mock {
   id: string;
   quizId: string;
   title: string;
+  accessType?: "private" | "public" | string;
   startTime: string | number | TimestampLike;
   endTime?: string | number | TimestampLike;
   durationMinutes: number;
@@ -108,6 +109,11 @@ export default function TodayMocksPage() {
         "mockUser",
         JSON.stringify({ name: trimmedName, email: normalizedEmail })
       );
+      if (selectedMock.accessType === "public") {
+        router.push(`/public-mocks/${selectedMock.id}`);
+        return;
+      }
+
       router.push(`/mocks/${selectedMock.id}/rules`);
     } catch (error) {
       console.error("Failed to validate mock attempt:", error);
@@ -197,6 +203,11 @@ export default function TodayMocksPage() {
                       <div className="mt-3 text-sm font-semibold text-[#071014]">
                         {mock.title || "Grand Mock"}
                       </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#0f7896]">
+                          {mock.accessType === "public" ? "Public" : "Members"}
+                        </span>
+                      </div>
                       <div className="mt-2 text-xs leading-5 text-[#071014]/65">
                         Ends {new Date(endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </div>
@@ -243,6 +254,9 @@ export default function TodayMocksPage() {
                     </span>
                   </div>
                   <h2 className="mt-5 text-2xl font-semibold text-[#071014]">{mock.title || "Grand Mock"}</h2>
+                  <div className="mt-3 inline-flex rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#0f7896]">
+                    {mock.accessType === "public" ? "Public access" : "Members only"}
+                  </div>
                   <p className="mt-3 text-sm leading-7 text-[#071014]/65">
                     Available until{" "}
                     {new Date(
