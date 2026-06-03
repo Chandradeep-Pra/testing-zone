@@ -55,6 +55,10 @@ function normalizeMock(payload: unknown): Mock | null {
   };
 }
 
+function getOptionLabel(index: number) {
+  return String.fromCharCode(65 + index);
+}
+
 export default function Page() {
   const { id } = useParams();
   const router = useRouter();
@@ -325,4 +329,5 @@ export default function Page() {
     </>
   );
 }
+
 
