@@ -174,8 +174,7 @@ export default function PublicVivaSessionClient({ vivaCase }: { vivaCase: VivaCa
           <div className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
             Urologics AI
           </div>
-          <CardTitle className="text-center text-[#071014]">Start Public Viva</CardTitle>
-          <p className="text-center text-sm text-[#071014]/65">{vivaCase.case.title}</p>
+          <CardTitle className="text-center text-[#071014]">{vivaCase.case.title}</CardTitle>
           <p className="text-center text-xs uppercase tracking-[0.22em] text-[#0f7896]">
             {selectedModeFromUrl === "fast" ? "Fast and Furious" : "Calm and Composed"}
           </p>
