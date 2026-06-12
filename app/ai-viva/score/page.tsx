@@ -16,6 +16,7 @@ import toast from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
+import { appPath } from "@/lib/app-path";
 
 interface DomainReport {
   name: string;
@@ -121,7 +122,7 @@ export default function ReviewPage() {
 
         toast.loading("Sending your Urologics AI Viva report...", { id: "send-mail" });
 
-        const res = await fetch("/api/send-report", {
+        const res = await fetch(appPath("/api/send-report"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ candidateInfo: parsed }),

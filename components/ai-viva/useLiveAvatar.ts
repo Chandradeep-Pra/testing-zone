@@ -8,6 +8,8 @@ import {
   type RemoteTrack,
 } from "livekit-client";
 
+import { appPath } from "@/lib/app-path";
+
 type LiveAvatarSessionResponse = {
   sessionToken: string;
   session_id: string;
@@ -161,7 +163,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
     pushDebug("starting session");
 
     try {
-      const response = await fetch("/api/liveavatar/session", {
+      const response = await fetch(appPath("/api/liveavatar/session"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -366,7 +368,7 @@ export function useLiveAvatar(options?: UseLiveAvatarOptions) {
     }
 
     try {
-      await fetch("/api/liveavatar/session/stop", {
+      await fetch(appPath("/api/liveavatar/session/stop"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

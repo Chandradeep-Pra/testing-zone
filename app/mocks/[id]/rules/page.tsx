@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
+import { appPath } from "@/lib/app-path";
 
 interface Mock {
   id: string;
@@ -21,14 +22,14 @@ export default function MockRulesPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const publicRes = await fetch(`/api/public/mocks/${id}`);
+        const publicRes = await fetch(appPath(`/api/public/mocks/${id}`));
         if (publicRes.ok) {
           const publicData = await publicRes.json();
           setMock(publicData.mock);
           return;
         }
 
-        const res = await fetch(`/api/mocks/${id}`);
+        const res = await fetch(appPath(`/api/mocks/${id}`));
         const data = await res.json();
         setMock(data.mock);
       } catch (err) {

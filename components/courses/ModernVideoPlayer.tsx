@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { PlaybackResponse } from "@/components/courses/types";
 import { formatTime, getThumbnail, getYoutubeEmbedUrl } from "@/components/courses/videoUtils";
+import { appPath } from "@/lib/app-path";
 
 export default function ModernVideoPlayer({ playback }: { playback: PlaybackResponse | null }) {
   const playerShellRef = useRef<HTMLDivElement | null>(null);
@@ -146,7 +147,7 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
           ) : (
             <video
               ref={videoRef}
-              src={`/api/urologics/videos/${video.id}/stream`}
+              src={appPath(`/api/urologics/videos/${video.id}/stream`)}
               poster={thumbnail || undefined}
               controls={false}
               controlsList="nodownload noplaybackrate"

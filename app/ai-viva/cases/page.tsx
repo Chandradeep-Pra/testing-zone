@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import { appPath } from "@/lib/app-path";
 
 type VivaMode = "calm" | "fast";
 type VivaCaseWithAccess = VivaCaseRecord & {
@@ -35,13 +36,13 @@ const VivaCasesPage: React.FC = () => {
       try {
         setLoading(true);
         const res = user?.idToken
-          ? await fetch("/api/urologics/viva-cases", {
+          ? await fetch(appPath("/api/urologics/viva-cases"), {
               headers: {
                 Authorization: `Bearer ${user.idToken}`,
               },
               cache: "no-store",
             })
-          : await fetch("/api/public/viva-cases");
+          : await fetch(appPath("/api/public/viva-cases"));
 
         if (!res.ok) throw new Error("Failed to fetch cases");
         const data = await res.json();

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import { appPath } from "@/lib/app-path";
 
 type TimestampLike = {
   _seconds?: number;
@@ -50,7 +51,7 @@ export default function PublicMockPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`/api/public/mocks/${id}`);
+        const res = await fetch(appPath(`/api/public/mocks/${id}`));
         const data = (await res.json()) as { mock?: Mock; error?: string };
 
         if (!res.ok) {
@@ -88,7 +89,7 @@ export default function PublicMockPage() {
     try {
       setSubmitting(true);
 
-      const res = await fetch(`/api/public/mocks/${mock.id}`);
+      const res = await fetch(appPath(`/api/public/mocks/${mock.id}`));
       const data = (await res.json()) as { mock?: { attempts?: MockAttempt[] }; attempts?: MockAttempt[] };
       const attempts = Array.isArray(data.mock?.attempts)
         ? data.mock.attempts

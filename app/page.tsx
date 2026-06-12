@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import { appPath } from "@/lib/app-path";
 
 type Announcement = {
   id: string;
@@ -90,8 +91,8 @@ export default function Home() {
 
     async function loadOverviewContent() {
       const [announcementResult, quizResultResponse] = await Promise.allSettled([
-        fetch("/api/urologics/announcements", { cache: "no-store" }).then((res) => res.json()),
-        fetch("/api/urologics/daily-quiz", { cache: "no-store" }).then((res) => res.json()),
+        fetch(appPath("/api/urologics/announcements"), { cache: "no-store" }).then((res) => res.json()),
+        fetch(appPath("/api/urologics/daily-quiz"), { cache: "no-store" }).then((res) => res.json()),
       ]);
 
       if (!active) return;
@@ -136,7 +137,7 @@ export default function Home() {
     setQuizMessage("");
 
     try {
-      const response = await fetch("/api/urologics/daily-quiz/submit-quiz", {
+      const response = await fetch(appPath("/api/urologics/daily-quiz/submit-quiz"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${user.idToken}`,

@@ -16,6 +16,7 @@ import {
   signInWithEmailPassword,
   type UrologicsUser,
 } from "@/lib/urologics-auth";
+import { appPath } from "@/lib/app-path";
 
 type AuthContextValue = {
   user: UrologicsUser | null;
@@ -31,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const syncPlaybackSession = useCallback(async (idToken: string) => {
-    await fetch("/api/urologics/session", {
+    await fetch(appPath("/api/urologics/session"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idToken }),
@@ -76,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [syncPlaybackSession]);
 
   const signOut = useCallback(() => {
-    void fetch("/api/urologics/session", { method: "DELETE" });
+    void fetch(appPath("/api/urologics/session"), { method: "DELETE" });
     clearStoredAuth();
     setUser(null);
   }, []);

@@ -15,6 +15,7 @@ import type {
 } from "@/components/courses/types";
 import { isUnlocked } from "@/components/courses/videoUtils";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import { appPath } from "@/lib/app-path";
 
 export default function CoursesPage() {
   const { user, loading } = useAuth();
@@ -37,7 +38,7 @@ export default function CoursesPage() {
       setError("");
 
       try {
-        const response = await fetch("/api/urologics/videos/library", {
+        const response = await fetch(appPath("/api/urologics/videos/library"), {
           headers: { Authorization: `Bearer ${idToken}` },
         });
         const payload = (await response.json()) as VideoLibraryResponse & { error?: string };
@@ -110,7 +111,7 @@ export default function CoursesPage() {
 
     setPlayingId(video.id);
     try {
-      const response = await fetch(`/api/urologics/videos/${video.id}/play`, {
+      const response = await fetch(appPath(`/api/urologics/videos/${video.id}/play`), {
         headers: { Authorization: `Bearer ${user.idToken}` },
       });
       const payload = (await response.json()) as PlaybackResponse & { error?: string };

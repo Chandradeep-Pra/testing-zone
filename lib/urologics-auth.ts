@@ -1,5 +1,7 @@
 "use client";
 
+import { appPath } from "@/lib/app-path";
+
 const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const STORAGE_KEY = "urologics-testing-zone-auth";
 
@@ -91,7 +93,7 @@ export function getStoredAuth(): UrologicsUser | null {
 
 async function fetchUrologicsAccess(idToken: string): Promise<UrologicsAccessResponse | null> {
   try {
-    const response = await fetch("/api/urologics/access", {
+    const response = await fetch(appPath("/api/urologics/access"), {
       headers: {
         Authorization: `Bearer ${idToken}`,
       },

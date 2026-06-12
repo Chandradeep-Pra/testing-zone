@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import toast from "react-hot-toast";
 
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
+import { appPath } from "@/lib/app-path";
 
 type MockQuestion = {
   id: string;
@@ -81,12 +82,12 @@ export default function ResultPage() {
 
   useEffect(() => {
     const load = async () => {
-      const publicRes = await fetch(`/api/public/mocks/${id}`);
+      const publicRes = await fetch(appPath(`/api/public/mocks/${id}`));
       if (publicRes.ok) {
         const publicData = (await publicRes.json()) as { mock?: MockDetail };
         setMock(normalizeMock(publicData.mock));
       } else {
-        const res = await fetch(`/api/mocks/${id}`);
+        const res = await fetch(appPath(`/api/mocks/${id}`));
         const data = (await res.json()) as { mock?: MockDetail };
         setMock(normalizeMock(data.mock));
       }
@@ -155,7 +156,7 @@ export default function ResultPage() {
           mock?.accessType === "public"
             ? `/api/public/mocks/${id}/attempts`
             : `/api/mocks/${id}/attempts`;
-        const res = await fetch(attemptEndpoint, {
+        const res = await fetch(appPath(attemptEndpoint), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

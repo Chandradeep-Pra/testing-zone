@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import { appPath } from "@/lib/app-path";
 
 type TimestampLike = {
   _seconds?: number;
@@ -49,7 +50,7 @@ export default function TodayMocksPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch("/api/mocks");
+        const res = await fetch(appPath("/api/mocks"));
         const data = (await res.json()) as { mocks?: Mock[] };
 
         const filtered = (data.mocks || []).filter((mock) => {
@@ -87,7 +88,7 @@ export default function TodayMocksPage() {
     }
 
     try {
-      const res = await fetch(`/api/mocks/${selectedMock.id}`);
+      const res = await fetch(appPath(`/api/mocks/${selectedMock.id}`));
       const data = (await res.json()) as { mock?: { attempts?: MockAttempt[] }; attempts?: MockAttempt[] };
       const attempts = Array.isArray(data.mock?.attempts)
         ? data.mock.attempts

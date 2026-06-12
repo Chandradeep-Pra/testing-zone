@@ -3,6 +3,7 @@
 import { AlarmClock, Coffee, Send, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { appPath } from "@/lib/app-path";
 
 interface Question {
   id: string;
@@ -73,14 +74,14 @@ export default function Page() {
 
   useEffect(() => {
     const load = async () => {
-      const publicRes = await fetch(`/api/public/mocks/${id}`);
+      const publicRes = await fetch(appPath(`/api/public/mocks/${id}`));
       if (publicRes.ok) {
         const publicData = await publicRes.json();
         const nextMock = normalizeMock(publicData.mock);
         setMock(nextMock);
         setTimeLeft((nextMock?.durationMinutes || 0) * 60);
       } else {
-        const res = await fetch(`/api/mocks/${id}`);
+        const res = await fetch(appPath(`/api/mocks/${id}`));
         const data = await res.json();
         const nextMock = normalizeMock(data.mock);
         setMock(nextMock);

@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
 
+import { appPath } from "@/lib/app-path";
 import type { VivaCaseRecord, VivaModeQuestion } from "@/lib/viva-case";
 
 type QA = { question: string; answer: string };
@@ -240,7 +241,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       updateVivaSummaryInBackground(latestAnsweredQA, currentTurnState);
     }
 
-    const res = await fetch("/api/viva/generateFollowup", {
+    const res = await fetch(appPath("/api/viva/generateFollowup"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -283,7 +284,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
 
     summaryUpdateInFlightRef.current = true;
 
-    void fetch("/api/viva/updateSummary", {
+    void fetch(appPath("/api/viva/updateSummary"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -352,7 +353,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     try {
       const history = previousQARef.current;
 
-      const res = await fetch("/api/viva/generateScore", {
+      const res = await fetch(appPath("/api/viva/generateScore"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Clock } from "lucide-react";
 
+import { appPath } from "@/lib/app-path";
+
 import { useCountdown } from "./useCountdown";
 
 type Exhibit = {
@@ -54,7 +56,7 @@ export function VivaChat() {
   async function fetchNext(userAnswer: string) {
     setLoading(true);
 
-    const res = await fetch("/api/viva/next", {
+    const res = await fetch(appPath("/api/viva/next"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { appPath } from "@/lib/app-path";
 
 type ConversationEntry = {
   role: string;
@@ -35,7 +36,7 @@ export default function EmailSender({ candidate, onSent }: EmailSenderProps) {
 
     setSending(true);
     try {
-      const response = await fetch("/api/send-email", {
+      const response = await fetch(appPath("/api/send-email"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

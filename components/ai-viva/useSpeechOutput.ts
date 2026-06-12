@@ -68,6 +68,8 @@
 
 import { useRef, useState } from "react";
 
+import { appPath } from "@/lib/app-path";
+
 type SpeechOptions = {
   voiceName?: string;
   languageCode?: string;
@@ -92,7 +94,7 @@ try {
     audioRef.current = null;
   }
 
-  const res = await fetch("/api/viva/tts", {
+  const res = await fetch(appPath("/api/viva/tts"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

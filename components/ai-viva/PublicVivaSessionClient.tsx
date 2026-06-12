@@ -8,6 +8,7 @@ import VivaVoiceAi from "@/components/ai-viva/VivaVoiceAi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
+import { appPath } from "@/lib/app-path";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 
 type VivaMode = "calm" | "fast";
@@ -94,17 +95,20 @@ export default function PublicVivaSessionClient({ vivaCase }: { vivaCase: VivaCa
     setSubmitting(true);
 
     try {
-      const res = await fetch(`/api/public/viva-cases/${encodeURIComponent(vivaCase.id)}/start`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name,
-          email,
-          source,
-        }),
-      });
+      const res = await fetch(
+        appPath(`/api/public/viva-cases/${encodeURIComponent(vivaCase.id)}/start`),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name,
+            email,
+            source,
+          }),
+        }
+      );
 
       if (res.status === 400) {
         throw new Error("Please enter your name and a valid email.");
