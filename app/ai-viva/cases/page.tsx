@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Clock3, Filter, Flame, LockKeyhole, Search, Sparkles } from "lucide-react";
+import { ArrowRight, Clock3, Filter, LockKeyhole, Search, Sparkles, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -96,8 +96,6 @@ const VivaCasesPage: React.FC = () => {
 
   const levels = Array.from(new Set(cases.map((c) => c.case.level)));
   const creditPercent = Math.max(0, Math.min(100, vivaCredit?.percentRemaining || 0));
-  const isCreditHealthy =
-    vivaCredit && vivaCredit.remainingMinutes > Math.max(10, vivaCredit.totalMinutes * 0.2);
   const filteredCases = cases.filter((viva) => {
     const matchesLevel = levelFilter === "all" || viva.case.level === levelFilter;
     const searchLower = search.toLowerCase();
@@ -206,11 +204,7 @@ const VivaCasesPage: React.FC = () => {
                 </div>
               </div>
               <div
-                className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                  isCreditHealthy
-                    ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
-                    : "bg-[#fff3df] text-[#b45309]"
-                }`}
+                className="rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent-strong)]"
               >
                 {creditPercent}% remaining
               </div>
@@ -220,7 +214,7 @@ const VivaCasesPage: React.FC = () => {
                 className="h-full rounded-full transition-all"
                 style={{
                   width: `${creditPercent}%`,
-                  backgroundColor: isCreditHealthy ? "var(--accent)" : "#F59E0B",
+                  backgroundColor: "var(--accent)",
                 }}
               />
             </div>
@@ -290,12 +284,12 @@ const VivaCasesPage: React.FC = () => {
       disabled={!viva.modes?.fastAndFurious?.enabled}
       className={`rounded-[18px] px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
         getSelectedMode(viva) === "fast"
-          ? "bg-[#F59E0B] text-white shadow-[0_12px_28px_rgba(245,158,11,0.28)]"
-          : "text-[#b45309] hover:bg-[#fff3df]"
+          ? "bg-[#FF6347] text-white shadow-[0_12px_28px_rgba(255,99,71,0.3)]"
+          : "text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
       }`}
     >
       <span className="inline-flex items-center justify-center gap-2">
-        <Flame size={15} />
+        <Zap size={15} />
         Fast & Furious
       </span>
     </button>

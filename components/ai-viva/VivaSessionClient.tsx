@@ -121,7 +121,6 @@ export default function VivaSessionClient({
     if (!autoStart || !initialCandidate?.name || !initialCandidate.email) return;
 
     saveCandidateSession(vivaCase, selectedModeFromUrl, initialCandidate);
-    setSubmitted(true);
   }, [autoStart, initialCandidate, selectedModeFromUrl, vivaCase]);
 
   const handleSubmit = async (e: React.FormEvent) => {

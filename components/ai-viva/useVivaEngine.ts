@@ -24,6 +24,13 @@ type VivaTurnState = {
   coveredTopics: string[];
   weakAreas: string[];
 };
+type VivaScorePayload = Record<string, unknown> & {
+  basic_knowledge?: { score?: unknown };
+  higher_order_processing?: { score?: unknown };
+  clinical_skills?: { score?: unknown };
+  professionalism?: { score?: unknown };
+  caseTitle?: string;
+};
 
 export type VivaApiResponse = {
   question?: string;
@@ -117,7 +124,7 @@ function getFastModeExhibit(vivaCase: VivaCaseRecord, question: VivaModeQuestion
   return null;
 }
 
-function getOverallVivaScore(score: Record<string, any>) {
+function getOverallVivaScore(score: VivaScorePayload) {
   const domainScores = [
     score.basic_knowledge?.score,
     score.higher_order_processing?.score,
@@ -136,7 +143,7 @@ function getOverallVivaScore(score: Record<string, any>) {
 async function submitAuthenticatedVivaAttempt(params: {
   vivaCase: VivaCaseRecord;
   selectedMode: VivaMode;
-  score: Record<string, any>;
+  score: VivaScorePayload;
 }) {
   const user = getStoredAuth();
 

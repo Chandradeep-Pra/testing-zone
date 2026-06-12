@@ -134,6 +134,7 @@ export default function VivaVoiceAi({
   const warmupPendingRef = useRef(false);
   const warmupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fillerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fastSilenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fillerIndexRef = useRef(0);
   const liveCandidateMsgId = useRef<string | null>(null);
   const advanceLockRef = useRef(false);
@@ -204,6 +205,11 @@ export default function VivaVoiceAi({
   }
 
   function clearFastSilencePromptTimer() {
+    if (fastSilenceTimeoutRef.current) {
+      clearTimeout(fastSilenceTimeoutRef.current);
+      fastSilenceTimeoutRef.current = null;
+    }
+
     setFastPauseState((current) => (current === "detected" ? "idle" : current));
   }
 
@@ -304,6 +310,30 @@ export default function VivaVoiceAi({
     void submitCurrentAnswer(latestAnswer);
   }
 
+  function scheduleFastSilenceAdvance(answerText: string) {
+    const latestAnswer = answerText.trim();
+
+    clearFastSilencePromptTimer();
+
+    if (
+      !isFastMode ||
+      !vivaStarted ||
+      endingRef.current ||
+      advanceLockRef.current ||
+      warmupPendingRef.current ||
+      !latestAnswer ||
+      doesAnswerMatchCurrentFastQuestion(latestAnswer)
+    ) {
+      return;
+    }
+
+    setFastPauseState("monitoring");
+    fastSilenceTimeoutRef.current = setTimeout(() => {
+      fastSilenceTimeoutRef.current = null;
+      handleFastSpeechPause(latestAnswer);
+    }, 3000);
+  }
+
   function tryAdvanceFastMode(answerText: string) {
     if (
       !isFastMode ||
@@ -375,7 +405,7 @@ export default function VivaVoiceAi({
       );
 
       if (!tryAdvanceFastMode(combinedInterim)) {
-        setFastPauseState(combinedInterim.trim() ? "monitoring" : "idle");
+        scheduleFastSilenceAdvance(combinedInterim);
       }
     },
 
@@ -396,7 +426,7 @@ export default function VivaVoiceAi({
 
         answerPrefixRef.current = combinedFinalText;
         syncCandidateMessage(combinedFinalText, false);
-        handleFastSpeechPause(combinedFinalText);
+        scheduleFastSilenceAdvance(combinedFinalText);
         return;
       }
 
@@ -456,6 +486,9 @@ export default function VivaVoiceAi({
       }
       if (fillerTimeoutRef.current) {
         clearTimeout(fillerTimeoutRef.current);
+      }
+      if (fastSilenceTimeoutRef.current) {
+        clearTimeout(fastSilenceTimeoutRef.current);
       }
       if (keywordFlashTimeoutRef.current) {
         clearTimeout(keywordFlashTimeoutRef.current);
