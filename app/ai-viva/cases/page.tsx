@@ -1,17 +1,26 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Filter, Search, Sparkles } from "lucide-react";
+import { ArrowRight, Filter, LockKeyhole, Search, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { useAuth } from "@/components/auth/AuthProvider";
 import type { VivaCaseRecord } from "@/lib/viva-case";
-import UrologicsBrand from "@/components/brand/UrologicsBrand";
-import UrologicsNav from "@/components/brand/UrologicsNav";
+import UrologicsHeader from "@/components/brand/UrologicsHeader";
 
 type VivaMode = "calm" | "fast";
+type VivaCaseWithAccess = VivaCaseRecord & {
+  accessType?: "public" | "restricted";
+  access?: {
+    allowed?: boolean;
+    reason?: string;
+    isPublic?: boolean;
+  };
+};
 
 const VivaCasesPage: React.FC = () => {
-  const [cases, setCases] = useState<VivaCaseRecord[]>([]);
+  const { user, loading: authLoading } = useAuth();
+  const [cases, setCases] = useState<VivaCaseWithAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -21,8 +30,19 @@ const VivaCasesPage: React.FC = () => {
 
   useEffect(() => {
     const fetchCases = async () => {
+      if (authLoading) return;
+
       try {
-        const res = await fetch("/api/public/viva-cases");
+        setLoading(true);
+        const res = user?.idToken
+          ? await fetch("/api/urologics/viva-cases", {
+              headers: {
+                Authorization: `Bearer ${user.idToken}`,
+              },
+              cache: "no-store",
+            })
+          : await fetch("/api/public/viva-cases");
+
         if (!res.ok) throw new Error("Failed to fetch cases");
         const data = await res.json();
         setCases(data.cases || []);
@@ -34,7 +54,7 @@ const VivaCasesPage: React.FC = () => {
     };
 
     void fetchCases();
-  }, []);
+  }, [authLoading, user?.idToken]);
 
   function getSelectedMode(viva: VivaCaseRecord): VivaMode {
     return selectedModes[viva.id] || "calm";
@@ -48,9 +68,21 @@ const VivaCasesPage: React.FC = () => {
     }));
   }
 
-  function openCase(viva: VivaCaseRecord) {
+  function isVivaAllowed(viva: VivaCaseWithAccess) {
+    if (viva.accessType === "public" || viva.access?.isPublic) return true;
+    return viva.access ? Boolean(viva.access.allowed) : true;
+  }
+
+  function openCase(viva: VivaCaseWithAccess) {
+    if (!isVivaAllowed(viva)) return;
+
     const selectedMode = getSelectedMode(viva);
-    router.push(`/public-viva/${viva.id}?mode=${selectedMode}&source=ai-viva-cases`);
+    const isPublic = viva.accessType === "public" || viva.access?.isPublic;
+    router.push(
+      isPublic
+        ? `/public-viva/${viva.id}?mode=${selectedMode}&source=ai-viva-cases`
+        : `/ai-viva/session/${viva.id}?mode=${selectedMode}`
+    );
   }
 
   const levels = Array.from(new Set(cases.map((c) => c.case.level)));
@@ -88,10 +120,7 @@ const VivaCasesPage: React.FC = () => {
   return (
     <main className="urologics-shell overflow-hidden">
       <div className="mx-auto max-w-7xl px-6 py-6">
-        <header className="urologics-header flex flex-wrap items-center justify-between gap-4 px-5 py-4 md:px-6">
-          <UrologicsBrand product="AI Viva" tag="Case library" />
-          <UrologicsNav current="AI Viva" />
-        </header>
+        <UrologicsHeader current="AI Viva" product="AI Viva" tag="Case library" />
 
         <section className="grid gap-8 py-24 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="urologics-panel p-7 md:p-10">
@@ -155,10 +184,14 @@ const VivaCasesPage: React.FC = () => {
           </div>
         ) : (
           <section className="grid gap-6 pb-16 md:grid-cols-2 xl:grid-cols-3">
-            {filteredCases.map((viva, index) => (
+            {filteredCases.map((viva) => (
              <article
   key={viva.id}
-  className="flex cursor-pointer flex-col justify-between rounded-[28px] border border-[#0f7896]/12 bg-white p-6 shadow-[0_16px_40px_rgba(15,120,150,0.09)] transition hover:-translate-y-1 hover:border-[#0f7896]/30"
+  className={`flex flex-col justify-between rounded-[28px] border border-[#0f7896]/12 bg-white p-6 shadow-[0_16px_40px_rgba(15,120,150,0.09)] transition ${
+    isVivaAllowed(viva)
+      ? "cursor-pointer hover:-translate-y-1 hover:border-[#0f7896]/30"
+      : "cursor-not-allowed opacity-75"
+  }`}
   onClick={() => openCase(viva)}
   tabIndex={0}
   onKeyDown={(e) => {
@@ -173,7 +206,7 @@ const VivaCasesPage: React.FC = () => {
   {viva.case.level}
 </span>
                     <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#071014]/65">
-  Urologics Case
+  {viva.accessType === "public" || viva.access?.isPublic ? "Public" : isVivaAllowed(viva) ? "Included" : "Locked"}
 </span>
                   </div>
 
@@ -227,15 +260,20 @@ const VivaCasesPage: React.FC = () => {
                 </div>
 
                 <button
-                  className={`mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition bg-[#0f7896] text-white hover:bg-[#0b6078]`}
+                  disabled={!isVivaAllowed(viva)}
+                  className={`mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${
+                    isVivaAllowed(viva)
+                      ? "bg-[#0f7896] text-white hover:bg-[#0b6078]"
+                      : "cursor-not-allowed border border-[#0f7896]/12 bg-cyan-50 text-[#0f7896]"
+                  }`}
                   onClick={(e) => {
                     localStorage.removeItem("candidateInfo");
                     e.stopPropagation();
                     openCase(viva);
                   }}
                 >
-                  Start Urologics AI Viva
-                  <ArrowRight size={16} />
+                  {isVivaAllowed(viva) ? "Start Urologics AI Viva" : viva.access?.reason || "Locked"}
+                  {isVivaAllowed(viva) ? <ArrowRight size={16} /> : <LockKeyhole size={16} />}
                 </button>
               </article>
             ))}

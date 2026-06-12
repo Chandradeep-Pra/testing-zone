@@ -8,14 +8,14 @@ export default function ToasterProvider() {
       position="top-right"
       toastOptions={{
         duration: 4000,
-        className: "text-white [&_*]:text-white", // 🔥 KEY FIX
+        className: "text-[#071014] [&_*]:text-[#071014]",
         style: {
-          background: "rgba(15, 23, 42, 0.95)",
-          border: "1px solid rgba(148, 163, 184, 0.2)",
+          background: "rgba(255, 255, 255, 0.96)",
+          border: "1px solid rgba(15, 120, 150, 0.14)",
           backdropFilter: "blur(12px)",
           borderRadius: "14px",
           padding: "14px 16px",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+          boxShadow: "0 16px 40px rgba(15, 120, 150, 0.14)",
         },
       }}
     />

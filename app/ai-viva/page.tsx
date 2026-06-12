@@ -3,8 +3,7 @@
 import { ArrowRight, BrainCircuit, Mic, ScanSearch, Stethoscope } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import UrologicsBrand from "@/components/brand/UrologicsBrand";
-import UrologicsNav from "@/components/brand/UrologicsNav";
+import UrologicsHeader from "@/components/brand/UrologicsHeader";
 
 export default function VivaIntroPage() {
   const router = useRouter();
@@ -12,10 +11,7 @@ export default function VivaIntroPage() {
   return (
     <main className="urologics-shell">
       <div className="mx-auto max-w-7xl px-6 py-6">
-        <header className="urologics-header flex flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <UrologicsBrand product="AI Viva" tag="Flagship oral exam preparation" />
-          <UrologicsNav current="AI Viva" />
-        </header>
+        <UrologicsHeader current="AI Viva" product="AI Viva" tag="Flagship oral exam preparation" />
 
         <section className="grid gap-8 py-24 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="urologics-panel p-8 md:p-10">

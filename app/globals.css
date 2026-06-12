@@ -154,10 +154,10 @@
     transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
-  .urologics-header {
-    @apply rounded-[28px] border border-[#0f7896]/12 bg-white/95 backdrop-blur-xl;
+  /* .urologics-header {
+    @apply rounded-[28px]  backdrop-blur-xl;
     box-shadow: 0 16px 40px rgba(15, 120, 150, 0.08);
-  }
+  } */
 
   .urologics-panel:hover {
     @apply border-[#0f7896]/30;

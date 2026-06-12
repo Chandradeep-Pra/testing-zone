@@ -1,12 +1,11 @@
 "use client";
 
-import { CalendarClock, CircleDot, Mail, ShieldCheck, Sparkles, TimerReset } from "lucide-react";
+import { CalendarClock, Mail, ShieldCheck, Sparkles, TimerReset } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
-import UrologicsBrand from "@/components/brand/UrologicsBrand";
-import UrologicsNav from "@/components/brand/UrologicsNav";
+import UrologicsHeader from "@/components/brand/UrologicsHeader";
 
 type TimestampLike = {
   _seconds?: number;
@@ -145,12 +144,7 @@ export default function PublicMockPage() {
   return (
     <main className="urologics-shell overflow-hidden">
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
-        <header className="urologics-header flex flex-col items-start gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 md:px-6">
-          <UrologicsBrand product="Grand Mocks" tag="Public candidate registration" />
-          <div className="w-full sm:w-auto">
-            <UrologicsNav current="Mocks" />
-          </div>
-        </header>
+        <UrologicsHeader current="Mocks" product="Grand Mocks" tag="Public candidate registration" />
 
         <section className="grid gap-6 py-10 sm:gap-8 md:py-24 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="urologics-panel p-5 sm:p-7 md:p-10">
