@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Filter, LockKeyhole, Search, Sparkles } from "lucide-react";
+import { ArrowRight, Clock3, Filter, Flame, LockKeyhole, Search, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -18,6 +18,12 @@ type VivaCaseWithAccess = VivaCaseRecord & {
     isPublic?: boolean;
   };
 };
+type VivaCredit = {
+  totalMinutes: number;
+  usedMinutes: number;
+  remainingMinutes: number;
+  percentRemaining: number;
+};
 
 const VivaCasesPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -27,6 +33,7 @@ const VivaCasesPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [selectedModes, setSelectedModes] = useState<Record<string, VivaMode>>({});
+  const [vivaCredit, setVivaCredit] = useState<VivaCredit | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -47,6 +54,7 @@ const VivaCasesPage: React.FC = () => {
         if (!res.ok) throw new Error("Failed to fetch cases");
         const data = await res.json();
         setCases(data.cases || []);
+        setVivaCredit(user?.idToken && data.vivaCredit ? data.vivaCredit : null);
       } catch {
         setError("Failed to load cases");
       } finally {
@@ -87,6 +95,9 @@ const VivaCasesPage: React.FC = () => {
   }
 
   const levels = Array.from(new Set(cases.map((c) => c.case.level)));
+  const creditPercent = Math.max(0, Math.min(100, vivaCredit?.percentRemaining || 0));
+  const isCreditHealthy =
+    vivaCredit && vivaCredit.remainingMinutes > Math.max(10, vivaCredit.totalMinutes * 0.2);
   const filteredCases = cases.filter((viva) => {
     const matchesLevel = levelFilter === "all" || viva.case.level === levelFilter;
     const searchLower = search.toLowerCase();
@@ -178,6 +189,44 @@ const VivaCasesPage: React.FC = () => {
           </div>
         </section>
 
+        {user && vivaCredit && vivaCredit.totalMinutes > 0 ? (
+          <section className="urologics-panel mb-6 overflow-hidden p-6">
+            <div className="flex flex-wrap items-center justify-between gap-5">
+              <div className="flex items-center gap-4">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl border border-[var(--border)] bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                  <Clock3 size={20} />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                    AI Viva Minutes
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">
+                    {vivaCredit.remainingMinutes} / {vivaCredit.totalMinutes} minutes left
+                  </h2>
+                </div>
+              </div>
+              <div
+                className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                  isCreditHealthy
+                    ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+                    : "bg-[#fff3df] text-[#b45309]"
+                }`}
+              >
+                {creditPercent}% remaining
+              </div>
+            </div>
+            <div className="mt-5 h-3 overflow-hidden rounded-full bg-[var(--accent-soft)]">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${creditPercent}%`,
+                  backgroundColor: isCreditHealthy ? "var(--accent)" : "#F59E0B",
+                }}
+              />
+            </div>
+          </section>
+        ) : null}
+
         {filteredCases.length === 0 ? (
           <div className="urologics-panel p-10 text-center">
             <div className="text-xl font-semibold text-[var(--text-primary)]">No cases found</div>
@@ -241,11 +290,14 @@ const VivaCasesPage: React.FC = () => {
       disabled={!viva.modes?.fastAndFurious?.enabled}
       className={`rounded-[18px] px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
         getSelectedMode(viva) === "fast"
-          ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_12px_28px_var(--shadow-brand)]"
-          : "text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
+          ? "bg-[#F59E0B] text-white shadow-[0_12px_28px_rgba(245,158,11,0.28)]"
+          : "text-[#b45309] hover:bg-[#fff3df]"
       }`}
     >
-      Fast & Furious
+      <span className="inline-flex items-center justify-center gap-2">
+        <Flame size={15} />
+        Fast & Furious
+      </span>
     </button>
   </div>
 </div>
