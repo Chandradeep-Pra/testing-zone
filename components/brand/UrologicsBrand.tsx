@@ -3,6 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { appPath } from "@/lib/app-path";
+
 type UrologicsBrandProps = {
   product?: string;
   tag?: string;
@@ -19,7 +21,7 @@ export default function UrologicsBrand({
   const content = (
     <div className="flex items-center gap-3">
       <Image
-        src="/logo.png"
+        src={appPath("/logo.png")}
         alt="Urologics"
         width={44}
         height={44}

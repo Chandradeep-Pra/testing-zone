@@ -1,13 +1,14 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { appPath } from "@/lib/app-path";
 
 export default function PublicVivaNotFound() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-white p-4 text-[#071014]">
       <section className="w-full max-w-md text-center">
         <img
-          src="/logo.png"
+          src={appPath("/logo.png")}
           alt="Urologics"
           className="mx-auto mb-5 h-16 w-16 object-contain"
         />

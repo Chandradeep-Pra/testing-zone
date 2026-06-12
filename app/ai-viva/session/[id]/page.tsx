@@ -1,7 +1,11 @@
 import { notFound } from "next/navigation";
 
 import VivaSessionClient from "@/components/ai-viva/VivaSessionClient";
-import { fetchRemoteVivaCaseById, getDefaultVivaCase } from "@/lib/viva-case";
+import {
+  fetchRemotePublicVivaCaseById,
+  fetchRemoteVivaCaseById,
+  getDefaultVivaCase,
+} from "@/lib/viva-case";
 
 export default async function VivaSessionPage({
   params,
@@ -15,6 +19,14 @@ export default async function VivaSessionPage({
     vivaCase = await fetchRemoteVivaCaseById(id);
   } catch (error) {
     console.error("Failed to load viva case:", error);
+  }
+
+  if (!vivaCase) {
+    try {
+      vivaCase = await fetchRemotePublicVivaCaseById(id);
+    } catch (error) {
+      console.error("Failed to load public viva case:", error);
+    }
   }
 
   if (!vivaCase) {

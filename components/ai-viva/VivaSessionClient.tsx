@@ -8,6 +8,7 @@ import VivaVoiceAi from "@/components/ai-viva/VivaVoiceAi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
+import { appPath } from "@/lib/app-path";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 
 type CandidateInfo = {
@@ -148,7 +149,7 @@ export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseReco
       <Card className="w-full max-w-md rounded-[28px] border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
         <CardHeader>
           <img
-            src="/logo.png"
+            src={appPath("/logo.png")}
             alt="Urologics"
             className="mx-auto mb-3 h-16 w-16 object-contain"
           />
