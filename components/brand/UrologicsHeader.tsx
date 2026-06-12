@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import AuthStatus from "@/components/auth/AuthStatus";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import UrologicsNav from "@/components/brand/UrologicsNav";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 type UrologicsHeaderProps = {
   current?: string;
@@ -49,7 +50,7 @@ export default function UrologicsHeader({
   return (
     <>
       <header
-        className={`fixed inset-x-0 top-3 z-50 mx-auto w-full max-w-7xl px-4 transition-all duration-500 ease-in-out sm:px-6 ${
+        className={`fixed inset-x-0 top-3 z-50  mx-auto w-full max-w-7xl px-4 transition-all duration-500 ease-in-out sm:px-6 ${
           showHeader ? "translate-y-0 opacity-100" : "-translate-y-[130%] opacity-0"
         }`}
       >
@@ -57,7 +58,8 @@ export default function UrologicsHeader({
           <UrologicsBrand product={product} tag={tag} />
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             <UrologicsNav current={current} />
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <ThemeToggle />
               <AuthStatus />
             </div>
           </div>

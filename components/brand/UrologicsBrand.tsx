@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 
 type UrologicsBrandProps = {
@@ -17,20 +18,22 @@ export default function UrologicsBrand({
 }: UrologicsBrandProps) {
   const content = (
     <div className="flex items-center gap-3">
-      <img
+      <Image
         src="/logo.png"
         alt="Urologics"
+        width={44}
+        height={44}
         className="h-11 w-11 object-contain"
       />
       <div className="min-w-0">
         {/* <div className="text-[10px] uppercase tracking-[0.28em] text-teal-300/90">
           Urologics
         </div> */}
-        <div className={`${compact ? "text-sm" : "text-base"} truncate font-semibold text-[#071014]`}>
+        <div className={`${compact ? "text-sm" : "text-base"} truncate font-semibold text-[var(--text-primary)]`}>
           Urologics {product}
         </div>
         {!compact && (
-          <div className="text-xs text-[#071014]/65">
+          <div className="text-xs text-[var(--text-secondary)]">
             {tag}
           </div>
         )}

@@ -5,10 +5,6 @@ import Link from "next/link";
 import { LogOut, UserRound } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 
-function getFirstName(name: string) {
-  return name.trim().split(/\s+/)[0] || "there";
-}
-
 export default function AuthStatus() {
   const { user, loading, signOut } = useAuth();
   const [open, setOpen] = useState(false);
@@ -27,7 +23,7 @@ export default function AuthStatus() {
 
   if (loading) {
     return (
-      <span className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-4 py-2 text-sm font-medium text-[#0f7896]">
+      <span className="rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent-strong)]">
         Checking session
       </span>
     );
@@ -37,21 +33,19 @@ export default function AuthStatus() {
     return (
       <Link
         href="/login"
-        className="rounded-full bg-[#0f7896] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0b6078]"
+        className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-hover)]"
       >
         Login
       </Link>
     );
   }
 
-  const firstName = getFirstName(user.name || user.email);
-
   return (
     <div ref={menuRef} className="relative flex items-center gap-3">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="grid h-11 w-11 place-items-center overflow-hidden rounded-full border border-[#0f7896]/12 bg-cyan-50 text-[#0f7896] shadow-[0_10px_28px_rgba(15,120,150,0.08)] transition hover:border-[#0f7896]/30"
+        className="grid h-11 w-11 place-items-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-[0_10px_28px_var(--shadow-soft)] transition hover:border-[var(--accent)]"
         aria-label="Open account menu"
       >
         {user.profileImageUrl ? (
@@ -63,10 +57,10 @@ export default function AuthStatus() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-56 rounded-[22px] border border-[#0f7896]/12 bg-white p-2 shadow-[0_20px_50px_rgba(15,120,150,0.16)]">
+        <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-56 rounded-[22px] border border-[var(--border)] bg-[var(--surface-raised)] p-2 shadow-[0_20px_50px_var(--shadow-brand)]">
           <div className="px-3 py-2">
-            <p className="truncate text-sm font-semibold text-[#071014]">{user.name}</p>
-            <p className="truncate text-xs text-[#071014]/55">{user.email}</p>
+            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{user.name}</p>
+            <p className="truncate text-xs text-[var(--text-tertiary)]">{user.email}</p>
           </div>
           <button
             type="button"
@@ -74,7 +68,7 @@ export default function AuthStatus() {
               setOpen(false);
               signOut();
             }}
-            className="mt-1 flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-[#071014] transition hover:bg-cyan-50 hover:text-[#0f7896]"
+            className="mt-1 flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]"
           >
             <LogOut className="h-4 w-4" />
             Logout

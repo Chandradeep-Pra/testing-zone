@@ -46,15 +46,15 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
 
   if (!playback) {
     return (
-      <div className="grid min-h-[520px] place-items-center rounded-[30px] border border-[#0f7896]/12 bg-[radial-gradient(circle_at_top_left,rgba(15,120,150,0.16),transparent_36%),linear-gradient(135deg,#ffffff,#ecfeff)] p-8 text-center shadow-[0_16px_40px_rgba(15,120,150,0.08)]">
+      <div className="grid min-h-[520px] place-items-center rounded-[30px] border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,var(--accent-muted),transparent_36%),linear-gradient(135deg,var(--surface-raised),var(--surface-tint))] p-8 text-center shadow-[0_16px_40px_var(--shadow-soft)]">
         <div>
-          <div className="mx-auto grid h-20 w-20 place-items-center rounded-[28px] bg-white text-[#0f7896] shadow-[0_16px_40px_rgba(15,120,150,0.13)]">
+          <div className="mx-auto grid h-20 w-20 place-items-center rounded-[28px] bg-[var(--surface-raised)] text-[var(--accent-strong)] shadow-[0_16px_40px_var(--shadow-brand)]">
             <PlayCircle className="h-10 w-10" />
           </div>
-          <h2 className="mt-6 text-2xl font-semibold tracking-[-0.03em] text-[#071014]">
+          <h2 className="mt-6 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
             Select a lesson
           </h2>
-          <p className="mt-2 text-sm text-[#071014]/55">Your video will open here.</p>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">Your video will open here.</p>
         </div>
       </div>
     );
@@ -125,7 +125,7 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
       className={`overflow-hidden ${
         isFullscreen
           ? "rounded-none border-0 bg-black shadow-none"
-          : "rounded-[30px] border border-[#0f7896]/12 bg-white shadow-[0_18px_48px_rgba(15,120,150,0.1)]"
+          : "rounded-[30px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_18px_48px_var(--shadow-soft)]"
       }`}
     >
       <div
@@ -201,7 +201,7 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
                 className="block h-full w-full text-left"
               >
                 <span
-                  className="block h-full rounded-full bg-[#23b7d9]"
+                  className="block h-full rounded-full bg-[var(--accent-strong)]"
                   style={{ width: `${progress}%` }}
                 />
               </button>
@@ -270,11 +270,11 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
       </div>
 
       <div className="p-4 sm:p-5">
-        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-[#0f7896]">
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
           <Video className="h-3.5 w-3.5" />
           Playing
         </div>
-        <h1 className="line-clamp-2 text-xl font-semibold tracking-[-0.03em] text-[#071014] sm:text-2xl">
+        <h1 className="line-clamp-2 text-xl font-semibold tracking-[-0.03em] text-[var(--text-primary)] sm:text-2xl">
           {video.title}
         </h1>
       </div>

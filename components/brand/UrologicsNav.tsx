@@ -11,7 +11,7 @@ const NAV_ITEMS = [
 
 export default function UrologicsNav({ current }: { current?: string }) {
   return (
-    <nav className="flex flex-wrap items-center gap-2 rounded-full border border-[#0f7896]/12 bg-white px-2 py-2 shadow-[0_12px_30px_rgba(15,120,150,0.09)] backdrop-blur-xl">
+    <nav className="flex flex-wrap items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2 shadow-[0_12px_30px_var(--shadow-soft)] backdrop-blur-xl">
       {NAV_ITEMS.map((item) => {
         const active = item.label === current;
 
@@ -21,8 +21,8 @@ export default function UrologicsNav({ current }: { current?: string }) {
             href={item.href}
             className={`rounded-full px-4 py-2 text-sm transition ${
               active
-                ? "bg-[#0f7896] text-white"
-                : "text-[#071014]/65 hover:bg-cyan-50 hover:text-[#071014]"
+                ? "bg-[var(--accent)] text-[var(--accent-text)]"
+                : "text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
             }`}
           >
             {item.label}

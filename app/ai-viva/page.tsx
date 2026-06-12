@@ -10,10 +10,10 @@ export default function VivaIntroPage() {
 
   return (
     <main className="urologics-shell">
-      <div className="mx-auto max-w-7xl px-6 py-6">
+      <div className="mx-auto max-w-7xl px-6 py-2">
         <UrologicsHeader current="AI Viva" product="AI Viva" tag="Flagship oral exam preparation" />
 
-        <section className="grid gap-8 py-24 lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="grid gap-8 py-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="urologics-panel p-8 md:p-10">
             <div className="urologics-chip">Flagship Experience</div>
             <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.04em] text-[#071014] sm:text-5xl">

@@ -19,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="dark antialiased">
+      <body className="antialiased">
         <AuthProvider>{children}</AuthProvider>
         <ToasterProvider />
       </body>

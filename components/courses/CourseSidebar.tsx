@@ -37,18 +37,18 @@ export default function CourseSidebar({
     <aside className="urologics-panel flex min-h-0 flex-col overflow-hidden p-3">
       <div className="mb-3 flex items-center justify-between gap-3 px-1">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-cyan-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#0f7896]">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
             <BookOpenCheck className="h-3.5 w-3.5" />
-            Courses
+            Videos
           </div>
-          <p className="mt-2 text-xs text-[#071014]/55">
+          <p className="mt-2 text-xs text-[var(--text-secondary)]">
             {unlockedVideos}/{totalVideos} unlocked
           </p>
         </div>
       </div>
 
       <div className="relative mb-3">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0f7896]" />
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--accent-strong)]" />
         <input
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
@@ -59,7 +59,7 @@ export default function CourseSidebar({
 
       <div className="urologics-thin-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {libraryLoading ? (
-          <div className="rounded-[22px] bg-cyan-50 p-4 text-sm font-medium text-[#0f7896]">
+          <div className="rounded-[22px] bg-[var(--accent-soft)] p-4 text-sm font-medium text-[var(--accent-strong)]">
             Loading videos...
           </div>
         ) : error ? (
@@ -67,7 +67,7 @@ export default function CourseSidebar({
             {error}
           </div>
         ) : filteredSections.length === 0 ? (
-          <div className="rounded-[22px] bg-cyan-50 p-4 text-sm text-[#071014]/65">
+          <div className="rounded-[22px] bg-[var(--accent-soft)] p-4 text-sm text-[var(--text-secondary)]">
             No videos found.
           </div>
         ) : (
@@ -76,27 +76,27 @@ export default function CourseSidebar({
             const lockedCount = section.videos.filter((video) => !isUnlocked(video)).length;
 
             return (
-              <div key={section.id} className="rounded-[22px] border border-[#0f7896]/10 bg-white">
+              <div key={section.id} className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)]">
                 <button
                   type="button"
                   onClick={() => onToggleSection(section.id)}
                   className="flex w-full items-center gap-3 px-3 py-3 text-left"
                 >
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-cyan-50 text-[#0f7896]">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                     {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-[#071014]">
+                    <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">
                       {prettifyTitle(section.title)}
                     </span>
-                    <span className="mt-0.5 block text-xs text-[#071014]/50">
+                    <span className="mt-0.5 block text-xs text-[var(--text-tertiary)]">
                       {section.videoCount} lessons{lockedCount ? ` | ${lockedCount} locked` : ""}
                     </span>
                   </span>
                 </button>
 
                 {expanded ? (
-                  <div className="space-y-1 border-t border-[#0f7896]/8 p-2">
+                  <div className="space-y-1 border-t border-[var(--border)] p-2">
                     {section.videos.map((video) => {
                       const unlocked = isUnlocked(video);
                       const selected = selectedVideoId === video.id;
@@ -109,22 +109,22 @@ export default function CourseSidebar({
                           onClick={() => onVideoClick(video)}
                           className={`flex w-full items-start gap-3 rounded-[18px] px-3 py-2.5 text-left transition ${
                             selected
-                              ? "bg-[#0f7896] text-white"
+                              ? "bg-[var(--accent)] text-[var(--accent-text)]"
                               : unlocked
-                                ? "hover:bg-cyan-50"
-                                : "opacity-70 hover:bg-slate-50"
+                                ? "hover:bg-[var(--accent-soft)]"
+                                : "opacity-70 hover:bg-[var(--surface-muted)]"
                           }`}
                         >
-                          <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-sm bg-cyan-50">
+                          <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-sm bg-[var(--accent-soft)]">
                             {thumbnail ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={thumbnail} alt="" className="h-full w-full object-cover" />
                             ) : (
-                              <span className="grid h-full w-full place-items-center text-[#0f7896]">
+                              <span className="grid h-full w-full place-items-center text-[var(--accent-strong)]">
                                 <Video className="h-5 w-5" />
                               </span>
                             )}
-                            {!unlocked ? <span className="absolute inset-0 bg-white/58" /> : null}
+                            {!unlocked ? <span className="absolute inset-0 bg-[var(--surface-raised)]/70" /> : null}
                             <span
                               className={`absolute left-1 top-1 grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold ${
                                 unlocked ? "hidden" : "bg-amber-100 text-amber-700"
@@ -136,14 +136,14 @@ export default function CourseSidebar({
                           <span className="min-w-0 flex-1">
                             <span
                               className={`line-clamp-2 text-sm font-medium leading-5 ${
-                                selected ? "text-white" : "text-[#071014]"
+                                selected ? "text-[var(--accent-text)]" : "text-[var(--text-primary)]"
                               }`}
                             >
                               {video.title}
                             </span>
                             <span
                               className={`mt-1 block text-[11px] ${
-                                selected ? "text-white/70" : "text-[#071014]/45"
+                                selected ? "text-white/70" : "text-[var(--text-tertiary)]"
                               }`}
                             >
                               {playingId === video.id ? "Opening..." : unlocked ? "Available" : "Locked"}

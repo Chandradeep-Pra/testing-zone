@@ -126,53 +126,53 @@ export default function TodayMocksPage() {
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
         <UrologicsHeader current="Mocks" product="Grand Mocks" tag="Timed practice with premium exam-day polish" />
 
-        <section className="grid gap-6 py-10 sm:gap-8 md:py-24 lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="grid gap-6 py-10 sm:gap-8 md:py-8 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="urologics-panel p-5 sm:p-7 md:p-10">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7896] sm:px-4 sm:text-[11px] sm:tracking-[0.22em]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)] sm:px-4 sm:text-[11px] sm:tracking-[0.22em]">
               <Sparkles size={14} />
               Mocks
             </div>
 
-            <h1 className="mt-6 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[#071014] sm:mt-7 sm:text-4xl md:text-5xl">
+            <h1 className="mt-6 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[var(--text-primary)] sm:mt-7 sm:text-4xl md:text-5xl">
               Timed mock sessions.
             </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-[#071014]/65 sm:mt-5 sm:text-base sm:leading-8 md:text-lg">
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--text-secondary)] sm:mt-5 sm:text-base sm:leading-8 md:text-lg">
               Join today&apos;s mock or grand mock.
             </p>
 
             <div className="mt-7 grid gap-3 md:grid-cols-3 md:gap-4">
               <div className="urologics-subpanel p-4 sm:p-5">
-                <CalendarClock className="text-[#0f7896]" size={18} />
-                <div className="mt-3 text-sm font-semibold text-[#071014]">Today</div>
-                <p className="mt-2 text-sm leading-6 text-[#071014]/65">Active sessions only.</p>
+                <CalendarClock className="text-[var(--accent-strong)]" size={18} />
+                <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">Today</div>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">Active sessions only.</p>
               </div>
               <div className="urologics-subpanel p-4 sm:p-5">
-                <TimerReset className="text-[#0f7896]" size={18} />
-                <div className="mt-3 text-sm font-semibold text-[#071014]">Timed</div>
-                <p className="mt-2 text-sm leading-6 text-[#071014]/65">Simple timed flow.</p>
+                <TimerReset className="text-[var(--accent-strong)]" size={18} />
+                <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">Timed</div>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">Simple timed flow.</p>
               </div>
               <div className="urologics-subpanel p-4 sm:p-5">
-                <ShieldCheck className="text-[#0f7896]" size={18} />
-                <div className="mt-3 text-sm font-semibold text-[#071014]">Ready</div>
-                <p className="mt-2 text-sm leading-6 text-[#071014]/65">Built for exam prep.</p>
+                <ShieldCheck className="text-[var(--accent-strong)]" size={18} />
+                <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">Ready</div>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">Built for exam prep.</p>
               </div>
             </div>
           </div>
 
           <div className="urologics-panel p-5 sm:p-7 md:p-8">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
               Sessions
             </div>
-            <div className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#071014] sm:mt-4 sm:text-3xl">
+            <div className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)] sm:mt-4 sm:text-3xl">
               {loading ? "Loading mock schedule" : `${mocks.length} live sessions now`}
             </div>
             <div className="urologics-thin-scrollbar mt-4 max-h-[272px] space-y-3 overflow-y-auto pr-1 sm:mt-5 sm:pr-2">
               {loading ? (
-                <div className="rounded-[22px] border border-[#0f7896]/12 bg-cyan-50 p-4 text-sm text-[#071014]/65">
+                <div className="rounded-[22px] border border-[var(--border)] bg-[var(--accent-soft)] p-4 text-sm text-[var(--text-secondary)]">
                   Starting the test
                 </div>
               ) : mocks.length === 0 ? (
-                <div className="rounded-[22px] border border-[#0f7896]/12 bg-cyan-50 p-4 text-sm leading-6 text-[#071014]/65">
+                <div className="rounded-[22px] border border-[var(--border)] bg-[var(--accent-soft)] p-4 text-sm leading-6 text-[var(--text-secondary)]">
                   No live sessions right now.
                 </div>
               ) : (
@@ -186,26 +186,26 @@ export default function TodayMocksPage() {
                       key={`session-summary-${mock.id}`}
                       type="button"
                       onClick={() => setSelectedMock(mock)}
-                      className="w-full rounded-[22px] border border-[#0f7896]/12 bg-white p-4 text-left transition hover:-translate-y-1 hover:border-[#0f7896]/30"
+                      className="w-full rounded-[22px] border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:-translate-y-1 hover:border-[var(--accent)]"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <span className="inline-flex items-center gap-2 rounded-full border border-[#0f7896]/12 bg-cyan-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#0f7896]">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
                           <CircleDot size={9} />
                           Live
                         </span>
-                        <span className="text-[11px] uppercase tracking-[0.18em] text-[#071014]/55">
+                        <span className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                           {mock.durationMinutes} min
                         </span>
                       </div>
-                      <div className="mt-3 text-sm font-semibold text-[#071014]">
+                      <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
                         {mock.title || "Grand Mock"}
                       </div>
                       <div className="mt-2 flex items-center gap-2">
-                        <span className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#0f7896]">
+                        <span className="rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
                           {mock.accessType === "public" ? "Public" : "Members"}
                         </span>
                       </div>
-                      <div className="mt-2 text-xs leading-5 text-[#071014]/65">
+                      <div className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
                         Ends {new Date(endTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </div>
                     </button>
@@ -217,20 +217,20 @@ export default function TodayMocksPage() {
         </section>
 
         <section className="pb-16">
-          <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896] sm:mb-5">
+          <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)] sm:mb-5">
             All Sessions
           </div>
           {loading ? (
-            <div className="urologics-panel p-8 text-center text-[#071014]/65 sm:p-10">
+            <div className="urologics-panel p-8 text-center text-[var(--text-secondary)] sm:p-10">
               Loading scheduled mocks...
             </div>
           ) : mocks.length === 0 ? (
             <div className="urologics-panel p-8 text-center sm:p-10">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                 <CalendarClock size={20} />
               </div>
-              <div className="text-xl font-semibold text-[#071014]">No live sessions now</div>
-              <p className="mt-3 text-sm leading-7 text-[#071014]/65">
+              <div className="text-xl font-semibold text-[var(--text-primary)]">No live sessions now</div>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
                 New sessions will appear here.
               </p>
             </div>
@@ -242,19 +242,19 @@ export default function TodayMocksPage() {
                   className="urologics-panel p-5 sm:p-6"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
                       <CircleDot size={10} />
                       Live Today
                     </span>
-                    <span className="text-xs font-medium uppercase tracking-[0.18em] text-[#071014]/65">
+                    <span className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                       {mock.durationMinutes} min
                     </span>
                   </div>
-                  <h2 className="mt-4 text-xl font-semibold text-[#071014] sm:mt-5 sm:text-2xl">{mock.title || "Grand Mock"}</h2>
-                  <div className="mt-3 inline-flex rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#0f7896]">
+                  <h2 className="mt-4 text-xl font-semibold text-[var(--text-primary)] sm:mt-5 sm:text-2xl">{mock.title || "Grand Mock"}</h2>
+                  <div className="mt-3 inline-flex rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
                     {mock.accessType === "public" ? "Public access" : "Members only"}
                   </div>
-                  <p className="mt-3 text-sm leading-7 text-[#071014]/65">
+                  <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
                     Available until{" "}
                     {new Date(
                       getTimestamp(mock.endTime) || getTimestamp(mock.startTime) + mock.durationMinutes * 60 * 1000
@@ -274,23 +274,23 @@ export default function TodayMocksPage() {
       </div>
 
       {selectedMock && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#071014]/35 p-3 backdrop-blur-sm sm:items-center sm:p-4">
-          <div className="w-full max-w-lg rounded-t-[28px] border border-[#0f7896]/12 bg-white p-6 shadow-[0_24px_60px_rgba(15,120,150,0.18)] sm:rounded-[28px] sm:p-8">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:p-4">
+          <div className="w-full max-w-lg rounded-t-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-[0_24px_60px_var(--shadow-medium)] sm:rounded-[28px] sm:p-8">
             <UrologicsBrand compact product="Grand Mocks" tag="Candidate registration" />
-            <div className="mt-5 text-2xl font-semibold text-[#071014]">{selectedMock.title}</div>
-            <p className="mt-3 text-sm leading-7 text-[#071014]/65">
+            <div className="mt-5 text-2xl font-semibold text-[var(--text-primary)]">{selectedMock.title}</div>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
               Enter your details to continue.
             </p>
             <div className="mt-6 space-y-4">
               <div>
-                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#071014]/65">
+                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                   <ShieldCheck size={14} />
                   Full Name
                 </label>
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" className="urologics-input" />
               </div>
               <div>
-                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#071014]/65">
+                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                   <Mail size={14} />
                   Email
                 </label>

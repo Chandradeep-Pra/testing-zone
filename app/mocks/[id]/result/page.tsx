@@ -29,7 +29,12 @@ function normalizeOption(option: unknown) {
 }
 
 function normalizeQuestion(question: unknown, index: number): MockQuestion {
-  const source = (question && typeof question === "object" ? question : {}) as Record<string, any>;
+  const source = (question && typeof question === "object" ? question : {}) as Record<string, unknown>;
+  const explanation =
+    source.explanation && typeof source.explanation === "object"
+      ? (source.explanation as Record<string, unknown>)
+      : null;
+
   return {
     id: typeof source.id === "string" ? source.id : `question-${index + 1}`,
     questionText: typeof source.questionText === "string" ? source.questionText : "",
@@ -42,19 +47,18 @@ function normalizeQuestion(question: unknown, index: number): MockQuestion {
         : Number.isFinite(Number(source.correctAnswer))
           ? Number(source.correctAnswer)
           : -1,
-    explanation:
-      source.explanation && typeof source.explanation === "object"
-        ? {
-            text: typeof source.explanation.text === "string" ? source.explanation.text : undefined,
-            image: typeof source.explanation.image === "string" ? source.explanation.image : undefined,
-          }
-        : undefined,
+    explanation: explanation
+      ? {
+          text: typeof explanation.text === "string" ? explanation.text : undefined,
+          image: typeof explanation.image === "string" ? explanation.image : undefined,
+        }
+      : undefined,
   };
 }
 
 function normalizeMock(payload: unknown): MockDetail | null {
   if (!payload || typeof payload !== "object") return null;
-  const source = payload as Record<string, any>;
+  const source = payload as Record<string, unknown>;
   return {
     title: typeof source.title === "string" ? source.title : "Grand Mock",
     accessType: source.accessType === "public" ? "public" : "private",
@@ -226,15 +230,15 @@ export default function ResultPage() {
           <section className="grid gap-4 lg:grid-cols-[1fr_0.38fr]">
             <div className="urologics-panel p-5 sm:p-8">
               <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896] sm:h-14 sm:w-14">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)] sm:h-14 sm:w-14">
                   <ShieldCheck size={22} />
                 </div>
                 <div>
-                  <div className="text-xs uppercase tracking-[0.22em] text-[#0f7896]">Urologics Mock Review</div>
-                  <h1 className="mt-2 text-2xl font-semibold text-[#071014] sm:mt-3 sm:text-3xl">
+                  <div className="text-xs uppercase tracking-[0.22em] text-[var(--accent-strong)]">Urologics Mock Review</div>
+                  <h1 className="mt-2 text-2xl font-semibold text-[var(--text-primary)] sm:mt-3 sm:text-3xl">
                     {mock.title || "Grand Mock"}
                   </h1>
-                  <p className="mt-3 text-sm leading-7 text-[#071014]/65">
+                  <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
                     Analysis of your performance in this mock session, along with explanations for each question.
                   </p>
                 </div>
@@ -242,11 +246,11 @@ export default function ResultPage() {
             </div>
 
             <div className="urologics-panel flex flex-col items-center justify-center p-6 text-center sm:p-8">
-              <Trophy className="text-[#0f7896]" size={22} />
-              <div className="mt-4 text-4xl font-semibold text-[#0f7896] sm:text-5xl">
+              <Trophy className="text-[var(--accent-strong)]" size={22} />
+              <div className="mt-4 text-4xl font-semibold text-[var(--accent-strong)] sm:text-5xl">
                 {score}/{mock.questions.length}
               </div>
-              <div className="mt-2 text-sm text-[#071014]/65">Final mock score</div>
+              <div className="mt-2 text-sm text-[var(--text-secondary)]">Final mock score</div>
             </div>
           </section>
 
@@ -267,11 +271,11 @@ export default function ResultPage() {
               return (
                 <article key={question.id} className="urologics-panel p-5 sm:p-6">
                   <div className="flex items-start gap-3">
-                    <div className={`mt-1 rounded-full p-2 ${isCorrect ? "bg-cyan-50 text-[#0f7896]" : "bg-rose-50 text-rose-600"}`}>
+                    <div className={`mt-1 rounded-full p-2 ${isCorrect ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]" : "bg-rose-50 text-rose-600"}`}>
                       {isCorrect ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                     </div>
                     <div className="flex-1">
-                      <div className="text-lg font-semibold leading-8 text-[#071014]">
+                      <div className="text-lg font-semibold leading-8 text-[var(--text-primary)]">
                         {index + 1}. {question.questionText}
                       </div>
 
@@ -288,7 +292,7 @@ export default function ResultPage() {
                                   ? "border-emerald-300 bg-emerald-50"
                                   : isSelected
                                     ? "border-rose-200 bg-rose-50"
-                                    : "border-[#0f7896]/12 bg-white"
+                                    : "border-[var(--border)] bg-[var(--surface)]"
                               }`}
                             >
                               <div className="flex items-center gap-3">
@@ -298,7 +302,7 @@ export default function ResultPage() {
                                       ? "border-emerald-300 bg-emerald-500 text-white"
                                       : isSelected
                                         ? "border-rose-200 bg-rose-500 text-white"
-                                        : "border-[#0f7896]/18 bg-cyan-50 text-[#0f7896]"
+                                        : "border-[var(--border)] bg-[var(--accent-soft)] text-[var(--accent-strong)]"
                                   }`}
                                 >
                                   {getOptionLabel(optionIndex)}
@@ -309,7 +313,7 @@ export default function ResultPage() {
                                       ? "bg-white/80 text-emerald-900"
                                       : isSelected
                                         ? "bg-white/80 text-rose-700"
-                                        : "bg-cyan-50 text-[#071014]/80"
+                                        : "bg-[var(--surface-muted)] text-[var(--text-primary)]"
                                   }`}
                                 >
                                   {option}
@@ -321,15 +325,15 @@ export default function ResultPage() {
                       </div>
 
                       <div className="mt-4 space-y-2 text-sm leading-6">
-                        <p className="text-[#071014]/65">
+                        <p className="text-[var(--text-secondary)]">
                           Your answer:{" "}
-                          <span className={isCorrect ? "text-[#0f7896]" : "text-rose-600"}>
+                          <span className={isCorrect ? "text-[var(--accent-strong)]" : "text-rose-600"}>
                             {selectedAnswer ? `${getOptionLabel(selectedIndex)}. ${selectedAnswer}` : "Not answered"}
                           </span>
                         </p>
-                        <p className="text-[#071014]/70">
+                        <p className="text-[var(--text-secondary)]">
                           Correct answer:{" "}
-                          <span className="text-[#0f7896]">
+                          <span className="text-[var(--accent-strong)]">
                             {correctAnswer ? `${getOptionLabel(correctIndex)}. ${correctAnswer}` : "Not available"}
                           </span>
                         </p>
@@ -338,7 +342,7 @@ export default function ResultPage() {
                       {question.explanation && (
                         <div className="urologics-subpanel mt-5 p-4">
                           {question.explanation.text && (
-                            <p className="text-sm leading-7 text-[#071014]/75">{question.explanation.text}</p>
+                            <p className="text-sm leading-7 text-[var(--text-secondary)]">{question.explanation.text}</p>
                           )}
 
                           {question.explanation.image && (

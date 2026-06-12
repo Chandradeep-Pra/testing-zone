@@ -171,8 +171,8 @@ export default function Home() {
 
         <section className="py-8">
           <div className="mb-6">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0f7896]">Overview</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[#071014] sm:text-4xl md:text-5xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">Overview</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[var(--text-primary)] sm:text-4xl md:text-5xl">
               Hi, {firstName}
             </h1>
           </div>
@@ -182,14 +182,14 @@ export default function Home() {
               <section className="urologics-panel overflow-hidden p-5 sm:p-6 md:p-7">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                     <Megaphone size={20} />
                   </div>
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
                       Announcements
                     </p>
-                    <p className="text-xs text-[#071014]/50">
+                    <p className="text-xs text-[var(--text-tertiary)]">
                       {announcements.length ? `${activeAnnouncement + 1} of ${announcements.length}` : "Latest updates"}
                     </p>
                   </div>
@@ -200,7 +200,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => moveAnnouncement(-1)}
-                      className="grid h-9 w-9 place-items-center rounded-full border border-[#0f7896]/12 text-[#0f7896] transition hover:bg-cyan-50"
+                      className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border)] text-[var(--accent-strong)] transition hover:bg-[var(--accent-soft)]"
                       aria-label="Previous announcement"
                     >
                       <ChevronLeft size={17} />
@@ -208,7 +208,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => moveAnnouncement(1)}
-                      className="grid h-9 w-9 place-items-center rounded-full border border-[#0f7896]/12 text-[#0f7896] transition hover:bg-cyan-50"
+                      className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border)] text-[var(--accent-strong)] transition hover:bg-[var(--accent-soft)]"
                       aria-label="Next announcement"
                     >
                       <ChevronRight size={17} />
@@ -219,7 +219,7 @@ export default function Home() {
 
               {announcement ? (
                 <div className="mt-6 flex flex-col gap-5">
-                  <div className="overflow-hidden rounded-[26px] border border-[#0f7896]/10 bg-cyan-50">
+                  <div className="overflow-hidden rounded-[26px] border border-[var(--border)] bg-[var(--surface-muted)]">
                     {announcement.media?.type === "image" && announcement.media.src ? (
                       <button
                         type="button"
@@ -242,29 +242,29 @@ export default function Home() {
                         allowFullScreen
                       />
                     ) : (
-                      <div className="flex min-h-48 items-center justify-center text-[#0f7896]">
+                      <div className="flex min-h-48 items-center justify-center text-[var(--accent-strong)]">
                         <Megaphone size={42} />
                       </div>
                     )}
                   </div>
 
                   <div className="flex flex-col">
-                    <span className="w-fit rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-[#0f7896]">
+                    <span className="w-fit rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
                       {getAnnouncementBadge(announcement.kind)}
                     </span>
-                    <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[#071014]">
+                    <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
                       {announcement.title}
                     </h2>
                     {announcement.subtitle ? (
-                      <p className="mt-2 text-sm font-semibold text-[#0f7896]">{announcement.subtitle}</p>
+                      <p className="mt-2 text-sm font-semibold text-[var(--accent-strong)]">{announcement.subtitle}</p>
                     ) : null}
                     {announcement.description ? (
-                      <p className="mt-3 line-clamp-4 text-sm leading-7 text-[#071014]/65">{announcement.description}</p>
+                      <p className="mt-3 line-clamp-4 text-sm leading-7 text-[var(--text-secondary)]">{announcement.description}</p>
                     ) : null}
                   </div>
                 </div>
               ) : (
-                <p className="mt-6 text-sm leading-7 text-[#071014]/60">
+                <p className="mt-6 text-sm leading-7 text-[var(--text-secondary)]">
                   No active announcement right now. New updates will appear here when published.
                 </p>
               )}
@@ -277,7 +277,7 @@ export default function Home() {
                       type="button"
                       onClick={() => setActiveAnnouncement(index)}
                       className={`h-2 rounded-full transition ${
-                        index === activeAnnouncement ? "w-8 bg-[#0f7896]" : "w-2 bg-[#0f7896]/20"
+                        index === activeAnnouncement ? "w-8 bg-[var(--accent)]" : "w-2 bg-[var(--accent-muted)]"
                       }`}
                       aria-label={`Show announcement ${index + 1}`}
                     />
@@ -295,18 +295,18 @@ export default function Home() {
                       key={card.title}
                       type="button"
                       onClick={() => router.push(card.href)}
-                      className="urologics-subpanel group flex items-center gap-4 p-4 text-left transition hover:-translate-y-0.5 hover:border-[#0f7896]/25 sm:gap-5 sm:p-5"
+                      className="urologics-subpanel group flex items-center gap-4 p-4 text-left transition hover:-translate-y-0.5 sm:gap-5 sm:p-5"
                     >
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-cyan-50 text-[#0f7896] sm:h-16 sm:w-16">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-[var(--accent-soft)] text-[var(--accent-strong)] sm:h-16 sm:w-16">
                         <Icon size={27} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h2 className="text-lg font-semibold tracking-[-0.03em] text-[#071014] sm:text-xl">
+                        <h2 className="text-lg font-semibold tracking-[-0.03em] text-[var(--text-primary)] sm:text-xl">
                           {card.title}
                         </h2>
-                        <p className="mt-1 text-sm leading-6 text-[#071014]/65">{card.copy}</p>
+                        <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{card.copy}</p>
                       </div>
-                      <ArrowRight className="h-5 w-5 shrink-0 text-[#0f7896] transition group-hover:translate-x-1" />
+                      <ArrowRight className="h-5 w-5 shrink-0 text-[var(--accent-strong)] transition group-hover:translate-x-1" />
                     </button>
                   );
                 })}
@@ -315,22 +315,22 @@ export default function Home() {
 
             <section className="urologics-panel p-5 sm:p-6 md:p-7">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                   <BookOpenCheck size={20} />
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
                     Quiz of the day
                   </p>
-                  <p className="text-xs text-[#071014]/50">{dailyQuiz?.examTrack || "Daily practice"}</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">{dailyQuiz?.examTrack || "Daily practice"}</p>
                 </div>
               </div>
 
               {dailyQuiz ? (
                 <div className="mt-5">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
                     {dailyQuiz.topic ? (
-                      <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-[#0f7896]">
+                      <span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
                         {dailyQuiz.topic}
                       </span>
                     ) : null}
@@ -338,7 +338,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={() => setPreviewImage(dailyQuiz.image || null)}
-                        className="inline-flex items-center gap-1 rounded-full border border-[#0f7896]/12 px-3 py-1 text-xs font-semibold text-[#0f7896] transition hover:bg-cyan-50"
+                        className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)] transition hover:bg-[var(--accent-soft)]"
                       >
                         <ImageIcon size={13} />
                         Open image
@@ -350,14 +350,14 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={() => setPreviewImage(dailyQuiz.image || null)}
-                      className="mt-4 block overflow-hidden rounded-[22px] border border-[#0f7896]/10"
+                      className="mt-4 block overflow-hidden rounded-[22px] border border-[var(--border)]"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={dailyQuiz.image} alt="Quiz exhibit" className="max-h-44 w-full object-cover" />
                     </button>
                   ) : null}
 
-                  <h2 className="mt-4 text-lg font-semibold leading-7 text-[#071014]">{dailyQuiz.question}</h2>
+                  <h2 className="mt-4 text-lg font-semibold leading-7 text-[var(--text-primary)]">{dailyQuiz.question}</h2>
 
                   <div className="mt-4 space-y-2">
                     {(dailyQuiz.options || []).map((option, index) => {
@@ -374,11 +374,11 @@ export default function Home() {
                             isCorrect
                               ? "border-emerald-500/30 bg-emerald-50 text-emerald-700"
                               : selected
-                                ? "border-[#0f7896]/35 bg-cyan-50 text-[#071014]"
-                                : "border-[#0f7896]/10 bg-white text-[#071014]/70 hover:border-[#0f7896]/25"
+                                ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text-primary)]"
+                                : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:border-[var(--accent)]"
                           }`}
                         >
-                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#0f7896] text-xs font-bold text-white">
+                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--accent)] text-xs font-bold text-[var(--accent-text)]">
                             {String.fromCharCode(65 + index)}
                           </span>
                           <span>{option}</span>
@@ -394,7 +394,7 @@ export default function Home() {
                           ? "bg-emerald-50 text-emerald-700"
                           : quizResult === "wrong"
                             ? "bg-red-50 text-red-700"
-                            : "bg-cyan-50 text-[#0f7896]"
+                            : "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
                       }`}
                     >
                       {quizResult === "correct" ? <CheckCircle2 size={16} /> : quizResult === "wrong" ? <XCircle size={16} /> : <LockKeyhole size={16} />}
@@ -403,7 +403,7 @@ export default function Home() {
                   ) : null}
 
                   {quizResult && dailyQuiz.explanation ? (
-                    <p className="mt-3 rounded-2xl bg-[#071014]/[0.03] p-3 text-sm leading-6 text-[#071014]/65">
+                    <p className="mt-3 rounded-2xl bg-[var(--surface-muted)] p-3 text-sm leading-6 text-[var(--text-secondary)]">
                       {dailyQuiz.explanation}
                     </p>
                   ) : null}
@@ -418,7 +418,7 @@ export default function Home() {
                   </button>
                 </div>
               ) : (
-                <p className="mt-5 text-sm leading-7 text-[#071014]/60">
+                <p className="mt-5 text-sm leading-7 text-[var(--text-secondary)]">
                   Today&apos;s quiz will appear here once it is available.
                 </p>
               )}
@@ -429,11 +429,11 @@ export default function Home() {
       </div>
 
       {previewImage ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#071014]/75 p-4">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4">
           <button
             type="button"
             onClick={() => setPreviewImage(null)}
-            className="absolute right-5 top-5 grid h-11 w-11 place-items-center rounded-full bg-white text-[#071014]"
+            className="absolute right-5 top-5 grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-raised)] text-[var(--text-primary)]"
             aria-label="Close image preview"
           >
             <X size={20} />
