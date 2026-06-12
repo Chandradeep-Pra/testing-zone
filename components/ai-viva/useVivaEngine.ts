@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { appPath } from "@/lib/app-path";
+import { getStoredAuth } from "@/lib/urologics-auth";
 import type { VivaCaseRecord, VivaModeQuestion } from "@/lib/viva-case";
 
 type QA = { question: string; answer: string };
@@ -114,6 +115,57 @@ function getFastModeExhibit(vivaCase: VivaCaseRecord, question: VivaModeQuestion
   }
 
   return null;
+}
+
+function getOverallVivaScore(score: Record<string, any>) {
+  const domainScores = [
+    score.basic_knowledge?.score,
+    score.higher_order_processing?.score,
+    score.clinical_skills?.score,
+    score.professionalism?.score,
+  ].filter((value): value is number => typeof value === "number");
+
+  if (!domainScores.length) return null;
+
+  return Math.min(
+    8,
+    Math.max(4, Math.ceil(domainScores.reduce((sum, value) => sum + value, 0) / domainScores.length))
+  );
+}
+
+async function submitAuthenticatedVivaAttempt(params: {
+  vivaCase: VivaCaseRecord;
+  selectedMode: VivaMode;
+  score: Record<string, any>;
+}) {
+  const user = getStoredAuth();
+
+  if (!user?.idToken) {
+    return;
+  }
+
+  const durationMinutes =
+    params.selectedMode === "fast" ? 10 : params.vivaCase.viva_rules?.max_duration_minutes || 10;
+
+  const response = await fetch(appPath("/api/urologics/viva-attempts"), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${user.idToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      caseId: params.vivaCase.id,
+      mode: params.selectedMode === "calm" ? "Calm and Composed" : "Fast and Furious",
+      report: params.score,
+      score: getOverallVivaScore(params.score),
+      durationSeconds: durationMinutes * 60,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.error || "Failed to save viva attempt");
+  }
 }
 
 export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode = "calm") {
@@ -373,6 +425,14 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       if (!data.caseTitle) {
         data.caseTitle = vivaCase.case.title;
       }
+
+      await submitAuthenticatedVivaAttempt({
+        vivaCase,
+        selectedMode,
+        score: data,
+      }).catch((error) => {
+        console.warn("Viva attempt save failed:", error);
+      });
 
       sessionStorage.setItem("viva-final-score", JSON.stringify(data));
       router.push("/ai-viva/score");

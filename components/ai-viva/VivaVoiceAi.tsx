@@ -159,7 +159,8 @@ export default function VivaVoiceAi({
     ? getCurrentFastQuestionKeywordProgress(candidateTranscript)
     : { matchedKeywords: [], totalKeywords: 0, allMatched: false };
 
-  const vivaDurationSec = vivaCase.viva_rules.max_duration_minutes * 60;
+  const vivaDurationMinutes = vivaCase.viva_rules?.max_duration_minutes || 10;
+  const vivaDurationSec = vivaDurationMinutes * 60;
   const countdownRunning = (isFastMode ? fastTimerStarted : vivaStarted) && !ending;
   const countdownTotal = isFastMode ? fastModeTotalDurationSec : vivaDurationSec;
 
