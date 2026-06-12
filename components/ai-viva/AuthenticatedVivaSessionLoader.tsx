@@ -138,5 +138,14 @@ export default function AuthenticatedVivaSessionLoader({ id }: { id: string }) {
     );
   }
 
-  return <VivaSessionClient vivaCase={vivaCase} />;
+  return (
+    <VivaSessionClient
+      vivaCase={vivaCase}
+      initialCandidate={{
+        name: user.name || user.email.split("@")[0] || "Learner",
+        email: user.email,
+      }}
+      autoStart
+    />
+  );
 }

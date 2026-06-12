@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -29,18 +29,20 @@ type StoredCandidateInfo = CandidateInfo & {
   report?: unknown;
 };
 
-function getStoredCandidate(vivaCase: VivaCaseRecord): {
+function getStoredCandidate(vivaCase: VivaCaseRecord, mode: VivaMode, initialCandidate?: CandidateInfo): {
   candidate: CandidateInfo;
   submitted: boolean;
   selectedMode: VivaMode;
   selectedExaminerId?: string;
 } {
+  const defaultCandidate = initialCandidate || { name: "", email: "" };
+
   if (typeof window === "undefined") {
     return {
-      candidate: { name: "", email: "" },
-      submitted: false,
-      selectedMode: "calm",
-      selectedExaminerId: getDefaultExaminer("calm").id,
+      candidate: defaultCandidate,
+      submitted: Boolean(defaultCandidate.name && defaultCandidate.email),
+      selectedMode: mode,
+      selectedExaminerId: getDefaultExaminer(mode).id,
     };
   }
 
@@ -48,10 +50,10 @@ function getStoredCandidate(vivaCase: VivaCaseRecord): {
     const raw = window.localStorage.getItem("candidateInfo");
     if (!raw) {
       return {
-        candidate: { name: "", email: "" },
-        submitted: false,
-        selectedMode: "calm",
-        selectedExaminerId: getDefaultExaminer("calm").id,
+        candidate: defaultCandidate,
+        submitted: Boolean(defaultCandidate.name && defaultCandidate.email),
+        selectedMode: mode,
+        selectedExaminerId: getDefaultExaminer(mode).id,
       };
     }
 
@@ -68,22 +70,59 @@ function getStoredCandidate(vivaCase: VivaCaseRecord): {
     };
   } catch {
     return {
-      candidate: { name: "", email: "" },
-      submitted: false,
-      selectedMode: "calm",
-      selectedExaminerId: getDefaultExaminer("calm").id,
+      candidate: defaultCandidate,
+      submitted: Boolean(defaultCandidate.name && defaultCandidate.email),
+      selectedMode: mode,
+      selectedExaminerId: getDefaultExaminer(mode).id,
     };
   }
 }
 
-export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseRecord }) {
+function saveCandidateSession(
+  vivaCase: VivaCaseRecord,
+  selectedMode: VivaMode,
+  candidate: CandidateInfo
+) {
+  const selectedExaminer = getDefaultExaminer(selectedMode);
+  const storedValue: StoredCandidateInfo = {
+    name: candidate.name.trim(),
+    email: candidate.email.trim().toLowerCase(),
+    selectedCaseId: vivaCase.id,
+    selectedCaseTitle: vivaCase.case.title,
+    selectedCase: vivaCase,
+    selectedMode,
+    selectedExaminerId: selectedExaminer.id,
+    selectedExaminer,
+    conversation: [],
+    report: null,
+  };
+
+  window.localStorage.setItem("candidateInfo", JSON.stringify(storedValue));
+}
+
+export default function VivaSessionClient({
+  vivaCase,
+  initialCandidate,
+  autoStart = false,
+}: {
+  vivaCase: VivaCaseRecord;
+  initialCandidate?: CandidateInfo;
+  autoStart?: boolean;
+}) {
   const searchParams = useSearchParams();
   const selectedModeFromUrl: VivaMode = searchParams.get("mode") === "fast" ? "fast" : "calm";
-  const initialState = getStoredCandidate(vivaCase);
+  const initialState = getStoredCandidate(vivaCase, selectedModeFromUrl, initialCandidate);
   const [candidate, setCandidate] = useState<CandidateInfo>(initialState.candidate);
   const [submitted, setSubmitted] = useState(
-    initialState.submitted && initialState.selectedMode === selectedModeFromUrl
+    (autoStart || initialState.submitted) && initialState.selectedMode === selectedModeFromUrl
   );
+
+  useEffect(() => {
+    if (!autoStart || !initialCandidate?.name || !initialCandidate.email) return;
+
+    saveCandidateSession(vivaCase, selectedModeFromUrl, initialCandidate);
+    setSubmitted(true);
+  }, [autoStart, initialCandidate, selectedModeFromUrl, vivaCase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,44 +135,9 @@ export default function VivaSessionClient({ vivaCase }: { vivaCase: VivaCaseReco
       return;
     }
 
-    const checkAccess = new Promise<boolean>((resolve) => {
-      setTimeout(() => {
-        const isAllowed =
-          !Array.isArray(vivaCase.allowedUser) ||
-          vivaCase.allowedUser.length === 0 ||
-          vivaCase.allowedUser.includes(email);
-
-        resolve(isAllowed);
-      }, 3000);
-    });
-
-    toast.promise(checkAccess, {
-      loading: "Checking access...",
-      success: (isAllowed) => {
-        if (!isAllowed) {
-          throw new Error("Not allowed");
-        }
-
-        const storedValue: StoredCandidateInfo = {
-          name,
-          email,
-          selectedCaseId: vivaCase.id,
-          selectedCaseTitle: vivaCase.case.title,
-          selectedCase: vivaCase,
-          selectedMode: selectedModeFromUrl,
-          selectedExaminerId: getDefaultExaminer(selectedModeFromUrl).id,
-          selectedExaminer: getDefaultExaminer(selectedModeFromUrl),
-          conversation: [],
-          report: null,
-        };
-
-        window.localStorage.setItem("candidateInfo", JSON.stringify(storedValue));
-        setSubmitted(true);
-
-        return "Access granted! Starting viva";
-      },
-      error: "You are not allowed to access this viva",
-    });
+    saveCandidateSession(vivaCase, selectedModeFromUrl, { name, email });
+    setSubmitted(true);
+    toast.success("Starting viva");
   };
 
   if (submitted) {
