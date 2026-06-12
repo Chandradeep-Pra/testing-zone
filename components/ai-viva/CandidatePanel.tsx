@@ -6,11 +6,13 @@ import { useEffect, useRef } from "react";
 type Props = {
   cameraOn: boolean;
   listening: boolean;
+  statusDot?: "idle" | "speaking" | "keyword" | "silence";
 };
 
 export function CandidatePanel({
   cameraOn,
   listening,
+  statusDot = "idle",
 }: Props) {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -100,6 +102,19 @@ export function CandidatePanel({
       <div className="absolute left-2 top-2 rounded-full bg-black/35 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-300 md:left-3 md:top-3 md:text-[11px]">
         You
       </div>
+
+      <div
+        className={`absolute left-1/2 top-2 h-2.5 w-2.5 -translate-x-1/2 rounded-full shadow-[0_0_12px_currentColor] md:top-3 ${
+          statusDot === "keyword"
+            ? "bg-purple-400 text-purple-400"
+            : statusDot === "silence"
+              ? "bg-amber-400 text-amber-400"
+              : statusDot === "speaking"
+                ? "bg-sky-400 text-sky-400"
+                : "bg-slate-500/50 text-slate-500/50"
+        }`}
+        aria-hidden="true"
+      />
 
       {/* MIC STATUS */}
 

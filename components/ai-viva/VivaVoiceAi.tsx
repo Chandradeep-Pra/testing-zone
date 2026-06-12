@@ -34,6 +34,7 @@ type CandidateConversationMessage =
       description?: string;
     };
 type FastPauseState = "idle" | "monitoring" | "detected";
+type CandidateStatusDot = "idle" | "speaking" | "keyword" | "silence";
 type StoredCandidateInfo = {
   name?: string;
   email?: string;
@@ -135,6 +136,8 @@ export default function VivaVoiceAi({
   const warmupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fillerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fastSilenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestCandidateTranscriptRef = useRef("");
+  const fastSilenceGenerationRef = useRef(0);
   const fillerIndexRef = useRef(0);
   const liveCandidateMsgId = useRef<string | null>(null);
   const advanceLockRef = useRef(false);
@@ -152,6 +155,7 @@ export default function VivaVoiceAi({
   const [keywordDetected, setKeywordDetected] = useState(false);
   const [candidateTranscript, setCandidateTranscript] = useState("");
   const [fastPauseState, setFastPauseState] = useState<FastPauseState>("idle");
+  const [candidateStatusDot, setCandidateStatusDot] = useState<CandidateStatusDot>("idle");
   const [fastTimerStarted, setFastTimerStarted] = useState(false);
   const [fastTimerResetKey, setFastTimerResetKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -244,6 +248,7 @@ export default function VivaVoiceAi({
 
   function flashKeywordDetected() {
     setKeywordDetected(true);
+    setCandidateStatusDot("keyword");
 
     if (keywordFlashTimeoutRef.current) {
       clearTimeout(keywordFlashTimeoutRef.current);
@@ -251,6 +256,7 @@ export default function VivaVoiceAi({
 
     keywordFlashTimeoutRef.current = setTimeout(() => {
       setKeywordDetected(false);
+      setCandidateStatusDot((current) => (current === "keyword" ? "idle" : current));
       keywordFlashTimeoutRef.current = null;
     }, 700);
   }
@@ -286,7 +292,9 @@ export default function VivaVoiceAi({
 
     resetTranscriptBuffer();
     advanceLockRef.current = false;
+    latestCandidateTranscriptRef.current = answerPrefixRef.current;
     setCandidateTranscript(answerPrefixRef.current);
+    setCandidateStatusDot(answerPrefixRef.current ? "speaking" : "idle");
     setIsListening(true);
     void setAvatarListening(true);
     void start();
@@ -307,6 +315,7 @@ export default function VivaVoiceAi({
     }
 
     setFastPauseState("detected");
+    setCandidateStatusDot("silence");
     void submitCurrentAnswer(latestAnswer);
   }
 
@@ -314,6 +323,7 @@ export default function VivaVoiceAi({
     const latestAnswer = answerText.trim();
 
     clearFastSilencePromptTimer();
+    latestCandidateTranscriptRef.current = latestAnswer;
 
     if (
       !isFastMode ||
@@ -328,9 +338,17 @@ export default function VivaVoiceAi({
     }
 
     setFastPauseState("monitoring");
+    setCandidateStatusDot("speaking");
+    const generation = fastSilenceGenerationRef.current + 1;
+    fastSilenceGenerationRef.current = generation;
+
     fastSilenceTimeoutRef.current = setTimeout(() => {
       fastSilenceTimeoutRef.current = null;
-      handleFastSpeechPause(latestAnswer);
+      if (fastSilenceGenerationRef.current !== generation) {
+        return;
+      }
+
+      handleFastSpeechPause(latestCandidateTranscriptRef.current || latestAnswer);
     }, 3000);
   }
 
@@ -374,6 +392,7 @@ export default function VivaVoiceAi({
     }
 
     setCandidateTranscript(fallbackText);
+    latestCandidateTranscriptRef.current = fallbackText;
 
     if (tryAdvanceFastMode(fallbackText)) {
       return;
@@ -396,6 +415,7 @@ export default function VivaVoiceAi({
 
       const combinedInterim = mergeWithAnswerPrefix(interim);
 
+      latestCandidateTranscriptRef.current = combinedInterim;
       setCandidateTranscript(combinedInterim);
 
       setMessages((msgs) =>
@@ -417,6 +437,7 @@ export default function VivaVoiceAi({
       }
 
       const combinedFinalText = mergeWithAnswerPrefix(finalText);
+      latestCandidateTranscriptRef.current = combinedFinalText;
       setCandidateTranscript(combinedFinalText);
 
       if (isFastMode) {
@@ -494,6 +515,7 @@ export default function VivaVoiceAi({
         clearTimeout(keywordFlashTimeoutRef.current);
       }
       clearFastSilencePromptTimer();
+      setCandidateStatusDot("idle");
       closeSocket();
       stop();
     };
@@ -575,6 +597,7 @@ export default function VivaVoiceAi({
     answerPrefixRef.current = "";
     resetTranscriptBuffer();
     setCandidateTranscript(finalAnswer);
+    latestCandidateTranscriptRef.current = finalAnswer;
     syncCandidateMessage(finalAnswer, false);
 
     try {
@@ -606,6 +629,7 @@ export default function VivaVoiceAi({
     answerPrefixRef.current = "";
     resetTranscriptBuffer();
     setCandidateTranscript(finalAnswer);
+    latestCandidateTranscriptRef.current = finalAnswer;
     syncCandidateMessage(finalAnswer, false);
 
     if (!isFastMode) {
@@ -944,6 +968,7 @@ export default function VivaVoiceAi({
               <CandidatePanel
                 cameraOn={cameraOn}
                 listening={isListening}
+                statusDot={candidateStatusDot}
               />
             </div>
           </div>
