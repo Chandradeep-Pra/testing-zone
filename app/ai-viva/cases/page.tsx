@@ -1,7 +1,18 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { ArrowRight, Clock3, Filter, FolderOpen, LockKeyhole, Search, Sparkles, Zap } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  Clock3,
+  Filter,
+  FolderOpen,
+  LockKeyhole,
+  Search,
+  Sparkles,
+  Zap,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -25,6 +36,8 @@ type VivaCredit = {
   percentRemaining: number;
 };
 const PRICING_URL = "https://urologics.co.uk/pricing";
+const UNFILED_FOLDER_KEY = "unfiled";
+const UNFILED_FOLDER_NAME = "Unfiled Viva Cases";
 
 const VivaCasesPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -34,6 +47,7 @@ const VivaCasesPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [selectedModes, setSelectedModes] = useState<Record<string, VivaMode>>({});
+  const [expandedFolderKeys, setExpandedFolderKeys] = useState<string[]>([]);
   const [vivaCredit, setVivaCredit] = useState<VivaCredit | null>(null);
   const router = useRouter();
 
@@ -110,6 +124,53 @@ const VivaCasesPage: React.FC = () => {
 
     return matchesLevel && matchesSearch;
   });
+  const folderGroups = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        key: string;
+        name: string;
+        cases: VivaCaseWithAccess[];
+      }
+    >();
+
+    filteredCases.forEach((viva) => {
+      const folderName = String(viva.folderName || "").trim();
+      const key = String(viva.folderId || folderName || UNFILED_FOLDER_KEY).trim();
+      const name = folderName || UNFILED_FOLDER_NAME;
+      const existing = groups.get(key);
+
+      if (existing) {
+        existing.cases.push(viva);
+        return;
+      }
+
+      groups.set(key, {
+        key,
+        name,
+        cases: [viva],
+      });
+    });
+
+    return Array.from(groups.values()).sort((left, right) => {
+      if (left.key === UNFILED_FOLDER_KEY) return 1;
+      if (right.key === UNFILED_FOLDER_KEY) return -1;
+      return left.name.localeCompare(right.name);
+    });
+  }, [filteredCases]);
+
+  useEffect(() => {
+    if (!folderGroups.length || expandedFolderKeys.length) return;
+    setExpandedFolderKeys([folderGroups[0].key]);
+  }, [expandedFolderKeys.length, folderGroups]);
+
+  function toggleFolder(folderKey: string) {
+    setExpandedFolderKeys((current) =>
+      current.includes(folderKey)
+        ? current.filter((key) => key !== folderKey)
+        : [...current, folderKey]
+    );
+  }
 
   if (loading) {
     return (
@@ -225,15 +286,97 @@ const VivaCasesPage: React.FC = () => {
           </section>
         ) : null}
 
-        {filteredCases.length === 0 ? (
-          <div className="urologics-panel p-10 text-center">
-            <div className="text-xl font-semibold text-[var(--text-primary)]">No cases found</div>
-            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Try a wider filter or a simpler search term.</p>
-          </div>
-        ) : (
-          <section className="grid gap-6 pb-16 md:grid-cols-2 xl:grid-cols-3 mt-4">
-            {filteredCases.map((viva) => (
-             <article
+        <section className="grid gap-5 pb-16 lg:grid-cols-[340px_1fr]">
+          <aside className="urologics-panel h-fit max-h-[calc(100vh-120px)] overflow-hidden p-3 lg:sticky lg:top-4">
+            <div className="mb-3 px-1">
+              <div className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                <FolderOpen className="h-3.5 w-3.5" />
+                AI Viva folders
+              </div>
+              <p className="mt-2 text-xs text-[var(--text-secondary)]">
+                {filteredCases.filter(isVivaAllowed).length}/{filteredCases.length} accessible
+              </p>
+            </div>
+
+            <div className="urologics-thin-scrollbar max-h-[calc(100vh-220px)] space-y-2 overflow-y-auto pr-1">
+              {folderGroups.length === 0 ? (
+                <div className="rounded-[22px] bg-[var(--accent-soft)] p-4 text-sm text-[var(--text-secondary)]">
+                  No viva folders found.
+                </div>
+              ) : (
+                folderGroups.map((folder) => {
+                  const expanded = expandedFolderKeys.includes(folder.key);
+                  const lockedCount = folder.cases.filter((viva) => !isVivaAllowed(viva)).length;
+
+                  return (
+                    <div
+                      key={folder.key}
+                      className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)]"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleFolder(folder.key)}
+                        className="flex w-full items-center gap-3 px-3 py-3 text-left"
+                      >
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">
+                            {folder.name}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-[var(--text-tertiary)]">
+                            {folder.cases.length} cases{lockedCount ? ` | ${lockedCount} locked` : ""}
+                          </span>
+                        </span>
+                      </button>
+
+                      {expanded ? (
+                        <div className="space-y-1 border-t border-[var(--border)] p-2">
+                          {folder.cases.map((viva) => {
+                            const allowed = isVivaAllowed(viva);
+
+                            return (
+                              <button
+                                key={viva.id}
+                                type="button"
+                                onClick={() => openCase(viva)}
+                                className={`flex w-full items-start gap-3 rounded-[18px] px-3 py-2.5 text-left transition ${
+                                  allowed ? "hover:bg-[var(--accent-soft)]" : "opacity-80 hover:bg-amber-50"
+                                }`}
+                              >
+                                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                                  {allowed ? <Sparkles className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4 text-amber-700" />}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="line-clamp-2 text-sm font-medium leading-5 text-[var(--text-primary)]">
+                                    {viva.case.title}
+                                  </span>
+                                  <span className="mt-1 block text-[11px] text-[var(--text-tertiary)]">
+                                    {viva.case.level} | {allowed ? "Available" : "Locked"}
+                                  </span>
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </aside>
+
+          {filteredCases.length === 0 ? (
+            <div className="urologics-panel p-10 text-center">
+              <div className="text-xl font-semibold text-[var(--text-primary)]">No cases found</div>
+              <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Try a wider filter or a simpler search term.</p>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {filteredCases.map((viva) => (
+                <article
   key={viva.id}
   className={`flex flex-col justify-between rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-[0_16px_40px_var(--shadow-soft)] transition ${
     isVivaAllowed(viva)
@@ -331,10 +474,11 @@ const VivaCasesPage: React.FC = () => {
                   {isVivaAllowed(viva) ? "Start Urologics AI Viva" : viva.access?.reason || "Locked"}
                   {isVivaAllowed(viva) ? <ArrowRight size={16} /> : <LockKeyhole size={16} />}
                 </button>
-              </article>
-            ))}
-          </section>
-        )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

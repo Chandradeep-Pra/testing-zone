@@ -326,7 +326,7 @@ export default function Home() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
                     Quiz of the day
                   </p>
-                  <p className="text-xs text-[var(--text-tertiary)]">{dailyQuiz?.examTrack || "Daily practice"}</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">{"FRCS Urology"}</p>
                 </div>
               </div>
 

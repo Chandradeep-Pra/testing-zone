@@ -229,7 +229,7 @@ export default function CoursesPage() {
                             {section.videoCount} lessons · {unlockedCount} unlocked
                           </p>
                           <div className="mt-4 flex items-center justify-between text-sm font-semibold text-[var(--accent-strong)]">
-                            <span>Browse lessons</span>
+                            <span>Browse Content</span>
                             <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
                           </div>
                         </div>
