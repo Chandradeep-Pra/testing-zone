@@ -17,9 +17,19 @@ export type UrologicsUser = {
   activeCourseIds: string[];
   phone?: string | null;
   country?: string | null;
+  medicalInstitution?: string | null;
 };
 
 type FirebasePasswordResponse = {
+  localId: string;
+  email?: string;
+  displayName?: string;
+  idToken: string;
+  refreshToken: string;
+  expiresIn: string;
+};
+
+type FirebaseUpdatePasswordResponse = {
   localId: string;
   email?: string;
   displayName?: string;
@@ -45,6 +55,7 @@ type UrologicsAccessResponse = {
     activeCourseIds?: string[];
     phone?: string | null;
     country?: string | null;
+    medicalInstitution?: string | null;
   };
 };
 
@@ -139,6 +150,10 @@ async function buildUserFromAuth(params: {
     activeCourseIds: Array.isArray(profile?.activeCourseIds) ? profile.activeCourseIds : [],
     phone: typeof profile?.phone === "string" && profile.phone.trim() ? profile.phone.trim() : null,
     country: typeof profile?.country === "string" && profile.country.trim() ? profile.country.trim() : null,
+    medicalInstitution:
+      typeof profile?.medicalInstitution === "string" && profile.medicalInstitution.trim()
+        ? profile.medicalInstitution.trim()
+        : null,
   };
 
   saveAuth(user);
@@ -205,5 +220,38 @@ export async function refreshStoredAuth(user: UrologicsUser) {
     idToken: payload.id_token,
     refreshToken: payload.refresh_token,
     expiresIn: payload.expires_in,
+  });
+}
+
+export async function updateAccountPassword(user: UrologicsUser, password: string) {
+  const apiKey = requireFirebaseApiKey();
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idToken: user.idToken,
+        password,
+        returnSecureToken: true,
+      }),
+    }
+  );
+
+  const payload = (await response.json()) as FirebaseUpdatePasswordResponse & {
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new Error(payload.error?.message || "Unable to set password.");
+  }
+
+  return buildUserFromAuth({
+    uid: payload.localId || user.uid,
+    email: payload.email || user.email,
+    displayName: payload.displayName || user.name,
+    idToken: payload.idToken,
+    refreshToken: payload.refreshToken,
+    expiresIn: payload.expiresIn,
   });
 }

@@ -1,14 +1,39 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Sparkles, UserRoundCheck, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { appPath } from "@/lib/app-path";
+import { updateAccountPassword } from "@/lib/urologics-auth";
 
 const DEFAULT_COUNTRY = "United Kingdom";
 const DEFAULT_DIAL_CODE = "+44";
+const DEFAULT_COUNTRY_VALUE = `${DEFAULT_COUNTRY}-${DEFAULT_DIAL_CODE}`;
+
+type CountryOption = {
+  label: string;
+  value: string;
+};
+
+type RestCountry = {
+  name?: {
+    common?: string;
+  };
+  idd?: {
+    root?: string;
+    suffixes?: string[];
+  };
+};
+
+const fallbackCountries: CountryOption[] = [
+  { label: "India (+91)", value: "India-+91" },
+  { label: "United Kingdom (+44)", value: DEFAULT_COUNTRY_VALUE },
+  { label: "United States (+1)", value: "United States-+1" },
+  { label: "United Arab Emirates (+971)", value: "United Arab Emirates-+971" },
+  { label: "Singapore (+65)", value: "Singapore-+65" },
+];
 
 function getInitialName(name?: string | null, email?: string | null) {
   const cleanName = String(name || "").trim();
@@ -24,22 +49,88 @@ export default function CompleteProfilePrompt() {
   const { user, refreshUser } = useAuth();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [countries, setCountries] = useState<CountryOption[]>(fallbackCountries);
+  const [countriesLoading, setCountriesLoading] = useState(false);
   const [name, setName] = useState(() => getInitialName(user?.name, user?.email));
-  const [country, setCountry] = useState(user?.country || DEFAULT_COUNTRY);
-  const [dialCode, setDialCode] = useState(DEFAULT_DIAL_CODE);
+  const [countryValue, setCountryValue] = useState(
+    user?.country ? `${user.country}-${DEFAULT_DIAL_CODE}` : DEFAULT_COUNTRY_VALUE
+  );
+  const [medicalInstitution, setMedicalInstitution] = useState(user?.medicalInstitution || "");
   const [phone, setPhone] = useState(() => {
     const currentPhone = String(user?.phone || "").trim();
     return currentPhone.startsWith(DEFAULT_DIAL_CODE)
       ? currentPhone.slice(DEFAULT_DIAL_CODE.length).trim()
       : currentPhone;
   });
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+
+    async function loadCountries() {
+      try {
+        setCountriesLoading(true);
+        const response = await fetch("https://restcountries.com/v3.1/all?fields=name,idd");
+        const data = await response.json();
+
+        if (!Array.isArray(data)) return;
+
+        const nextCountries = (data as RestCountry[])
+          .map((country) => {
+            const root = country?.idd?.root;
+            const suffix = country?.idd?.suffixes?.[0] ?? "";
+            const name = country?.name?.common;
+
+            if (!root || !name) return null;
+
+            const dialCode = `${root}${suffix}`;
+            return {
+              label: `${name} (${dialCode})`,
+              value: `${name}-${dialCode}`,
+            };
+          })
+          .filter((country): country is CountryOption => Boolean(country))
+          .sort((left, right) => left.label.localeCompare(right.label)) as CountryOption[];
+
+        if (!cancelled && nextCountries.length > 0) {
+          setCountries(nextCountries);
+        }
+      } catch {
+        if (!cancelled) {
+          setCountries(fallbackCountries);
+        }
+      } finally {
+        if (!cancelled) {
+          setCountriesLoading(false);
+        }
+      }
+    }
+
+    void loadCountries();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const selectedCountry = useMemo(() => {
+    const [selectedName, selectedDialCode] = countryValue.split(/-(?=\+)/);
+
+    return {
+      name: selectedName || DEFAULT_COUNTRY,
+      dialCode: selectedDialCode || DEFAULT_DIAL_CODE,
+    };
+  }, [countryValue]);
 
   const fullPhone = useMemo(() => {
-    const cleanDialCode = dialCode.trim() || DEFAULT_DIAL_CODE;
+    const cleanDialCode = selectedCountry.dialCode.trim() || DEFAULT_DIAL_CODE;
     const cleanPhone = phone.trim();
 
     return cleanPhone ? `${cleanDialCode} ${cleanPhone}`.trim() : "";
-  }, [dialCode, phone]);
+  }, [phone, selectedCountry.dialCode]);
 
   if (!user || user.tier !== "guest") {
     return null;
@@ -56,22 +147,39 @@ export default function CompleteProfilePrompt() {
       return;
     }
 
-    if (!country.trim()) {
+    if (!selectedCountry.name.trim()) {
       toast.error("Please enter your country.");
+      return;
+    }
+
+    if (!password) {
+      toast.error("Please create a password.");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("Password should be at least 6 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match.");
       return;
     }
 
     try {
       setSubmitting(true);
+      const accountUser = await updateAccountPassword(user, password);
       const response = await fetch(appPath("/api/urologics/upgrade-user"), {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${user.idToken}`,
+          Authorization: `Bearer ${accountUser.idToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           name: name.trim(),
-          country: country.trim(),
+          country: selectedCountry.name.trim(),
+          medicalInstitution: medicalInstitution.trim(),
           phone: fullPhone,
         }),
       });
@@ -168,12 +276,22 @@ export default function CompleteProfilePrompt() {
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
                 Country
               </span>
-              <input
-                value={country}
-                onChange={(event) => setCountry(event.target.value)}
-                placeholder="United Kingdom"
+              <select
+                value={countryValue}
+                onChange={(event) => setCountryValue(event.target.value)}
                 className="mt-2 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
-              />
+              >
+                {countries.map((country) => (
+                  <option key={`${country.label}-${country.value}`} value={country.value}>
+                    {country.label}
+                  </option>
+                ))}
+              </select>
+              {countriesLoading ? (
+                <span className="mt-1 block text-xs text-[var(--text-tertiary)]">
+                  Loading country codes...
+                </span>
+              ) : null}
             </label>
 
             <div>
@@ -181,12 +299,9 @@ export default function CompleteProfilePrompt() {
                 Phone number
               </span>
               <div className="mt-2 flex gap-2">
-                <input
-                  value={dialCode}
-                  onChange={(event) => setDialCode(event.target.value)}
-                  className="w-24 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
-                  aria-label="Country code"
-                />
+                <div className="w-24 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)]">
+                  {selectedCountry.dialCode}
+                </div>
                 <input
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
@@ -195,6 +310,44 @@ export default function CompleteProfilePrompt() {
                 />
               </div>
             </div>
+
+            <label className="block sm:col-span-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+                Medical Institution
+              </span>
+              <input
+                value={medicalInstitution}
+                onChange={(event) => setMedicalInstitution(event.target.value)}
+                placeholder="NHS Trust, hospital, medical college..."
+                className="mt-2 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+                Password
+              </span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Create password"
+                className="mt-2 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+                Confirm Password
+              </span>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="Confirm password"
+                className="mt-2 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
+              />
+            </label>
           </div>
 
           <button
