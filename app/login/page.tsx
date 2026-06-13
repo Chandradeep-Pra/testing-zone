@@ -87,7 +87,7 @@ export default function LoginPage() {
                 Login
               </h2>
               <p className="mt-2 text-sm leading-6 text-[#071014]/60">
-                We will show your name after login, then connect your accessible content.
+                Login to Urologics to access your content.
               </p>
             </div>
 

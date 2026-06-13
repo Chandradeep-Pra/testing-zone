@@ -107,12 +107,13 @@ export default function CourseSidebar({
                           key={video.id}
                           type="button"
                           onClick={() => onVideoClick(video)}
+                          title={!unlocked ? "Preview this lesson in available course plans" : undefined}
                           className={`flex w-full items-start gap-3 rounded-[18px] px-3 py-2.5 text-left transition ${
                             selected
                               ? "bg-[var(--accent)] text-[var(--accent-text)]"
                               : unlocked
                                 ? "hover:bg-[var(--accent-soft)]"
-                                : "opacity-70 hover:bg-[var(--surface-muted)]"
+                                : "opacity-80 hover:bg-amber-50"
                           }`}
                         >
                           <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-sm bg-[var(--accent-soft)]">
@@ -146,7 +147,7 @@ export default function CourseSidebar({
                                 selected ? "text-white/70" : "text-[var(--text-tertiary)]"
                               }`}
                             >
-                              {playingId === video.id ? "Opening..." : unlocked ? "Available" : "Locked"}
+                              {playingId === video.id ? "Opening..." : unlocked ? "Available" : "Preview in plans"}
                             </span>
                           </span>
                         </button>

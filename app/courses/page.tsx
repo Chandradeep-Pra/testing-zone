@@ -17,6 +17,8 @@ import { isUnlocked } from "@/components/courses/videoUtils";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
 import { appPath } from "@/lib/app-path";
 
+const PRICING_URL = "https://urologics.co.uk/pricing";
+
 export default function CoursesPage() {
   const { user, loading } = useAuth();
   const [sections, setSections] = useState<VideoSection[]>([]);
@@ -105,7 +107,8 @@ export default function CoursesPage() {
     }
 
     if (!isUnlocked(video)) {
-      toast("This video is locked for your current course access.");
+      toast("Opening course plans...");
+      window.open(PRICING_URL, "_blank", "noopener,noreferrer");
       return;
     }
 
