@@ -24,6 +24,7 @@ type VivaCredit = {
   remainingMinutes: number;
   percentRemaining: number;
 };
+const PRICING_URL = "https://urologics.co.uk/pricing";
 
 const VivaCasesPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -83,7 +84,10 @@ const VivaCasesPage: React.FC = () => {
   }
 
   function openCase(viva: VivaCaseWithAccess) {
-    if (!isVivaAllowed(viva)) return;
+    if (!isVivaAllowed(viva)) {
+      window.open(PRICING_URL, "_blank", "noopener,noreferrer");
+      return;
+    }
 
     const selectedMode = getSelectedMode(viva);
     const isPublic = viva.accessType === "public" || viva.access?.isPublic;
@@ -234,7 +238,7 @@ const VivaCasesPage: React.FC = () => {
   className={`flex flex-col justify-between rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-[0_16px_40px_var(--shadow-soft)] transition ${
     isVivaAllowed(viva)
       ? "cursor-pointer hover:-translate-y-1 hover:border-[var(--accent)]"
-      : "cursor-not-allowed opacity-75"
+      : "cursor-pointer opacity-75 hover:-translate-y-1 hover:border-amber-300"
   }`}
   onClick={() => openCase(viva)}
   tabIndex={0}
@@ -257,7 +261,7 @@ const VivaCasesPage: React.FC = () => {
                   <h2 className="mt-6 text-2xl font-semibold text-[var(--text-primary)]">
   {viva.case.title}
 </h2>
-                  <p className="mt-3 line-clamp-4 text-sm leading-7 text-[var(--text-secondary)]">
+                  <p className="mt-3 line-clamp-2 max-h-[2.3rem] overflow-hidden text-sm leading-[1.15rem] text-[var(--text-secondary)]">
   {viva.case.stem}
 </p>
 
@@ -307,11 +311,10 @@ const VivaCasesPage: React.FC = () => {
                 </div>
 
                 <button
-                  disabled={!isVivaAllowed(viva)}
                   className={`mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${
                     isVivaAllowed(viva)
                       ? "bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
-                      : "cursor-not-allowed border border-[var(--border)] bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+                      : "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
                   }`}
                   onClick={(e) => {
                     localStorage.removeItem("candidateInfo");

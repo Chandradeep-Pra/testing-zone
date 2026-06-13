@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenCheck, ChevronDown, ChevronRight, LockKeyhole, Search, Video } from "lucide-react";
+import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, LockKeyhole, Search, Video } from "lucide-react";
 import type { VideoItem, VideoSection } from "@/components/courses/types";
 import { getThumbnail, isUnlocked, prettifyTitle } from "@/components/courses/videoUtils";
 
@@ -10,6 +10,7 @@ type CourseSidebarProps = {
   filteredSections: VideoSection[];
   libraryLoading: boolean;
   onQueryChange: (query: string) => void;
+  onBackToFolders: () => void;
   onToggleSection: (sectionId: string) => void;
   onVideoClick: (video: VideoItem) => void;
   playingId: string | null;
@@ -24,6 +25,7 @@ export default function CourseSidebar({
   expandedSectionIds,
   filteredSections,
   libraryLoading,
+  onBackToFolders,
   onQueryChange,
   onToggleSection,
   onVideoClick,
@@ -45,6 +47,15 @@ export default function CourseSidebar({
             {unlockedVideos}/{totalVideos} unlocked
           </p>
         </div>
+        <button
+          type="button"
+          onClick={onBackToFolders}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--text-secondary)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]"
+          aria-label="Back to video folders"
+          title="Back to video folders"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
       </div>
 
       <div className="relative mb-3">

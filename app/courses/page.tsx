@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, FolderOpen, LockKeyhole, Mail, PlayCircle } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -18,13 +19,17 @@ import UrologicsHeader from "@/components/brand/UrologicsHeader";
 import { appPath } from "@/lib/app-path";
 
 const PRICING_URL = "https://urologics.co.uk/pricing";
+const COURSE_INQUIRY_MAIL =
+  "mailto:ankitgoel042@gmail.com?subject=I%20want%20to%20inquire%20about%20your%20courses";
 
 export default function CoursesPage() {
   const { user, loading } = useAuth();
   const [sections, setSections] = useState<VideoSection[]>([]);
+  const [showPlayerView, setShowPlayerView] = useState(false);
   const [query, setQuery] = useState("");
   const [expandedSectionIds, setExpandedSectionIds] = useState<string[]>([]);
   const [selectedPlayback, setSelectedPlayback] = useState<PlaybackResponse | null>(null);
+  const [selectedLockedVideo, setSelectedLockedVideo] = useState<VideoItem | null>(null);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -52,7 +57,7 @@ export default function CoursesPage() {
         if (!active) return;
         const nextSections = payload.sections || [];
         setSections(nextSections);
-        setExpandedSectionIds(nextSections[0]?.id ? [nextSections[0].id] : []);
+        setExpandedSectionIds([]);
       } catch (nextError) {
         if (!active) return;
         setError(nextError instanceof Error ? nextError.message : "Unable to load video library.");
@@ -100,6 +105,22 @@ export default function CoursesPage() {
     );
   }
 
+  function openSection(section: VideoSection) {
+    setExpandedSectionIds([section.id]);
+    setShowPlayerView(true);
+
+    const firstUnlockedVideo = section.videos.find(isUnlocked);
+    setSelectedLockedVideo(null);
+
+    if (firstUnlockedVideo) {
+      void handleVideoClick(firstUnlockedVideo);
+      return;
+    }
+
+    setSelectedPlayback(null);
+    setSelectedLockedVideo(section.videos[0] || null);
+  }
+
   async function handleVideoClick(video: VideoItem) {
     if (!user?.idToken) {
       toast.error("Please login to access your course videos.");
@@ -107,11 +128,12 @@ export default function CoursesPage() {
     }
 
     if (!isUnlocked(video)) {
-      toast("Opening course plans...");
-      window.open(PRICING_URL, "_blank", "noopener,noreferrer");
+      setSelectedPlayback(null);
+      setSelectedLockedVideo(video);
       return;
     }
 
+    setSelectedLockedVideo(null);
     setPlayingId(video.id);
     try {
       const response = await fetch(appPath(`/api/urologics/videos/${video.id}/play`), {
@@ -138,8 +160,88 @@ export default function CoursesPage() {
 
         {!loading && !user ? (
           <LoginRequiredPanel />
+        ) : !showPlayerView ? (
+          <section className="urologics-thin-scrollbar min-h-0 flex-1 overflow-y-auto py-3">
+            <div className="rounded-[34px] border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,var(--accent-muted),transparent_34%),var(--surface-raised)] p-6 shadow-[0_16px_40px_var(--shadow-soft)]">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    Video folders
+                  </div>
+                  <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--text-primary)]">
+                    Choose a course folder.
+                  </h1>
+                  <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
+                    Preview the full video library structure. Open any folder to browse lessons and play unlocked content.
+                  </p>
+                </div>
+                <div className="rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent-strong)]">
+                  {unlockedVideos}/{totalVideos} unlocked
+                </div>
+              </div>
+
+              <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {libraryLoading ? (
+                  <div className="rounded-[26px] border border-[var(--border)] bg-[var(--surface)] p-6 text-sm font-medium text-[var(--accent-strong)]">
+                    Loading video folders...
+                  </div>
+                ) : error ? (
+                  <div className="rounded-[26px] border border-red-100 bg-red-50 p-6 text-sm text-red-700">
+                    {error}
+                  </div>
+                ) : sections.length === 0 ? (
+                  <div className="rounded-[26px] border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-secondary)]">
+                    No video folders found.
+                  </div>
+                ) : (
+                  sections.map((section) => {
+                    const unlockedCount = section.videos.filter(isUnlocked).length;
+                    const firstThumbnail = section.videos.map((video) => video.thumbnailUrl).find(Boolean);
+
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        onClick={() => openSection(section)}
+                        className="group overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface)] text-left shadow-[0_12px_32px_var(--shadow-soft)] transition-all duration-500 hover:-translate-y-1 hover:border-[var(--accent)] hover:shadow-[0_18px_44px_var(--shadow-brand)]"
+                      >
+                        <div className="relative aspect-video bg-[var(--accent-soft)]">
+                          {firstThumbnail ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={firstThumbnail} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="grid h-full w-full place-items-center text-[var(--accent-strong)]">
+                              <FolderOpen className="h-12 w-12" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+                          <div className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-[#071014]">
+                            <PlayCircle className="h-3.5 w-3.5" />
+                            Open folder
+                          </div>
+                        </div>
+                        <div className="p-5">
+                          <h2 className="line-clamp-2 text-lg font-semibold text-[var(--text-primary)]">
+                            {section.title}
+                          </h2>
+                          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                            {section.videoCount} lessons · {unlockedCount} unlocked
+                          </p>
+                          <div className="mt-4 flex items-center justify-between text-sm font-semibold text-[var(--accent-strong)]">
+                            <span>Browse lessons</span>
+                            <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </section>
         ) : (
-          <section className="grid min-h-0 flex-1 gap-3 py-3 lg:grid-cols-[390px_1fr]">
+          <section className="grid min-h-0 flex-1 gap-3 py-3 transition-all duration-500 lg:grid-cols-[390px_1fr]">
             <CourseSidebar
               error={error}
               expandedSectionIds={expandedSectionIds}
@@ -148,22 +250,82 @@ export default function CoursesPage() {
               onQueryChange={setQuery}
               onToggleSection={toggleSection}
               onVideoClick={(video) => void handleVideoClick(video)}
+              onBackToFolders={() => {
+                setShowPlayerView(false);
+                setSelectedPlayback(null);
+                setSelectedLockedVideo(null);
+              }}
               playingId={playingId}
               query={query}
-              selectedVideoId={selectedPlayback?.video.id}
+              selectedVideoId={selectedPlayback?.video.id || selectedLockedVideo?.id}
               totalVideos={totalVideos}
               unlockedVideos={unlockedVideos}
             />
 
             <div className="min-h-0 overflow-y-auto rounded-[30px]">
-              <ModernVideoPlayer
-                key={selectedPlayback?.video.id || "empty-player"}
-                playback={selectedPlayback}
-              />
+              {selectedLockedVideo ? (
+                <LockedVideoAccessPanel video={selectedLockedVideo} />
+              ) : (
+                <ModernVideoPlayer
+                  key={selectedPlayback?.video.id || "empty-player"}
+                  playback={selectedPlayback}
+                />
+              )}
             </div>
           </section>
         )}
       </div>
     </main>
   );
+}
+
+function LockedVideoAccessPanel({ video }: { video: VideoItem }) {
+  return (
+    <div className="grid min-h-[520px] place-items-center rounded-[30px] border border-amber-200 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.18),transparent_36%),linear-gradient(135deg,var(--surface-raised),var(--surface-tint))] p-8 text-center shadow-[0_16px_40px_var(--shadow-soft)]">
+      <div className="max-w-2xl">
+        <div className="mx-auto grid h-20 w-20 place-items-center rounded-[28px] bg-amber-50 text-amber-700 shadow-[0_16px_40px_rgba(245,158,11,0.22)]">
+          <LockKeyhole className="h-10 w-10" />
+        </div>
+        <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+          <VideoItemLabel />
+          Restricted content
+        </div>
+        <h2 className="mt-5 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
+          {video.title}
+        </h2>
+        <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[var(--text-secondary)]">
+          Please buy this course to access it&apos;s content, contact{" "}
+          <a
+            href={COURSE_INQUIRY_MAIL}
+            className="font-semibold text-[var(--accent-strong)] underline underline-offset-4"
+          >
+            ankitgoel042@gmail.com
+          </a>{" "}
+          to know more about this.
+        </p>
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <a
+            href={PRICING_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-hover)]"
+          >
+            View Pricing Plans
+            <ArrowRight className="h-4 w-4" />
+          </a>
+          <a
+            href={COURSE_INQUIRY_MAIL}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--accent-soft)]"
+          >
+            <Mail className="h-4 w-4" />
+            Email Us
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VideoItemLabel() {
+  return <LockKeyhole className="h-3.5 w-3.5" />;
 }
