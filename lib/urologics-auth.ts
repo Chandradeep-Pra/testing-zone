@@ -89,7 +89,7 @@ function saveAuth(user: UrologicsUser) {
 
 export function clearStoredAuth() {
   window.localStorage.removeItem(STORAGE_KEY);
-  window.sessionStorage.setItem(LOGOUT_FLAG_KEY, "1");
+  window.localStorage.setItem(LOGOUT_FLAG_KEY, "1");
 }
 
 export function getStoredAuth(): UrologicsUser | null {
