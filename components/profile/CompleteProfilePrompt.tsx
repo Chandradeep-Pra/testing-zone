@@ -213,16 +213,14 @@ export default function CompleteProfilePrompt() {
             <h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
               Unlock your free starter access
             </h2>
-            <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
-              Add your basic details to move from guest access to free access.
-            </p>
+            
           </div>
         </div>
 
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-[var(--accent-text)] transition hover:-translate-y-0.5"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-8 py-3 text-md font-semibold text-[var(--accent-text)] transition hover:-translate-y-0.5"
         >
           <Sparkles size={16} />
           Complete now

@@ -51,7 +51,7 @@ const actionCards = [
   },
   {
     title: "AI Vivas",
-    copy: "Browse all viva sets. Locked cases stay visible until access is granted.",
+    copy: "Browse all viva sets. Your AI mentor to practice Viva daily",
     icon: BrainCircuit,
     href: "/ai-viva/cases",
   },

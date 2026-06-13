@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArrowRight, Clock3, Filter, LockKeyhole, Search, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, Clock3, Filter, FolderOpen, LockKeyhole, Search, Sparkles, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -261,6 +261,12 @@ const VivaCasesPage: React.FC = () => {
                   <h2 className="mt-6 text-2xl font-semibold text-[var(--text-primary)]">
   {viva.case.title}
 </h2>
+                  {viva.folderName ? (
+                    <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)]">
+                      <FolderOpen size={14} className="shrink-0 text-[var(--accent-strong)]" />
+                      <span className="truncate">{viva.folderName}</span>
+                    </div>
+                  ) : null}
                   <p className="mt-3 line-clamp-2 max-h-[2.3rem] overflow-hidden text-sm leading-[1.15rem] text-[var(--text-secondary)]">
   {viva.case.stem}
 </p>
