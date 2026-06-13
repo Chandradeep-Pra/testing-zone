@@ -4,6 +4,7 @@ import { appPath } from "@/lib/app-path";
 
 const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const STORAGE_KEY = "urologics-testing-zone-auth";
+const LOGOUT_FLAG_KEY = "urologics-auth-logged-out";
 
 export type UrologicsUser = {
   uid: string;
@@ -88,6 +89,7 @@ function saveAuth(user: UrologicsUser) {
 
 export function clearStoredAuth() {
   window.localStorage.removeItem(STORAGE_KEY);
+  window.sessionStorage.setItem(LOGOUT_FLAG_KEY, "1");
 }
 
 export function getStoredAuth(): UrologicsUser | null {
