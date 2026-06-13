@@ -22,6 +22,7 @@ type AuthContextValue = {
   user: UrologicsUser | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<UrologicsUser>;
+  refreshUser: () => Promise<UrologicsUser | null>;
   signOut: () => void;
 };
 
@@ -76,6 +77,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return nextUser;
   }, [syncPlaybackSession]);
 
+  const refreshUser = useCallback(async () => {
+    const stored = getStoredAuth();
+
+    if (!stored) {
+      setUser(null);
+      return null;
+    }
+
+    const nextUser = await refreshStoredAuth(stored);
+    await syncPlaybackSession(nextUser.idToken);
+    setUser(nextUser);
+    return nextUser;
+  }, [syncPlaybackSession]);
+
   const signOut = useCallback(() => {
     void fetch(appPath("/api/urologics/session"), { method: "DELETE" });
     clearStoredAuth();
@@ -87,9 +102,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       signIn,
+      refreshUser,
       signOut,
     }),
-    [loading, signIn, signOut, user]
+    [loading, refreshUser, signIn, signOut, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -18,6 +18,7 @@ export type VideoItem = {
 export type VideoSection = {
   id: string;
   title: string;
+  imageUrl?: string;
   videoCount: number;
   videos: VideoItem[];
 };

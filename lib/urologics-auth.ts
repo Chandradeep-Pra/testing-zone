@@ -15,6 +15,8 @@ export type UrologicsUser = {
   expiresAt: number;
   profileImageUrl: string | null;
   activeCourseIds: string[];
+  phone?: string | null;
+  country?: string | null;
 };
 
 type FirebasePasswordResponse = {
@@ -41,6 +43,8 @@ type UrologicsAccessResponse = {
     name?: string | null;
     profileImageUrl?: string | null;
     activeCourseIds?: string[];
+    phone?: string | null;
+    country?: string | null;
   };
 };
 
@@ -133,6 +137,8 @@ async function buildUserFromAuth(params: {
         ? profile.profileImageUrl.trim()
         : null,
     activeCourseIds: Array.isArray(profile?.activeCourseIds) ? profile.activeCourseIds : [],
+    phone: typeof profile?.phone === "string" && profile.phone.trim() ? profile.phone.trim() : null,
+    country: typeof profile?.country === "string" && profile.country.trim() ? profile.country.trim() : null,
   };
 
   saveAuth(user);

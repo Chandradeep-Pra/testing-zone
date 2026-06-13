@@ -170,11 +170,9 @@ export default function CoursesPage() {
                     Video folders
                   </div>
                   <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--text-primary)]">
-                    Choose a course folder.
+                    Urologics Video Library.
                   </h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
-                    Preview the full video library structure. Open any folder to browse lessons and play unlocked content.
-                  </p>
+                  
                 </div>
                 <div className="rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent-strong)]">
                   {unlockedVideos}/{totalVideos} unlocked
@@ -197,7 +195,9 @@ export default function CoursesPage() {
                 ) : (
                   sections.map((section) => {
                     const unlockedCount = section.videos.filter(isUnlocked).length;
-                    const firstThumbnail = section.videos.map((video) => video.thumbnailUrl).find(Boolean);
+                    const firstThumbnail =
+                      section.imageUrl ||
+                      section.videos.map((video) => video.thumbnailUrl).find(Boolean);
 
                     return (
                       <button

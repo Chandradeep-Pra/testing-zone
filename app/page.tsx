@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import CompleteProfilePrompt from "@/components/profile/CompleteProfilePrompt";
 import { appPath } from "@/lib/app-path";
 
 type Announcement = {
@@ -177,6 +178,8 @@ export default function Home() {
               Hi, {firstName}
             </h1>
           </div>
+
+          <CompleteProfilePrompt />
 
           <div className="grid items-start gap-5 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="grid gap-5">
