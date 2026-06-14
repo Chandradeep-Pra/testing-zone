@@ -18,6 +18,8 @@ import {
 } from "@/lib/urologics-auth";
 import { appPath } from "@/lib/app-path";
 
+const UROLOGICS_HOME_URL = "https://urologics.co.uk";
+
 type AuthContextValue = {
   user: UrologicsUser | null;
   loading: boolean;
@@ -95,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void fetch(appPath("/api/urologics/session"), { method: "DELETE" });
     clearStoredAuth();
     setUser(null);
+    window.location.assign(UROLOGICS_HOME_URL);
   }, []);
 
   const value = useMemo(

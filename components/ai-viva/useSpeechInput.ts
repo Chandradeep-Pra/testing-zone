@@ -11,7 +11,8 @@ type SttMessage = {
 export function useSpeechInput(
   onInterim: (text: string) => void,
   onFinal: (text: string) => void | Promise<void>,
-  onSpeechEndedWithoutFinal?: () => void | Promise<void>
+  onSpeechEndedWithoutFinal?: () => void | Promise<void>,
+  getMicDeviceId?: () => string | undefined
 ) {
   const wsRef = useRef<WebSocket | null>(null);
   const transcriptBuffer = useRef("");
@@ -58,10 +59,14 @@ export function useSpeechInput(
     const ws = new WebSocket("wss://testing-zone-hx7q.onrender.com");
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
+    console.info("[Viva STT WebSocket] connecting", {
+      url: "wss://testing-zone-hx7q.onrender.com",
+    });
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data as string) as SttMessage;
       if (!data) return;
+      console.debug("[Viva STT WebSocket] message", data);
 
       if (data.transcript) {
         if (data.final) {
@@ -103,6 +108,22 @@ export function useSpeechInput(
       }
     };
 
+    ws.onopen = () => {
+      console.info("[Viva STT WebSocket] open");
+    };
+
+    ws.onerror = (event) => {
+      console.error("[Viva STT WebSocket] error", event);
+    };
+
+    ws.onclose = (event) => {
+      console.info("[Viva STT WebSocket] close", {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean,
+      });
+    };
+
     await new Promise<WebSocket>((resolve, reject) => {
       ws.addEventListener("open", () => resolve(ws), { once: true });
       ws.addEventListener("error", () => reject(new Error("Socket connection failed")), {
@@ -116,8 +137,23 @@ export function useSpeechInput(
   async function start() {
     await ensureSocketReady();
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const micDeviceId = getMicDeviceId?.();
+
+    console.info("[Viva STT] requesting microphone", {
+      micDeviceId: micDeviceId || "default",
+    });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: micDeviceId ? { deviceId: { exact: micDeviceId } } : true,
+    });
     mediaStreamRef.current = stream;
+    console.info("[Viva STT] microphone stream started", {
+      tracks: stream.getAudioTracks().map((track) => ({
+        label: track.label,
+        enabled: track.enabled,
+        muted: track.muted,
+        readyState: track.readyState,
+      })),
+    });
 
     const audioContext = new AudioContext({
       sampleRate: 16000,
@@ -154,13 +190,19 @@ export function useSpeechInput(
 
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(event.data);
+      } else {
+        console.debug("[Viva STT WebSocket] audio chunk skipped; socket is not open", {
+          readyState: wsRef.current?.readyState,
+        });
       }
     };
 
     source.connect(worklet);
+    console.info("[Viva STT] audio worklet connected");
   }
 
   function stop() {
+    console.info("[Viva STT] stopping microphone stream");
     if (workletRef.current) {
       workletRef.current.disconnect();
       workletRef.current = null;
@@ -186,6 +228,7 @@ export function useSpeechInput(
 
   function closeSocket() {
     if (wsRef.current) {
+      console.info("[Viva STT WebSocket] close requested");
       wsRef.current.close();
       wsRef.current = null;
     }

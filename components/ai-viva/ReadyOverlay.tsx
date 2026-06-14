@@ -22,7 +22,7 @@ import {
 } from "@/lib/examiner-voices";
 
 type ReadyOverlayProps = {
-  onBegin: (cameraEnabled: boolean, examiner: ExaminerVoice) => void;
+  onBegin: (cameraEnabled: boolean, examiner: ExaminerVoice, micDeviceId?: string) => void;
   vivaTitle: string;
   selectedMode: VivaMode;
 };
@@ -39,6 +39,8 @@ export default function ReadyOverlay({
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [checking, setChecking] = useState(true);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedMicDeviceId, setSelectedMicDeviceId] = useState("");
   const [selectedExaminerId, setSelectedExaminerId] = useState(
     getDefaultExaminer(selectedMode).id
   );
@@ -61,8 +63,15 @@ export default function ReadyOverlay({
         const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         setMicAllowed(true);
         micStream.getTracks().forEach(track => track.stop());
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter((device) => device.kind === "audioinput");
+        setMicDevices(audioInputs);
+        setSelectedMicDeviceId((current) => current || audioInputs[0]?.deviceId || "");
       } catch {
         setMicAllowed(false);
+        setMicDevices([]);
+        setSelectedMicDeviceId("");
       }
 
       try {
@@ -239,12 +248,35 @@ export default function ReadyOverlay({
                 </div>
 
                 {micAllowed ? (
-                  <MicLevelMeter
-                    selfTest
-                    active={micAllowed}
-                    label="Speak to test microphone"
-                    helper="If the bars do not move while you speak, check browser microphone permission or select the correct input device."
-                  />
+                  <div className="space-y-3">
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#071014]/55">
+                        Microphone Device
+                      </span>
+                      <select
+                        value={selectedMicDeviceId}
+                        onChange={(event) => setSelectedMicDeviceId(event.target.value)}
+                        className="urologics-input bg-white text-sm"
+                      >
+                        {micDevices.length === 0 ? (
+                          <option value="">Default microphone</option>
+                        ) : (
+                          micDevices.map((device, index) => (
+                            <option key={device.deviceId || index} value={device.deviceId}>
+                              {device.label || `Microphone ${index + 1}`}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
+                    <MicLevelMeter
+                      selfTest
+                      active={micAllowed}
+                      deviceId={selectedMicDeviceId}
+                      label="Speak to test microphone"
+                      helper="If the line does not move while you speak, choose another microphone or check browser permission."
+                    />
+                  </div>
                 ) : null}
 
                 <div className="flex items-center justify-between rounded-2xl border border-[#0f7896]/12 bg-white px-4 py-3">
@@ -270,7 +302,9 @@ export default function ReadyOverlay({
               <button
                 disabled={!canStart}
                 onClick={
-                  canStart ? () => onBegin(cameraEnabled, selectedExaminer) : undefined
+                  canStart
+                    ? () => onBegin(cameraEnabled, selectedExaminer, selectedMicDeviceId || undefined)
+                    : undefined
                 }
                 className={`mt-6 flex w-full items-center justify-center gap-3 rounded-2xl py-3 font-medium transition-all duration-200 ${
                   canStart

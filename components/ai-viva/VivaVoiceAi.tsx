@@ -42,6 +42,7 @@ type StoredCandidateInfo = {
   selectedExaminerId?: string;
   conversation?: CandidateConversationMessage[];
   qaHistory?: QaHistoryItem[];
+  selectedMicDeviceId?: string;
   selectedCaseId?: string;
   selectedCaseTitle?: string;
   selectedCase?: VivaCaseRecord;
@@ -144,6 +145,7 @@ export default function VivaVoiceAi({
   const keywordFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const answerPrefixRef = useRef("");
   const messagesRef = useRef<CandidateConversationMessage[]>([]);
+  const selectedMicDeviceIdRef = useRef<string | undefined>(undefined);
 
   const [readyVisible, setReadyVisible] = useState(true);
   const [ending, setEnding] = useState(false);
@@ -456,7 +458,8 @@ export default function VivaVoiceAi({
     },
     async () => {
       await finalizeFastModeFromTranscriptFallback();
-    }
+    },
+    () => selectedMicDeviceIdRef.current
   );
 
   useEffect(() => {
@@ -736,12 +739,14 @@ export default function VivaVoiceAi({
 
   async function handleBegin(
     cameraPref = false,
-    examinerChoice: ExaminerVoice = getDefaultExaminer(selectedMode)
+    examinerChoice: ExaminerVoice = getDefaultExaminer(selectedMode),
+    micDeviceId?: string
   ) {
     if (hasStartedRef.current) return;
 
     hasStartedRef.current = true;
     setCameraEnabled(cameraPref);
+    selectedMicDeviceIdRef.current = micDeviceId;
     setReadyVisible(false);
     setThinking(true);
 
@@ -753,6 +758,7 @@ export default function VivaVoiceAi({
         const parsed = JSON.parse(stored);
         parsed.selectedExaminer = examinerChoice;
         parsed.selectedExaminerId = examinerChoice.id;
+        parsed.selectedMicDeviceId = micDeviceId || "";
         localStorage.setItem("candidateInfo", JSON.stringify(parsed));
       }
       const avatarStarted = await liveAvatar.startSession();

@@ -9,6 +9,7 @@ type MicLevelMeterProps = {
   label?: string;
   helper?: string;
   selfTest?: boolean;
+  deviceId?: string;
 };
 
 function normalizeLevel(value: number) {
@@ -21,6 +22,7 @@ export default function MicLevelMeter({
   label = "Mic level",
   helper,
   selfTest = false,
+  deviceId,
 }: MicLevelMeterProps) {
   const [selfLevel, setSelfLevel] = useState(0);
   const animationRef = useRef<number | null>(null);
@@ -38,7 +40,9 @@ export default function MicLevelMeter({
 
     async function startMeter() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: deviceId ? { deviceId: { exact: deviceId } } : true,
+        });
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
           return;
@@ -99,13 +103,9 @@ export default function MicLevelMeter({
         audioContextRef.current = null;
       }
     };
-  }, [active, selfTest]);
+  }, [active, deviceId, selfTest]);
 
   const visibleLevel = normalizeLevel(selfTest ? (active ? selfLevel : 0) : level ?? 0);
-  const bars = Array.from({ length: 18 }, (_, index) => {
-    const threshold = (index + 1) / 18;
-    return visibleLevel >= threshold;
-  });
   const speaking = visibleLevel > 0.08;
 
   return (
@@ -124,16 +124,11 @@ export default function MicLevelMeter({
         </span>
       </div>
 
-      <div className="flex h-8 items-end gap-1">
-        {bars.map((filled, index) => (
-          <span
-            key={index}
-            className={`flex-1 rounded-full transition-all duration-100 ${
-              filled ? "bg-[#0f7896]" : "bg-[#0f7896]/12"
-            }`}
-            style={{ height: `${28 + ((index % 6) + 1) * 10}%` }}
-          />
-        ))}
+      <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-[linear-gradient(90deg,#22c55e_0%,#eab308_58%,#ef4444_100%)] transition-[width] duration-100"
+          style={{ width: `${Math.round(visibleLevel * 100)}%` }}
+        />
       </div>
 
       {helper ? <p className="mt-3 text-xs leading-5 text-[#071014]/60">{helper}</p> : null}
