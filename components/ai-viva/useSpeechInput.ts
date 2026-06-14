@@ -8,6 +8,15 @@ type SttMessage = {
   speechEnded?: boolean;
 };
 
+function getPublicAssetPath(path: string) {
+  const basePath =
+    typeof window !== "undefined" && window.location.pathname.startsWith("/web")
+      ? "/web"
+      : "";
+
+  return `${basePath}${path}`;
+}
+
 export function useSpeechInput(
   onInterim: (text: string) => void,
   onFinal: (text: string) => void | Promise<void>,
@@ -187,7 +196,7 @@ export function useSpeechInput(
         await audioContext.resume();
       }
 
-      await audioContext.audioWorklet.addModule("/audio-processor.js");
+      await audioContext.audioWorklet.addModule(getPublicAssetPath("/audio-processor.js"));
 
       const source = audioContext.createMediaStreamSource(stream);
       sourceRef.current = source;
