@@ -10,19 +10,19 @@ export default function VivaIntroPage() {
 
   return (
     <main className="urologics-shell">
-      <div className="mx-auto max-w-7xl px-6 py-2">
+      <div className="mobile-native-page mx-auto max-w-7xl sm:px-6 sm:py-2">
         <UrologicsHeader current="AI Viva" product="AI Viva" tag="Flagship oral exam preparation" />
 
-        <section className="grid gap-8 py-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="urologics-panel p-8 md:p-10">
+        <section className="grid gap-4 py-4 sm:gap-8 sm:py-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="urologics-panel p-5 sm:p-8 md:p-10">
             <div className="urologics-chip">Flagship Experience</div>
-            <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.04em] text-[#071014] sm:text-5xl">
+            <h1 className="mobile-native-title mt-6 max-w-3xl font-semibold text-[#071014] sm:text-5xl sm:tracking-[-0.04em]">
               Urologics AI Viva
             </h1>
-            <p className="mt-5 max-w-3xl text-lg leading-8 text-[#071014]/65">
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-[#071014]/65 sm:mt-5 sm:text-lg sm:leading-8">
               The signature Urologics product for realistic case-based oral preparation, examiner-led pacing, image-linked discussion, and polished post-session scoring.
             </p>
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
+            <div className="mt-6 grid gap-3 sm:mt-10 md:grid-cols-3 md:gap-4">
               <div className="urologics-subpanel p-5">
                 <Mic className="text-[#0f7896]" size={18} />
                 <div className="mt-3 text-sm font-semibold text-[#071014]">Voice First</div>
@@ -54,7 +54,7 @@ export default function VivaIntroPage() {
             </button>
           </div>
 
-          <div className="urologics-panel flex flex-col justify-between p-8">
+          <div className="urologics-panel flex flex-col justify-between p-5 sm:p-8">
             <div>
               <div className="flex items-center gap-3 text-[#0f7896]">
                 <Stethoscope size={18} />

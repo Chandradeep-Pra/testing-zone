@@ -148,8 +148,8 @@ export default function VivaSessionClient({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-white p-4 text-[#071014]">
-      <Card className="w-full max-w-md rounded-[28px] border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
+    <main className="flex min-h-screen items-center justify-center bg-white p-3 text-[#071014] sm:p-4">
+      <Card className="w-full max-w-md rounded-[30px] border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)] sm:rounded-[28px]">
         <CardHeader>
           <img
             src={appPath("/logo.png")}
@@ -159,7 +159,7 @@ export default function VivaSessionClient({
           <div className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
             Urologics AI
           </div>
-          <CardTitle className="text-center text-[#071014]">Candidate Information</CardTitle>
+          <CardTitle className="text-center text-xl text-[#071014] sm:text-2xl">Candidate Information</CardTitle>
           <p className="text-center text-sm text-[#071014]/65">{vivaCase.case.title}</p>
           <p className="text-center text-xs uppercase tracking-[0.22em] text-[#0f7896]">
             {selectedModeFromUrl === "fast" ? "Fast and Furious" : "Calm and Composed"}

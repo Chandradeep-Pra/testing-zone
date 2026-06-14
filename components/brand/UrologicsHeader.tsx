@@ -52,11 +52,11 @@ export default function UrologicsHeader({
   return (
     <>
       <header
-        className={`fixed inset-x-0 top-3 z-50  mx-auto w-full max-w-7xl px-4 transition-all duration-500 ease-in-out sm:px-6 ${
+        className={`fixed inset-x-0 top-2 z-50 mx-auto w-full max-w-7xl px-3 transition-all duration-500 ease-in-out sm:top-3 sm:px-6 ${
           showHeader ? "translate-y-0 opacity-100" : "-translate-y-[130%] opacity-0"
         }`}
       >
-        <div className="urologics-header flex items-center justify-between gap-3 rounded-full px-4 py-3 backdrop-blur-xl sm:px-5 md:px-6">
+        <div className="urologics-header flex items-center justify-between gap-2 rounded-[28px] px-3 py-2.5 backdrop-blur-xl sm:gap-3 sm:rounded-full sm:px-5 sm:py-3 md:px-6">
           <UrologicsBrand product={product} tag={tag} />
           <div className="hidden w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center md:flex">
             <UrologicsNav current={current} />
@@ -70,7 +70,7 @@ export default function UrologicsHeader({
             aria-label="Toggle navigation"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((current) => !current)}
-            className="relative flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--accent-strong)] shadow-[0_10px_24px_var(--shadow-soft)] md:hidden"
+            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--accent-strong)] shadow-[0_10px_24px_var(--shadow-soft)] sm:h-11 sm:w-11 md:hidden"
           >
             <span
               className={`absolute h-0.5 w-5 rounded-full bg-current transition ${
@@ -121,7 +121,7 @@ export default function UrologicsHeader({
           </div>
         </div>
       </header>
-      <div className="h-24 shrink-0" aria-hidden="true" />
+      <div className="h-20 shrink-0 sm:h-24" aria-hidden="true" />
     </>
   );
 }

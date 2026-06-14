@@ -185,8 +185,8 @@ export default function CoursesPage() {
   }
 
   return (
-    <main className="urologics-shell h-screen overflow-hidden">
-      <div className="mx-auto flex h-screen w-full max-w-[1480px] flex-col px-3 py-3 sm:px-4">
+    <main className="urologics-shell min-h-screen overflow-x-hidden md:h-screen md:overflow-hidden">
+      <div className="mobile-native-page mx-auto flex min-h-screen w-full max-w-[1480px] flex-col md:h-screen md:min-h-0 md:px-3 md:py-3 sm:px-4">
         <UrologicsHeader
           current="Courses"
           product="Courses"
@@ -196,15 +196,15 @@ export default function CoursesPage() {
         {!loading && !user ? (
           <LoginRequiredPanel />
         ) : !showPlayerView ? (
-          <section className="urologics-thin-scrollbar min-h-0 flex-1 overflow-y-auto py-3">
-            <div className="rounded-[34px] border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,var(--accent-muted),transparent_34%),var(--surface-raised)] p-6 shadow-[0_16px_40px_var(--shadow-soft)]">
-              <div className="flex flex-wrap items-end justify-between gap-4">
+          <section className="urologics-thin-scrollbar min-h-0 flex-1 overflow-y-auto py-2 sm:py-3">
+            <div className="rounded-[30px] border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,var(--accent-muted),transparent_34%),var(--surface-raised)] p-4 shadow-[0_16px_40px_var(--shadow-soft)] sm:rounded-[34px] sm:p-6">
+              <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4">
                 <div>
                   <div className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
                     <FolderOpen className="h-3.5 w-3.5" />
                     Video folders
                   </div>
-                  <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--text-primary)]">
+                  <h1 className="mobile-native-title mt-4 font-semibold text-[var(--text-primary)] sm:text-3xl sm:tracking-[-0.04em]">
                     Urologics Video Library.
                   </h1>
                 </div>
@@ -213,7 +213,7 @@ export default function CoursesPage() {
                 </div>
               </div>
 
-              <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-5 grid gap-4 sm:mt-7 md:grid-cols-2 xl:grid-cols-3">
                 {libraryLoading ? (
                   <div className="rounded-[26px] border border-[var(--border)] bg-[var(--surface)] p-6 text-sm font-medium text-[var(--accent-strong)]">
                     Loading video folders...
@@ -263,7 +263,7 @@ export default function CoursesPage() {
                             Open folder
                           </div>
                         </div>
-                        <div className="p-5">
+                        <div className="p-4 sm:p-5">
                           <h2 className="line-clamp-2 text-lg font-semibold text-[var(--text-primary)]">
                             {section.title}
                           </h2>
@@ -284,7 +284,7 @@ export default function CoursesPage() {
             </div>
           </section>
         ) : (
-          <section className="grid min-h-0 flex-1 gap-3 py-3 transition-all duration-500 lg:grid-cols-[390px_1fr]">
+          <section className="grid min-h-0 flex-1 gap-3 py-2 transition-all duration-500 md:py-3 lg:grid-cols-[390px_1fr]">
             <CourseSidebar
               error={error}
               expandedSectionIds={expandedSectionIds}

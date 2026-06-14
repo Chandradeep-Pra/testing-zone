@@ -193,24 +193,24 @@ const VivaCasesPage: React.FC = () => {
 
   return (
     <main className="urologics-shell overflow-hidden">
-      <div className="mx-auto max-w-7xl px-6 py-6">
+      <div className="mobile-native-page mx-auto max-w-7xl sm:px-6 sm:py-6">
         <UrologicsHeader current="AI Viva" product="AI Viva" tag="Case library" />
 
-        <section className="grid gap-8 py-2 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="urologics-panel p-7 md:p-10">
+        <section className="grid gap-4 py-2 sm:gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="urologics-panel p-5 sm:p-7 md:p-10">
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
               <Sparkles size={14} />
               AI Viva
             </div>
-            <h1 className="mt-7 max-w-3xl text-4xl font-semibold tracking-[-0.04em] text-[var(--text-primary)] sm:text-5xl">
+            <h1 className="mobile-native-title mt-6 max-w-3xl font-semibold text-[var(--text-primary)] sm:mt-7 sm:text-5xl sm:tracking-[-0.04em]">
               Choose a viva case.
             </h1>
-            <p className="mt-5 max-w-3xl text-base leading-8 text-[var(--text-secondary)] md:text-lg">
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--text-secondary)] sm:mt-5 sm:text-base sm:leading-8 md:text-lg">
               Select a case and start in calm or fast mode.
             </p>
           </div>
 
-          <div className="urologics-panel p-7 md:p-8">
+          <div className="urologics-panel p-5 sm:p-7 md:p-8">
             <div className="flex items-center gap-3 text-[var(--accent-strong)]">
               <Sparkles size={18} />
               <span className="text-[11px] font-semibold uppercase tracking-[0.22em]">Filters</span>
@@ -285,8 +285,8 @@ const VivaCasesPage: React.FC = () => {
           </section>
         ) : null}
 
-        <section className="grid gap-5 pb-16 lg:grid-cols-[340px_1fr]">
-          <aside className="urologics-panel h-fit max-h-[calc(100vh-120px)] overflow-hidden p-3 lg:sticky lg:top-4">
+        <section className="grid gap-4 pb-16 sm:gap-5 lg:grid-cols-[340px_1fr]">
+          <aside className="urologics-panel h-fit overflow-hidden p-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-120px)]">
             <div className="mb-3 px-1">
               <div className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
                 <FolderOpen className="h-3.5 w-3.5" />
@@ -297,7 +297,7 @@ const VivaCasesPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="urologics-thin-scrollbar max-h-[calc(100vh-220px)] space-y-2 overflow-y-auto pr-1">
+            <div className="urologics-thin-scrollbar flex max-h-[172px] gap-2 overflow-x-auto overflow-y-hidden pr-1 lg:block lg:max-h-[calc(100vh-220px)] lg:space-y-2 lg:overflow-y-auto">
               {allFolderGroups.length === 0 ? (
                 <div className="rounded-[22px] bg-[var(--accent-soft)] p-4 text-sm text-[var(--text-secondary)]">
                   No viva folders found.
@@ -307,7 +307,7 @@ const VivaCasesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setSelectedFolderKey("all")}
-                    className={`flex w-full items-center gap-3 rounded-[22px] border px-3 py-3 text-left transition ${
+                    className={`flex min-w-[190px] items-center gap-3 rounded-[22px] border px-3 py-3 text-left transition lg:w-full lg:min-w-0 ${
                       selectedFolderKey === "all"
                         ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                         : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--accent-soft)]"
@@ -339,7 +339,7 @@ const VivaCasesPage: React.FC = () => {
                         key={folder.key}
                         type="button"
                         onClick={() => setSelectedFolderKey(folder.key)}
-                        className={`flex w-full items-center gap-3 rounded-[22px] border px-3 py-3 text-left transition ${
+                        className={`flex min-w-[220px] items-center gap-3 rounded-[22px] border px-3 py-3 text-left transition lg:w-full lg:min-w-0 ${
                           selected
                             ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                             : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--accent-soft)]"
@@ -382,11 +382,11 @@ const VivaCasesPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid gap-6 xl:grid-cols-2">
+              <div className="grid gap-4 sm:gap-6 xl:grid-cols-2">
               {visibleCases.map((viva) => (
                 <article
   key={viva.id}
-  className={`flex flex-col justify-between rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-[0_16px_40px_var(--shadow-soft)] transition ${
+  className={`flex flex-col justify-between rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-[0_16px_40px_var(--shadow-soft)] transition sm:p-6 ${
     isVivaAllowed(viva)
       ? "cursor-pointer hover:-translate-y-1 hover:border-[var(--accent)]"
       : "cursor-pointer opacity-75 hover:-translate-y-1 hover:border-amber-300"
@@ -409,7 +409,7 @@ const VivaCasesPage: React.FC = () => {
 </span>
                   </div>
 
-                  <h2 className="mt-6 text-2xl font-semibold text-[var(--text-primary)]">
+                  <h2 className="mt-5 line-clamp-2 text-xl font-semibold text-[var(--text-primary)] sm:mt-6 sm:text-2xl">
   {viva.case.title}
 </h2>
                   {viva.folderName ? (
@@ -423,14 +423,14 @@ const VivaCasesPage: React.FC = () => {
 </p>
 
                   <div
-  className="mt-6 rounded-[22px] border border-[var(--border)] bg-[var(--accent-soft)] p-2"
+  className="mt-5 rounded-[22px] border border-[var(--border)] bg-[var(--accent-soft)] p-2 sm:mt-6"
   onClick={(e) => e.stopPropagation()}
 >
   <div className="grid grid-cols-2 gap-2">
     <button
       type="button"
       onClick={() => handleModeChange(viva, false)}
-      className={`rounded-[18px] px-4 py-3 text-sm font-semibold transition ${
+      className={`rounded-[18px] px-3 py-3 text-xs font-semibold transition sm:px-4 sm:text-sm ${
         getSelectedMode(viva) === "calm"
           ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_12px_28px_var(--shadow-brand)]"
           : "text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
@@ -443,7 +443,7 @@ const VivaCasesPage: React.FC = () => {
       type="button"
       onClick={() => handleModeChange(viva, true)}
       disabled={!viva.modes?.fastAndFurious?.enabled}
-      className={`rounded-[18px] px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+      className={`rounded-[18px] px-3 py-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-4 sm:text-sm ${
         getSelectedMode(viva) === "fast"
           ? "bg-[#FF6347] text-white shadow-[0_12px_28px_rgba(255,99,71,0.3)]"
           : "text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"

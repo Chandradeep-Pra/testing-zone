@@ -12,11 +12,11 @@ const BeatAnalyze = () => {
   const [isPlaying, setIsPlaying] = useState(false);
 
   return (
-    <main className="urologics-shell px-4 py-4 sm:px-6 sm:py-8">
-      <div className="mx-auto max-w-5xl space-y-4 sm:space-y-6">
+    <main className="urologics-shell px-3 py-3 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-5xl space-y-3 sm:space-y-6">
         <header className="urologics-panel flex flex-col items-start gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
           <UrologicsBrand product="Labs" tag="Internal utility surface" />
-          <button onClick={() => router.back()} className="urologics-button-secondary gap-2">
+          <button onClick={() => router.back()} className="urologics-button-secondary gap-2 sm:w-auto">
             <ArrowLeft size={16} />
             Back
           </button>
@@ -24,7 +24,7 @@ const BeatAnalyze = () => {
 
         <section className="urologics-panel p-5 sm:p-8 md:p-10">
           <div className="urologics-chip">Experimental Utility</div>
-          <h1 className="mt-5 text-3xl font-semibold text-[#071014] sm:mt-6 sm:text-4xl">
+          <h1 className="mobile-native-title mt-5 font-semibold text-[#071014] sm:mt-6 sm:text-4xl">
             Urologics Rhythm Lab
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-[#071014]/65">

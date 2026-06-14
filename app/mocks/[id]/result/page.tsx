@@ -221,8 +221,8 @@ export default function ResultPage() {
         </div>
       )}
 
-      <main className="urologics-shell px-4 py-4 sm:px-6 sm:py-8">
-        <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6">
+      <main className="urologics-shell px-3 py-3 sm:px-6 sm:py-8">
+        <div className="mx-auto max-w-6xl space-y-3 sm:space-y-6">
           <header className="urologics-header flex flex-col items-start gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
             <UrologicsBrand product="Grand Mocks" tag="Session results" />
             <div className="urologics-chip">Completed Review</div>
@@ -230,13 +230,13 @@ export default function ResultPage() {
 
           <section className="grid gap-4 lg:grid-cols-[1fr_0.38fr]">
             <div className="urologics-panel p-5 sm:p-8">
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3 sm:gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)] sm:h-14 sm:w-14">
                   <ShieldCheck size={22} />
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-[0.22em] text-[var(--accent-strong)]">Urologics Mock Review</div>
-                  <h1 className="mt-2 text-2xl font-semibold text-[var(--text-primary)] sm:mt-3 sm:text-3xl">
+                  <h1 className="mt-2 text-xl font-semibold text-[var(--text-primary)] sm:mt-3 sm:text-3xl">
                     {mock.title || "Grand Mock"}
                   </h1>
                   <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
@@ -246,7 +246,7 @@ export default function ResultPage() {
               </div>
             </div>
 
-            <div className="urologics-panel flex flex-col items-center justify-center p-6 text-center sm:p-8">
+            <div className="urologics-panel flex flex-col items-center justify-center p-5 text-center sm:p-8">
               <Trophy className="text-[var(--accent-strong)]" size={22} />
               <div className="mt-4 text-4xl font-semibold text-[var(--accent-strong)] sm:text-5xl">
                 {score}/{mock.questions.length}
@@ -270,17 +270,17 @@ export default function ResultPage() {
               const isCorrect = selectedIndex === correctIndex && correctAnswer !== null;
 
               return (
-                <article key={question.id} className="urologics-panel p-5 sm:p-6">
-                  <div className="flex items-start gap-3">
+                <article key={question.id} className="urologics-panel p-4 sm:p-6">
+                  <div className="flex items-start gap-2 sm:gap-3">
                     <div className={`mt-1 rounded-full p-2 ${isCorrect ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]" : "bg-rose-50 text-rose-600"}`}>
                       {isCorrect ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                     </div>
                     <div className="flex-1">
-                      <div className="text-lg font-semibold leading-8 text-[var(--text-primary)]">
+                      <div className="text-base font-semibold leading-7 text-[var(--text-primary)] sm:text-lg sm:leading-8">
                         {index + 1}. {question.questionText}
                       </div>
 
-                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="mt-4 grid gap-2 sm:gap-3 md:grid-cols-2">
                         {question.options.map((option, optionIndex) => {
                           const isSelected = selectedIndex === optionIndex;
                           const isCorrectOption = correctIndex === optionIndex;
@@ -288,7 +288,7 @@ export default function ResultPage() {
                           return (
                             <div
                               key={`${question.id}-${optionIndex}`}
-                              className={`rounded-[28px] border p-3 ${
+                              className={`rounded-[24px] border p-2.5 sm:rounded-[28px] sm:p-3 ${
                                 isCorrectOption
                                   ? "border-emerald-300 bg-emerald-50"
                                   : isSelected

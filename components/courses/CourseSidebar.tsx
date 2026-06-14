@@ -36,7 +36,7 @@ export default function CourseSidebar({
   unlockedVideos,
 }: CourseSidebarProps) {
   return (
-    <aside className="urologics-panel flex min-h-0 flex-col overflow-hidden p-3">
+    <aside className="urologics-panel flex max-h-[46vh] min-h-0 flex-col overflow-hidden p-3 lg:max-h-none">
       <div className="mb-3 flex items-center justify-between gap-3 px-1">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
@@ -127,7 +127,7 @@ export default function CourseSidebar({
                                 : "opacity-80 hover:bg-amber-50"
                           }`}
                         >
-                          <span className="relative h-12 w-16 shrink-0 overflow-hidden rounded-sm bg-[var(--accent-soft)]">
+                          <span className="relative h-14 w-20 shrink-0 overflow-hidden rounded-2xl bg-[var(--accent-soft)] sm:h-12 sm:w-16 sm:rounded-sm">
                             {thumbnail ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={thumbnail} alt="" className="h-full w-full object-cover" />

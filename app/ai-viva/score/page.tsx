@@ -153,15 +153,15 @@ export default function ReviewPage() {
   }
 
   return (
-    <main className="urologics-shell px-6 py-6">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <header className="urologics-header flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+    <main className="urologics-shell px-3 py-3 sm:px-6 sm:py-6">
+      <div className="mx-auto max-w-6xl space-y-4 sm:space-y-8">
+        <header className="urologics-header flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
           <UrologicsBrand product="AI Viva" tag="Performance report" />
           <div className="urologics-chip">Scored Out Of 8</div>
         </header>
 
         <section className="grid gap-6 lg:grid-cols-[1fr_0.42fr]">
-          <div className="urologics-panel p-8">
+          <div className="urologics-panel p-5 sm:p-8">
             <div className="flex items-start gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
                 <Trophy size={22} />
@@ -170,7 +170,7 @@ export default function ReviewPage() {
                 <div className="text-xs uppercase tracking-[0.22em] text-[#0f7896]">
                   Urologics AI Viva Report
                 </div>
-                <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[#071014] md:text-4xl">
+                <h1 className="mt-3 max-w-3xl text-2xl font-semibold tracking-[-0.04em] text-[#071014] sm:text-3xl md:text-4xl">
                   {report.caseTitle}
                 </h1>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-[#071014]/65">
@@ -180,16 +180,16 @@ export default function ReviewPage() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center rounded-[28px] border border-[#0f7896]/12 bg-[#0f7896] p-8 text-center text-white shadow-[0_24px_60px_rgba(15,120,150,0.25)]">
+          <div className="flex flex-col items-center justify-center rounded-[28px] border border-[#0f7896]/12 bg-[#0f7896] p-6 text-center text-white shadow-[0_24px_60px_rgba(15,120,150,0.25)] sm:p-8">
             <div className="text-xs uppercase tracking-[0.22em] text-white/80">Overall Score</div>
-            <div className="mt-4 text-6xl font-semibold text-white">{report.overallScore}</div>
+            <div className="mt-3 text-5xl font-semibold text-white sm:mt-4 sm:text-6xl">{report.overallScore}</div>
             <div className="mt-2 text-sm text-white/75">out of 8</div>
           </div>
         </section>
 
         {(report.strengthsOverall.length > 0 || report.weaknessesOverall.length > 0) && (
           <section className="grid gap-6 md:grid-cols-2">
-            <div className="urologics-panel p-6">
+            <div className="urologics-panel p-5 sm:p-6">
               <div className="flex items-center gap-2 text-[#0f7896]">
                 <CheckCircle2 size={16} />
                 <h2 className="text-xs uppercase tracking-[0.24em]">Strengths</h2>
@@ -203,7 +203,7 @@ export default function ReviewPage() {
               </div>
             </div>
 
-            <div className="urologics-panel p-6">
+            <div className="urologics-panel p-5 sm:p-6">
               <div className="flex items-center gap-2 text-[#0f7896]">
                 <AlertTriangle size={16} />
                 <h2 className="text-xs uppercase tracking-[0.24em]">Weaknesses</h2>
@@ -219,7 +219,7 @@ export default function ReviewPage() {
           </section>
         )}
 
-        <section className="urologics-panel p-6">
+        <section className="urologics-panel p-5 sm:p-6">
           <div className="flex items-center gap-2 text-[#0f7896]">
             <Activity size={16} />
             <h2 className="text-xs uppercase tracking-[0.24em]">Domain Performance</h2>
@@ -235,7 +235,7 @@ export default function ReviewPage() {
                       <div className="text-lg font-semibold text-[#071014]">{domain.name}</div>
                       <p className="mt-2 text-sm leading-6 text-[#071014]/65">{domain.summary}</p>
                     </div>
-                    <div className="text-3xl font-semibold text-[#0f7896]">{domain.score}/8</div>
+                    <div className="text-2xl font-semibold text-[#0f7896] sm:text-3xl">{domain.score}/8</div>
                   </div>
                   <Button
                     variant="ghost"
@@ -258,7 +258,7 @@ export default function ReviewPage() {
         </section>
 
         {report.improvementPlan.length > 0 && (
-          <section className="urologics-panel p-6">
+          <section className="urologics-panel p-5 sm:p-6">
             <div className="flex items-center gap-2 text-[#0f7896]">
               <Target size={16} />
               <h2 className="text-xs uppercase tracking-[0.24em]">Next Focus Areas</h2>
@@ -273,7 +273,7 @@ export default function ReviewPage() {
           </section>
         )}
 
-        <section className="urologics-panel flex items-center gap-4 p-6">
+        <section className="urologics-panel flex items-center gap-4 p-5 sm:p-6">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
             <ShieldCheck size={20} />
           </div>

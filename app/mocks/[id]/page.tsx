@@ -71,6 +71,7 @@ export default function Page() {
   const [breakLeft, setBreakLeft] = useState(10 * 60);
   const [breakUsed, setBreakUsed] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -192,8 +193,19 @@ export default function Page() {
         </div>
       )}
 
-      <main className="flex min-h-screen flex-col gap-3 bg-[var(--background)] p-3 text-[var(--text-primary)] sm:p-4 lg:flex-row">
-        <aside className="order-1 flex w-full shrink-0 flex-col rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-[0_16px_40px_var(--shadow-soft)] lg:w-[300px] lg:p-5">
+      {previewImage && (
+        <button
+          type="button"
+          onClick={() => setPreviewImage(null)}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/92 p-3"
+          aria-label="Close image preview"
+        >
+          <img src={previewImage} alt="Question exhibit preview" className="max-h-[92vh] max-w-[94vw] rounded-[24px] object-contain" />
+        </button>
+      )}
+
+      <main className="flex min-h-screen flex-col gap-2 bg-[var(--background)] p-2 text-[var(--text-primary)] sm:gap-3 sm:p-4 lg:flex-row">
+        <aside className="order-1 flex w-full shrink-0 flex-col rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-3 shadow-[0_16px_40px_var(--shadow-soft)] sm:p-4 lg:w-[300px] lg:p-5">
           <div className="flex items-start gap-3 sm:items-center">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
               <ShieldCheck size={18} />
@@ -207,7 +219,7 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="mt-5 rounded-[24px] border border-[var(--border)] bg-[var(--accent-soft)] p-4 sm:mt-6">
+          <div className="mt-4 rounded-[24px] border border-[var(--border)] bg-[var(--accent-soft)] p-4 sm:mt-6">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
               <AlarmClock size={14} />
               Session Timer
@@ -222,12 +234,12 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-6 gap-2 sm:mt-6 sm:grid-cols-5">
+          <div className="urologics-thin-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1 sm:mt-6 sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
             {mock.questions.map((question, index) => (
               <button
                 key={question.id}
                 onClick={() => setCurrentQ(index)}
-                className={`rounded-xl px-0 py-2 text-sm font-semibold transition ${
+                className={`h-10 min-w-10 rounded-xl px-0 py-2 text-sm font-semibold transition sm:h-auto sm:min-w-0 ${
                   index === currentQ
                     ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_8px_20px_var(--shadow-brand)]"
                     : answers[question.id] !== undefined
@@ -240,14 +252,14 @@ export default function Page() {
             ))}
           </div>
 
-          <div className="mt-6 flex flex-col gap-3 pt-0 lg:mt-auto lg:space-y-3 lg:pt-6">
+          <div className="mt-4 grid grid-cols-2 gap-2 pt-0 sm:mt-6 sm:flex sm:flex-col sm:gap-3 lg:mt-auto lg:space-y-3 lg:pt-6">
             {!breakUsed && (
               <button
                 onClick={() => {
                   setIsBreak(true);
                   setBreakUsed(true);
                 }}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--border)] px-5 py-3 text-sm font-semibold text-[var(--accent-strong)] transition hover:bg-[var(--accent)] hover:text-[var(--accent-text)]"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--border)] px-4 py-3 text-sm font-semibold text-[var(--accent-strong)] transition hover:bg-[var(--accent)] hover:text-[var(--accent-text)] sm:px-5"
               >
                 <Coffee size={16} />
                 Take Break
@@ -256,7 +268,7 @@ export default function Page() {
 
             <button
               onClick={() => setShowConfirm(true)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-hover)]"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-hover)] sm:px-5"
             >
               <Send size={16} />
               Submit Mock
@@ -276,7 +288,7 @@ export default function Page() {
                   {q.questionText}
                 </h1>
 
-                <div className="mt-6 grid gap-3 sm:mt-8 md:grid-cols-2">
+                <div className="mt-5 grid gap-3 sm:mt-8 md:grid-cols-2">
                   {options.map((opt, i) => {
                     const isSelected = answers[q.id] === i;
 
@@ -284,7 +296,7 @@ export default function Page() {
                       <button
                         key={i}
                         onClick={() => select(q.id, i)}
-                        className={`rounded-[28px] border p-3 text-left transition ${
+                        className={`rounded-[24px] border p-2.5 text-left transition sm:rounded-[28px] sm:p-3 ${
                           isSelected
                             ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-[0_12px_28px_var(--shadow-brand)]"
                             : "border-[var(--border)] bg-[var(--surface-muted)] hover:border-[var(--accent)] hover:bg-[var(--surface-raised)]"
@@ -329,7 +341,9 @@ export default function Page() {
             {q?.questionImage && (
               <div className="border-t border-[var(--border)] p-4 sm:p-5 lg:w-[42%] lg:border-l lg:border-t-0 lg:p-6">
                 <div className="flex h-full min-h-[220px] items-center justify-center rounded-[24px] border border-[var(--border)] bg-[var(--surface-muted)] p-4 sm:min-h-[280px] sm:p-5">
-                  <img src={q.questionImage} alt="Question exhibit" className="max-h-[70vh] rounded-2xl object-contain" />
+                  <button type="button" onClick={() => setPreviewImage(q.questionImage || null)} className="block">
+                    <img src={q.questionImage} alt="Question exhibit" className="max-h-[70vh] rounded-2xl object-contain" />
+                  </button>
                 </div>
               </div>
             )}

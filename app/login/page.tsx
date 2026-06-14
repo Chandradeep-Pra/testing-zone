@@ -73,29 +73,29 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="urologics-shell min-h-screen overflow-hidden px-4 py-5 sm:px-6">
-      <div className="mx-auto flex min-h-[calc(100vh-40px)] w-full max-w-6xl flex-col">
-        <header className="urologics-header flex items-center justify-between px-5 py-4">
+    <main className="urologics-shell min-h-screen overflow-hidden px-3 py-3 sm:px-6 sm:py-5">
+      <div className="mx-auto flex min-h-[calc(100vh-24px)] w-full max-w-6xl flex-col sm:min-h-[calc(100vh-40px)]">
+        <header className="urologics-header flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4">
           <UrologicsBrand product="Login" tag="Secure learner access" />
         </header>
 
-        <section className="grid flex-1 items-center gap-8 py-10 lg:grid-cols-[1fr_0.92fr]">
-          <div className="urologics-panel px-6 py-8 sm:px-9 sm:py-10">
+        <section className="grid flex-1 items-center gap-4 py-5 sm:gap-8 sm:py-10 lg:grid-cols-[1fr_0.92fr]">
+          <div className="urologics-panel px-5 py-6 sm:px-9 sm:py-10">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#0f7896]/12 bg-cyan-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
               <ShieldCheck className="h-4 w-4" />
               Urologics Access
             </div>
 
-            <h1 className="mt-7 max-w-2xl text-3xl font-semibold tracking-[-0.04em] text-[#071014] sm:text-5xl">
+            <h1 className="mobile-native-title mt-6 max-w-2xl font-semibold text-[#071014] sm:mt-7 sm:text-5xl sm:tracking-[-0.04em]">
               Sign in to continue your viva and mock preparation.
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-8 text-[#071014]/65">
+            <p className="mt-4 max-w-xl text-sm leading-7 text-[#071014]/65 sm:mt-5 sm:text-base sm:leading-8">
               Use the same Urologics account connected with your course access. Your mock tests,
               AI viva access, and video content will be loaded from this account.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="urologics-panel p-5 sm:p-7">
+          <form onSubmit={handleSubmit} className="urologics-panel p-5 mobile-safe-bottom sm:p-7">
             <div>
               <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#071014]">
                 Login

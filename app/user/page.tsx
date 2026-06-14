@@ -158,7 +158,7 @@ export default function UserPage() {
 
   return (
     <main className="urologics-shell min-h-screen">
-      <div className="mx-auto min-h-screen w-full max-w-7xl px-4 py-4 sm:px-6">
+      <div className="mobile-native-page mx-auto min-h-screen w-full max-w-7xl sm:px-6 sm:py-4">
         <UrologicsHeader current="Profile" product="Profile" tag="Access, plans, and progress" />
 
         {loading || pageLoading ? (
@@ -173,10 +173,10 @@ export default function UserPage() {
             </Link>
           </section>
         ) : (
-          <section className="grid gap-5 pb-12 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="grid gap-5">
-              <div className="urologics-panel p-6">
-                <div className="flex items-center gap-4">
+          <section className="grid gap-4 pb-12 sm:gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="grid gap-4 sm:gap-5">
+              <div className="urologics-panel p-5 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-4">
                   <div className="grid h-16 w-16 place-items-center overflow-hidden rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                     {user.profileImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -186,12 +186,12 @@ export default function UserPage() {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-2xl font-semibold text-[var(--text-primary)]">{user.name}</p>
+                    <p className="truncate text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">{user.name}</p>
                     <p className="truncate text-sm text-[var(--text-secondary)]">{user.email}</p>
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <div className="mt-5 grid gap-2 sm:mt-6 sm:grid-cols-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={sendPasswordReset}
@@ -212,7 +212,7 @@ export default function UserPage() {
                 </div>
               </div>
 
-              <div className="urologics-panel p-6">
+              <div className="urologics-panel p-5 sm:p-6">
                 <div className="flex items-center gap-3">
                   <ShieldCheck className="h-5 w-5 text-[var(--accent-strong)]" />
                   <h2 className="text-xl font-semibold text-[var(--text-primary)]">Access</h2>
@@ -225,13 +225,13 @@ export default function UserPage() {
               </div>
             </div>
 
-            <div className="grid gap-5">
-              <div className="urologics-panel p-6">
+            <div className="grid gap-4 sm:gap-5">
+              <div className="urologics-panel p-5 sm:p-6">
                 <div className="flex items-center gap-3">
                   <BookOpenCheck className="h-5 w-5 text-[var(--accent-strong)]" />
                   <h2 className="text-xl font-semibold text-[var(--text-primary)]">Plan enrolled</h2>
                 </div>
-                <h3 className="mt-5 text-2xl font-semibold text-[var(--text-primary)]">
+                <h3 className="mt-5 text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">
                   {access?.plan?.title || access?.plan?.name || "No active plan"}
                 </h3>
                 <p className="mt-2 text-sm text-[var(--text-secondary)]">
@@ -244,12 +244,12 @@ export default function UserPage() {
                 </div>
               </div>
 
-              <div className="urologics-panel p-6">
+              <div className="urologics-panel p-5 sm:p-6">
                 <div className="flex items-center gap-3">
                   <Clock3 className="h-5 w-5 text-[var(--accent-strong)]" />
                   <h2 className="text-xl font-semibold text-[var(--text-primary)]">AI Viva credits</h2>
                 </div>
-                <p className="mt-5 text-3xl font-semibold text-[var(--text-primary)]">
+                <p className="mt-5 text-2xl font-semibold text-[var(--text-primary)] sm:text-3xl">
                   {access?.vivaCredit?.remainingMinutes ?? 0} minutes left
                 </p>
                 <div className="mt-4 h-3 overflow-hidden rounded-full bg-[var(--accent-soft)]">
@@ -260,7 +260,7 @@ export default function UserPage() {
                 </div>
               </div>
 
-              <div className="urologics-panel p-6">
+              <div className="urologics-panel p-5 sm:p-6">
                 <div className="flex items-center gap-3">
                   <TrendingUp className="h-5 w-5 text-[var(--accent-strong)]" />
                   <h2 className="text-xl font-semibold text-[var(--text-primary)]">Progress report</h2>

@@ -175,7 +175,7 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
 
         {source.provider !== "youtube" ? (
           <div
-            className={`absolute inset-x-4 bottom-4 rounded-[24px] border border-white/10 bg-black/62 p-3 text-white shadow-2xl backdrop-blur-xl transition-all duration-300 ${
+            className={`absolute inset-x-2 bottom-2 rounded-[22px] border border-white/10 bg-black/62 p-2.5 text-white shadow-2xl backdrop-blur-xl transition-all duration-300 sm:inset-x-4 sm:bottom-4 sm:rounded-[24px] sm:p-3 ${
               showControls
                 ? "translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-4 opacity-0"
@@ -208,8 +208,8 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
               </button>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+              <div className="flex items-center justify-between gap-2 sm:justify-start">
                 <button
                   type="button"
                   onClick={() => seekBy(-10)}
@@ -234,21 +234,21 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
                 >
                   <RotateCw className="h-4 w-4" />
                 </button>
-                <span className="ml-1 text-xs font-medium text-white/78">
+                <span className="ml-1 text-[11px] font-medium text-white/78 sm:text-xs">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2 sm:justify-start">
                 <Volume2 className="h-4 w-4 text-white/70" />
-                <div className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-1">
+                <div className="flex min-w-0 flex-1 items-center justify-center gap-1 rounded-full bg-white/10 px-2 py-1 sm:flex-none">
                   <Gauge className="h-3.5 w-3.5 text-white/70" />
                   {[0.75, 1, 1.25, 1.5, 2].map((item) => (
                     <button
                       key={item}
                       type="button"
                       onClick={() => changeSpeed(item)}
-                      className={`rounded-full px-2 py-1 text-[11px] font-semibold transition ${
+                      className={`rounded-full px-1.5 py-1 text-[10px] font-semibold transition sm:px-2 sm:text-[11px] ${
                         speed === item ? "bg-white text-[#071014]" : "text-white/70 hover:text-white"
                       }`}
                     >

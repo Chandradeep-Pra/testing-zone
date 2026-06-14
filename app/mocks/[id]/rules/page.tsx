@@ -63,20 +63,20 @@ export default function MockRulesPage() {
   const totalTime = mock.durationMinutes + 10;
 
   return (
-    <main className="urologics-shell px-4 py-4 sm:px-6 sm:py-8">
-      <div className="mx-auto max-w-4xl space-y-4 sm:space-y-6">
+    <main className="urologics-shell px-3 py-3 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-4xl space-y-3 sm:space-y-6">
         <header className="urologics-panel px-4 py-4 sm:px-6 sm:py-5">
           <UrologicsBrand product="Grand Mocks" tag="Candidate briefing" />
         </header>
 
         <section className="urologics-panel p-5 sm:p-8 md:p-10">
           <div className="urologics-chip">Session Rules</div>
-          <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[var(--text-primary)] sm:mt-6 sm:text-4xl md:text-5xl">{mock.title || "Grand Mock"}</h1>
+          <h1 className="mobile-native-title mt-5 max-w-3xl font-semibold text-[var(--text-primary)] sm:mt-6 sm:text-4xl sm:tracking-[-0.04em] md:text-5xl">{mock.title || "Grand Mock"}</h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-orange-600/65 sm:mt-4">
             No Part of this mock test is intended for copying.
           </p>
 
-          <div className="mt-7 grid gap-3 md:grid-cols-2 md:gap-4">
+          <div className="mobile-horizontal-snap mt-6 md:mt-7 md:grid md:grid-cols-2 md:gap-4 md:overflow-visible">
             <div className="urologics-subpanel p-4 sm:p-5">
               <TimerReset className="text-[var(--accent-strong)]" size={18} />
               <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">Main timer</div>

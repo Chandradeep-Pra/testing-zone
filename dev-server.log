@@ -1,0 +1,13 @@
+
+> ideaspikes@0.1.0 deb
+> next dev --hostname 127.0.0.1 --port 3000
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://127.0.0.1:3000
+- Network:       http://127.0.0.1:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 3.2s
+○ Compiling /_not-found/page ...
+✓ Finished writing to filesystem cache in 34.2s

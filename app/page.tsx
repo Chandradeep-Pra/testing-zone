@@ -168,25 +168,25 @@ export default function Home() {
 
   return (
     <main className="urologics-shell overflow-hidden">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-4 sm:px-6">
+      <div className="mobile-native-page mx-auto flex min-h-screen w-full max-w-7xl flex-col sm:px-6 sm:py-4">
         <UrologicsHeader current="Overview" product="Platform" tag="AI Viva, Mocks, and Grand Mocks" />
 
-        <section className="py-8">
-          <div className="mb-6">
+        <section className="py-4 sm:py-8">
+          <div className="mb-5 rounded-[30px] border border-[var(--border)] bg-[var(--surface-raised)] p-5 shadow-[0_12px_30px_var(--shadow-soft)] sm:mb-6 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">Overview</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[var(--text-primary)] sm:text-4xl md:text-5xl">
+            <h1 className="mobile-native-title mt-2 font-semibold text-[var(--text-primary)] sm:text-4xl sm:tracking-[-0.04em] md:text-5xl">
               Hi, {firstName}
             </h1>
           </div>
 
           <CompleteProfilePrompt />
 
-          <div className="grid items-start gap-5 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="grid gap-5">
-              <section className="urologics-panel overflow-hidden p-5 sm:p-6 md:p-7">
-              <div className="flex items-center justify-between gap-4">
+              <section className="urologics-panel overflow-hidden p-4 sm:p-6 md:p-7">
+              <div className="flex items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)] sm:h-11 sm:w-11">
                     <Megaphone size={20} />
                   </div>
                   <div>
@@ -222,7 +222,7 @@ export default function Home() {
               </div>
 
               {announcement ? (
-                <div className="mt-6 flex flex-col gap-5">
+                <div className="mt-5 flex flex-col gap-4 sm:mt-6 sm:gap-5">
                   <div className="overflow-hidden rounded-[26px] border border-[var(--border)] bg-[var(--surface-muted)]">
                     {announcement.media?.type === "image" && announcement.media.src ? (
                       <button
@@ -234,7 +234,7 @@ export default function Home() {
                         <img
                           src={announcement.media.src}
                           alt={announcement.title}
-                          className="max-h-[420px] w-full object-contain"
+                        className="max-h-[320px] w-full object-contain sm:max-h-[420px]"
                         />
                       </button>
                     ) : announcement.media?.type === "youtube" && announcement.media.src ? (
@@ -256,7 +256,7 @@ export default function Home() {
                     <span className="w-fit rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
                       {getAnnouncementBadge(announcement.kind)}
                     </span>
-                    <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)]">
+                    <h2 className="mt-4 text-xl font-semibold tracking-[-0.03em] text-[var(--text-primary)] sm:text-2xl">
                       {announcement.title}
                     </h2>
                     {announcement.subtitle ? (
@@ -299,16 +299,16 @@ export default function Home() {
                       key={card.title}
                       type="button"
                       onClick={() => router.push(card.href)}
-                      className="urologics-subpanel group flex items-center gap-4 p-4 text-left transition hover:-translate-y-0.5 sm:gap-5 sm:p-5"
+                      className="urologics-subpanel group flex items-center gap-3 p-4 text-left transition hover:-translate-y-0.5 sm:gap-5 sm:p-5"
                     >
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-[var(--accent-soft)] text-[var(--accent-strong)] sm:h-16 sm:w-16">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] bg-[var(--accent-soft)] text-[var(--accent-strong)] sm:h-16 sm:w-16 sm:rounded-[22px]">
                         <Icon size={27} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <h2 className="text-lg font-semibold tracking-[-0.03em] text-[var(--text-primary)] sm:text-xl">
                           {card.title}
                         </h2>
-                        <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{card.copy}</p>
+                        <p className="mt-1 line-clamp-2 text-sm leading-6 text-[var(--text-secondary)] sm:line-clamp-none">{card.copy}</p>
                       </div>
                       <ArrowRight className="h-5 w-5 shrink-0 text-[var(--accent-strong)] transition group-hover:translate-x-1" />
                     </button>
@@ -317,7 +317,7 @@ export default function Home() {
               </section>
             </div>
 
-            <section className="urologics-panel p-5 sm:p-6 md:p-7">
+            <section className="urologics-panel p-4 sm:p-6 md:p-7">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                   <BookOpenCheck size={20} />

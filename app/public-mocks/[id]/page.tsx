@@ -144,17 +144,17 @@ export default function PublicMockPage() {
 
   return (
     <main className="urologics-shell overflow-hidden">
-      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
+      <div className="mobile-native-page mx-auto max-w-7xl sm:px-6 sm:py-6">
         <UrologicsHeader current="Mocks" product="Grand Mocks" tag="Public candidate registration" />
 
-        <section className="grid gap-6 py-10 sm:gap-8 md:py-24 lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="grid gap-4 py-4 sm:gap-8 sm:py-10 md:py-24 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="urologics-panel p-5 sm:p-7 md:p-10">
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)] sm:px-4 sm:text-[11px] sm:tracking-[0.22em]">
               <Sparkles size={14} />
               Public Mock
             </div>
 
-            <h1 className="mt-6 max-w-3xl text-3xl font-semibold tracking-[-0.04em] text-[var(--text-primary)] sm:mt-7 sm:text-4xl md:text-5xl">
+            <h1 className="mobile-native-title mt-6 max-w-3xl font-semibold text-[var(--text-primary)] sm:mt-7 sm:text-4xl sm:tracking-[-0.04em] md:text-5xl">
               {mock.title || "Grand Mock"}
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--text-secondary)] sm:mt-5 sm:text-base sm:leading-8 md:text-lg">
@@ -162,7 +162,7 @@ export default function PublicMockPage() {
               attendance and marks.
             </p>
 
-            <div className="mt-7 grid gap-3 md:grid-cols-3 md:gap-4">
+            <div className="mobile-horizontal-snap mt-6 md:mt-7 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible">
               <div className="urologics-subpanel p-4 sm:p-5">
                 <CalendarClock className="text-[var(--accent-strong)]" size={18} />
                 <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">Ends at</div>
