@@ -850,10 +850,10 @@ export default function VivaVoiceAi({
             <div className="flex items-center justify-between gap-4 border-b border-[#0f7896]/12 px-5 py-4">
               <div>
                 <div className="text-[11px] uppercase tracking-[0.22em] text-[#0f7896]">
-                  Question History
+                  Session Transcript
                 </div>
                 <div className="mt-1 text-base font-semibold text-[#071014]">
-                  Questions asked by the examiner
+                  Examiner questions and your spoken answers
                 </div>
               </div>
               <button
@@ -1003,11 +1003,11 @@ export default function VivaVoiceAi({
           type="button"
           onClick={() => setHistoryOpen(true)}
           className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border border-[#0f7896]/12 bg-white text-[#071014] transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0 hover:bg-cyan-50"
-          title="Show question history"
+          title="Show session transcript"
         >
           <History size={14} className="sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Show History</span>
-          <span className="inline sm:hidden">History</span>
+          <span className="hidden sm:inline">Transcript</span>
+          <span className="inline sm:hidden">Transcript</span>
         </button>
 
         <button
