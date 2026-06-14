@@ -418,7 +418,7 @@ const VivaCasesPage: React.FC = () => {
                       <span className="truncate">{viva.folderName}</span>
                     </div>
                   ) : null}
-                  <p className="mt-3 line-clamp-2 max-h-[2.3rem] overflow-hidden text-sm leading-[1.15rem] text-[var(--text-secondary)]">
+                  <p className="mt-3 truncate text-sm font-semibold leading-6 text-[var(--text-secondary)]">
   {viva.case.stem}
 </p>
 

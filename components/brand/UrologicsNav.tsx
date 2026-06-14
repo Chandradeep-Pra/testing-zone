@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   { href: "/", label: "Overview" },
   { href: "/courses", label: "Courses" },
   { href: "/ai-viva/cases", label: "AI Viva" },

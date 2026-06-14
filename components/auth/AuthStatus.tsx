@@ -62,6 +62,14 @@ export default function AuthStatus() {
             <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{user.name}</p>
             <p className="truncate text-xs text-[var(--text-tertiary)]">{user.email}</p>
           </div>
+          <Link
+            href="/user"
+            onClick={() => setOpen(false)}
+            className="mt-1 flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]"
+          >
+            <UserRound className="h-4 w-4" />
+            My account
+          </Link>
           <button
             type="button"
             onClick={() => {

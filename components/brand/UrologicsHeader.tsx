@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import AuthStatus from "@/components/auth/AuthStatus";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
-import UrologicsNav from "@/components/brand/UrologicsNav";
+import UrologicsNav, { NAV_ITEMS } from "@/components/brand/UrologicsNav";
 import ThemeToggle from "@/components/theme/ThemeToggle";
+import Link from "next/link";
 
 type UrologicsHeaderProps = {
   current?: string;
@@ -18,6 +19,7 @@ export default function UrologicsHeader({
   tag = "AI Viva, Mocks, and Grand Mocks",
 }: UrologicsHeaderProps) {
   const [showHeader, setShowHeader] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const lastScrollYRef = useRef(0);
   const tickingRef = useRef(false);
 
@@ -54,18 +56,72 @@ export default function UrologicsHeader({
           showHeader ? "translate-y-0 opacity-100" : "-translate-y-[130%] opacity-0"
         }`}
       >
-        <div className="urologics-header flex flex-col items-start gap-4 px-4 py-4 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:px-5 md:px-6">
+        <div className="urologics-header flex items-center justify-between gap-3 rounded-full px-4 py-3 backdrop-blur-xl sm:px-5 md:px-6">
           <UrologicsBrand product={product} tag={tag} />
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+          <div className="hidden w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center md:flex">
             <UrologicsNav current={current} />
             <div className="flex justify-end gap-2">
               <ThemeToggle />
               <AuthStatus />
             </div>
           </div>
+          <button
+            type="button"
+            aria-label="Toggle navigation"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((current) => !current)}
+            className="relative flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-raised)] text-[var(--accent-strong)] shadow-[0_10px_24px_var(--shadow-soft)] md:hidden"
+          >
+            <span
+              className={`absolute h-0.5 w-5 rounded-full bg-current transition ${
+                menuOpen ? "translate-y-0 rotate-45" : "-translate-y-1.5"
+              }`}
+            />
+            <span
+              className={`absolute h-0.5 w-5 rounded-full bg-current transition ${
+                menuOpen ? "opacity-0" : "opacity-100"
+              }`}
+            />
+            <span
+              className={`absolute h-0.5 w-5 rounded-full bg-current transition ${
+                menuOpen ? "translate-y-0 -rotate-45" : "translate-y-1.5"
+              }`}
+            />
+          </button>
+        </div>
+
+        <div
+          className={`mt-2 overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_18px_46px_var(--shadow-soft)] transition-all duration-300 md:hidden ${
+            menuOpen ? "max-h-[520px] opacity-100" : "max-h-0 opacity-0"
+          }`}
+        >
+          <div className="grid gap-2 p-3">
+            {NAV_ITEMS.map((item) => {
+              const active = item.label === current;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMenuOpen(false)}
+                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                    active
+                      ? "bg-[var(--accent)] text-[var(--accent-text)]"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
+              <ThemeToggle />
+              <AuthStatus />
+            </div>
+          </div>
         </div>
       </header>
-      <div className="h-36 shrink-0 sm:h-24" aria-hidden="true" />
+      <div className="h-24 shrink-0" aria-hidden="true" />
     </>
   );
 }

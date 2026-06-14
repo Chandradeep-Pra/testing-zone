@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, FolderOpen, LockKeyhole, Mail, PlayCircle } from "lucide-react";
+import {
+  ArrowRight,
+  FolderOpen,
+  LockKeyhole,
+  Mail,
+  PlayCircle,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -28,8 +34,10 @@ export default function CoursesPage() {
   const [showPlayerView, setShowPlayerView] = useState(false);
   const [query, setQuery] = useState("");
   const [expandedSectionIds, setExpandedSectionIds] = useState<string[]>([]);
-  const [selectedPlayback, setSelectedPlayback] = useState<PlaybackResponse | null>(null);
-  const [selectedLockedVideo, setSelectedLockedVideo] = useState<VideoItem | null>(null);
+  const [selectedPlayback, setSelectedPlayback] =
+    useState<PlaybackResponse | null>(null);
+  const [selectedLockedVideo, setSelectedLockedVideo] =
+    useState<VideoItem | null>(null);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -48,7 +56,9 @@ export default function CoursesPage() {
         const response = await fetch(appPath("/api/urologics/videos/library"), {
           headers: { Authorization: `Bearer ${idToken}` },
         });
-        const payload = (await response.json()) as VideoLibraryResponse & { error?: string };
+        const payload = (await response.json()) as VideoLibraryResponse & {
+          error?: string;
+        };
 
         if (!response.ok) {
           throw new Error(payload.error || "Unable to load video library.");
@@ -60,7 +70,11 @@ export default function CoursesPage() {
         setExpandedSectionIds([]);
       } catch (nextError) {
         if (!active) return;
-        setError(nextError instanceof Error ? nextError.message : "Unable to load video library.");
+        setError(
+          nextError instanceof Error
+            ? nextError.message
+            : "Unable to load video library.",
+        );
       } finally {
         if (active) setLibraryLoading(false);
       }
@@ -79,11 +93,15 @@ export default function CoursesPage() {
 
     return sections
       .map((section) => {
-        const sectionMatches = section.title.toLowerCase().includes(normalizedQuery);
+        const sectionMatches = section.title
+          .toLowerCase()
+          .includes(normalizedQuery);
         const videos = sectionMatches
           ? section.videos
           : section.videos.filter((video) =>
-              `${video.title} ${video.description || ""}`.toLowerCase().includes(normalizedQuery)
+              `${video.title} ${video.description || ""}`
+                .toLowerCase()
+                .includes(normalizedQuery),
             );
 
         return { ...section, videos, videoCount: videos.length };
@@ -91,17 +109,20 @@ export default function CoursesPage() {
       .filter((section) => section.videos.length > 0);
   }, [query, sections]);
 
-  const totalVideos = sections.reduce((count, section) => count + section.videos.length, 0);
+  const totalVideos = sections.reduce(
+    (count, section) => count + section.videos.length,
+    0,
+  );
   const unlockedVideos = sections.reduce(
     (count, section) => count + section.videos.filter(isUnlocked).length,
-    0
+    0,
   );
 
   function toggleSection(sectionId: string) {
     setExpandedSectionIds((current) =>
       current.includes(sectionId)
         ? current.filter((id) => id !== sectionId)
-        : [...current, sectionId]
+        : [...current, sectionId],
     );
   }
 
@@ -136,10 +157,15 @@ export default function CoursesPage() {
     setSelectedLockedVideo(null);
     setPlayingId(video.id);
     try {
-      const response = await fetch(appPath(`/api/urologics/videos/${video.id}/play`), {
-        headers: { Authorization: `Bearer ${user.idToken}` },
-      });
-      const payload = (await response.json()) as PlaybackResponse & { error?: string };
+      const response = await fetch(
+        appPath(`/api/urologics/videos/${video.id}/play`),
+        {
+          headers: { Authorization: `Bearer ${user.idToken}` },
+        },
+      );
+      const payload = (await response.json()) as PlaybackResponse & {
+        error?: string;
+      };
 
       if (!response.ok) {
         throw new Error(payload.error || "Unable to prepare video.");
@@ -147,7 +173,11 @@ export default function CoursesPage() {
 
       setSelectedPlayback(payload);
     } catch (nextError) {
-      toast.error(nextError instanceof Error ? nextError.message : "Unable to prepare video.");
+      toast.error(
+        nextError instanceof Error
+          ? nextError.message
+          : "Unable to prepare video.",
+      );
     } finally {
       setPlayingId(null);
     }
@@ -156,7 +186,11 @@ export default function CoursesPage() {
   return (
     <main className="urologics-shell h-screen overflow-hidden">
       <div className="mx-auto flex h-screen w-full max-w-[1480px] flex-col px-3 py-3 sm:px-4">
-        <UrologicsHeader current="Courses" product="Courses" tag="Video library" />
+        <UrologicsHeader
+          current="Courses"
+          product="Courses"
+          tag="Video library"
+        />
 
         {!loading && !user ? (
           <LoginRequiredPanel />
@@ -172,7 +206,6 @@ export default function CoursesPage() {
                   <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-[var(--text-primary)]">
                     Urologics Video Library.
                   </h1>
-                  
                 </div>
                 <div className="rounded-full bg-[var(--accent-soft)] px-4 py-2 text-sm font-semibold text-[var(--accent-strong)]">
                   {unlockedVideos}/{totalVideos} unlocked
@@ -194,10 +227,13 @@ export default function CoursesPage() {
                   </div>
                 ) : (
                   sections.map((section) => {
-                    const unlockedCount = section.videos.filter(isUnlocked).length;
+                    const unlockedCount =
+                      section.videos.filter(isUnlocked).length;
                     const firstThumbnail =
                       section.imageUrl ||
-                      section.videos.map((video) => video.thumbnailUrl).find(Boolean);
+                      section.videos
+                        .map((video) => video.thumbnailUrl)
+                        .find(Boolean);
 
                     return (
                       <button
@@ -209,7 +245,11 @@ export default function CoursesPage() {
                         <div className="relative aspect-video bg-[var(--accent-soft)]">
                           {firstThumbnail ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={firstThumbnail} alt="" className="h-full w-full object-cover" />
+                            <img
+                              src={firstThumbnail}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
                           ) : (
                             <div className="grid h-full w-full place-items-center text-[var(--accent-strong)]">
                               <FolderOpen className="h-12 w-12" />
@@ -226,7 +266,8 @@ export default function CoursesPage() {
                             {section.title}
                           </h2>
                           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-                            {section.videoCount} lessons · {unlockedCount} unlocked
+                            {section.videoCount} lessons · {unlockedCount}{" "}
+                            unlocked
                           </p>
                           <div className="mt-4 flex items-center justify-between text-sm font-semibold text-[var(--accent-strong)]">
                             <span>Browse Content</span>
@@ -257,7 +298,9 @@ export default function CoursesPage() {
               }}
               playingId={playingId}
               query={query}
-              selectedVideoId={selectedPlayback?.video.id || selectedLockedVideo?.id}
+              selectedVideoId={
+                selectedPlayback?.video.id || selectedLockedVideo?.id
+              }
               totalVideos={totalVideos}
               unlockedVideos={unlockedVideos}
             />
@@ -294,7 +337,7 @@ function LockedVideoAccessPanel({ video }: { video: VideoItem }) {
           {video.title}
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[var(--text-secondary)]">
-          Please buy this course to access it&apos;s content, contact{" "}
+          Please purchase this course to access it&apos;s content, contact{" "}
           <a
             href={COURSE_INQUIRY_MAIL}
             className="font-semibold text-[var(--accent-strong)] underline underline-offset-4"
