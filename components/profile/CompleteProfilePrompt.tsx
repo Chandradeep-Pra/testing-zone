@@ -45,6 +45,10 @@ function getInitialName(name?: string | null, email?: string | null) {
   return email?.split("@")[0]?.replace(/[._-]+/g, " ").trim() || "";
 }
 
+function getPhoneDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 export default function CompleteProfilePrompt() {
   const { user, refreshUser } = useAuth();
   const [open, setOpen] = useState(false);
@@ -149,6 +153,11 @@ export default function CompleteProfilePrompt() {
 
     if (!selectedCountry.name.trim()) {
       toast.error("Please enter your country.");
+      return;
+    }
+
+    if (getPhoneDigits(phone).length !== 10) {
+      toast.error("Phone number should be exactly 10 digits.");
       return;
     }
 
@@ -302,7 +311,7 @@ export default function CompleteProfilePrompt() {
                 </div>
                 <input
                   value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
+                  onChange={(event) => setPhone(getPhoneDigits(event.target.value).slice(0, 10))}
                   placeholder="Phone number"
                   className="min-w-0 flex-1 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
                 />
