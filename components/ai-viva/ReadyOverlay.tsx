@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
+import MicLevelMeter from "./MicLevelMeter";
 import {
   getDefaultExaminer,
   EXAMINER_VOICES,
@@ -236,6 +237,15 @@ export default function ReadyOverlay({
                     <AlertTriangle size={18} className="text-red-400" />
                   )}
                 </div>
+
+                {micAllowed ? (
+                  <MicLevelMeter
+                    selfTest
+                    active={micAllowed}
+                    label="Speak to test microphone"
+                    helper="If the bars do not move while you speak, check browser microphone permission or select the correct input device."
+                  />
+                ) : null}
 
                 <div className="flex items-center justify-between rounded-2xl border border-[#0f7896]/12 bg-white px-4 py-3">
                   <div className="flex items-center gap-3">

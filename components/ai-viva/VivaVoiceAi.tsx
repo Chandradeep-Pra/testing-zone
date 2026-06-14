@@ -409,6 +409,7 @@ export default function VivaVoiceAi({
     closeSocket,
     getTranscriptBuffer,
     resetTranscriptBuffer,
+    micLevel,
   } = useSpeechInput(
     (interim) => {
       if (ending) return;
@@ -866,7 +867,11 @@ export default function VivaVoiceAi({
               </button>
             </div>
             <div className="min-h-0 flex-1">
-              <ChatTimeline messages={messages} />
+              <ChatTimeline
+                messages={messages}
+                micLevel={micLevel}
+                listening={isListening}
+              />
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type SttMessage = {
   transcript?: string;
@@ -21,9 +21,11 @@ export function useSpeechInput(
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const lastLevelUpdateRef = useRef(0);
   const onInterimRef = useRef(onInterim);
   const onFinalRef = useRef(onFinal);
   const onSpeechEndedWithoutFinalRef = useRef(onSpeechEndedWithoutFinal);
+  const [micLevel, setMicLevel] = useState(0);
 
   useEffect(() => {
     onInterimRef.current = onInterim;
@@ -131,7 +133,25 @@ export function useSpeechInput(
     const worklet = new AudioWorkletNode(audioContext, "audio-processor");
     workletRef.current = worklet;
 
-    worklet.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
+    worklet.port.onmessage = (event: MessageEvent<Int16Array | ArrayBuffer>) => {
+      const pcm =
+        event.data instanceof Int16Array
+          ? event.data
+          : new Int16Array(event.data);
+      const now = performance.now();
+
+      if (now - lastLevelUpdateRef.current > 80 && pcm.length > 0) {
+        let sum = 0;
+
+        for (let index = 0; index < pcm.length; index += 1) {
+          const value = pcm[index] / 32768;
+          sum += value * value;
+        }
+
+        setMicLevel(Math.max(0, Math.min(1, Math.sqrt(sum / pcm.length) * 4.5)));
+        lastLevelUpdateRef.current = now;
+      }
+
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(event.data);
       }
@@ -160,6 +180,8 @@ export function useSpeechInput(
       void audioContextRef.current.close();
       audioContextRef.current = null;
     }
+
+    setMicLevel(0);
   }
 
   function closeSocket() {
@@ -187,5 +209,6 @@ export function useSpeechInput(
     closeSocket,
     getTranscriptBuffer,
     resetTranscriptBuffer,
+    micLevel,
   };
 }
