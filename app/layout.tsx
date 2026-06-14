@@ -5,11 +5,16 @@ import ToasterProvider from "@/components/ToastProvider";
 
 export const metadata: Metadata = {
   title: {
-    default: "Urologics",
-    template: "%s | Urologics",
+    default: "Urologics Web",
+    template: "%s | Urologics Web",
   },
   description:
     "Premium AI viva, mock exam, and grand mock preparation for urology training with Urologics.",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

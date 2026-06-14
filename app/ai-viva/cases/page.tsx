@@ -370,7 +370,7 @@ const VivaCasesPage: React.FC = () => {
               <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Try a wider filter or a simpler search term.</p>
             </div>
           ) : (
-            <div>
+            <div className="min-w-0">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
@@ -382,11 +382,11 @@ const VivaCasesPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:gap-6 xl:grid-cols-2">
+              <div className="grid min-w-0 gap-4 sm:gap-6 xl:grid-cols-2">
               {visibleCases.map((viva) => (
                 <article
   key={viva.id}
-  className={`flex flex-col justify-between rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-[0_16px_40px_var(--shadow-soft)] transition sm:p-6 ${
+  className={`flex w-full min-w-0 max-w-full flex-col justify-between overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-[0_16px_40px_var(--shadow-soft)] transition sm:p-6 ${
     isVivaAllowed(viva)
       ? "cursor-pointer hover:-translate-y-1 hover:border-[var(--accent)]"
       : "cursor-pointer opacity-75 hover:-translate-y-1 hover:border-amber-300"
@@ -399,17 +399,17 @@ const VivaCasesPage: React.FC = () => {
     }
   }}
 >
-                <div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <span className="inline-flex min-w-0 max-w-[62%] items-center truncate rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)] sm:max-w-none sm:tracking-[0.22em]">
   {viva.case.level}
 </span>
-                    <span className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+                    <span className="shrink-0 text-xs font-medium uppercase tracking-[0.14em] text-[var(--text-secondary)] sm:tracking-[0.18em]">
   {viva.accessType === "public" || viva.access?.isPublic ? "Public" : isVivaAllowed(viva) ? "Included" : "Locked"}
 </span>
                   </div>
 
-                  <h2 className="mt-5 line-clamp-2 text-xl font-semibold text-[var(--text-primary)] sm:mt-6 sm:text-2xl">
+                  <h2 className="mt-5 line-clamp-2 break-words text-xl font-semibold text-[var(--text-primary)] sm:mt-6 sm:text-2xl">
   {viva.case.title}
 </h2>
                   {viva.folderName ? (
@@ -418,40 +418,40 @@ const VivaCasesPage: React.FC = () => {
                       <span className="truncate">{viva.folderName}</span>
                     </div>
                   ) : null}
-                  <p className="mt-3 truncate text-sm font-semibold leading-6 text-[var(--text-secondary)]">
+                  <p className="mt-3 line-clamp-1 min-w-0 break-words text-sm font-semibold leading-6 text-[var(--text-secondary)]">
   {viva.case.stem}
 </p>
 
                   <div
-  className="mt-5 rounded-[22px] border border-[var(--border)] bg-[var(--accent-soft)] p-2 sm:mt-6"
+  className="mt-5 min-w-0 rounded-[22px] border border-[var(--border)] bg-[var(--accent-soft)] p-2 sm:mt-6"
   onClick={(e) => e.stopPropagation()}
 >
-  <div className="grid grid-cols-2 gap-2">
+  <div className="grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-2">
     <button
       type="button"
       onClick={() => handleModeChange(viva, false)}
-      className={`rounded-[18px] px-3 py-3 text-xs font-semibold transition sm:px-4 sm:text-sm ${
+      className={`min-w-0 rounded-[18px] px-3 py-3 text-xs font-semibold leading-5 transition sm:px-4 sm:text-sm ${
         getSelectedMode(viva) === "calm"
           ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_12px_28px_var(--shadow-brand)]"
           : "text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
       }`}
     >
-      Calm & Composed
+      <span className="block truncate min-[420px]:whitespace-normal">Calm & Composed</span>
     </button>
 
     <button
       type="button"
       onClick={() => handleModeChange(viva, true)}
       disabled={!viva.modes?.fastAndFurious?.enabled}
-      className={`rounded-[18px] px-3 py-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-4 sm:text-sm ${
+      className={`min-w-0 rounded-[18px] px-3 py-3 text-xs font-semibold leading-5 transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-4 sm:text-sm ${
         getSelectedMode(viva) === "fast"
           ? "bg-[#FF6347] text-white shadow-[0_12px_28px_rgba(255,99,71,0.3)]"
           : "text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
       }`}
     >
-      <span className="inline-flex items-center justify-center gap-2">
-        <Zap size={15} />
-        Fast & Furious
+      <span className="inline-flex min-w-0 items-center justify-center gap-2">
+        <Zap size={15} className="shrink-0" />
+        <span className="truncate min-[420px]:whitespace-normal">Fast & Furious</span>
       </span>
     </button>
   </div>
@@ -459,9 +459,9 @@ const VivaCasesPage: React.FC = () => {
 
                   <div className="mt-6 space-y-2.5">
                     {viva.case.objectives.slice(0, 3).map((objective, objectiveIndex) => (
-                      <div key={objectiveIndex} className={`flex gap-3 text-sm text-[var(--text-secondary)]`}>
+                      <div key={objectiveIndex} className={`flex min-w-0 gap-3 text-sm text-[var(--text-secondary)]`}>
                         <span className={`mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--accent)]`} />
-                        <span className="leading-6">{objective}</span>
+                        <span className="min-w-0 break-words leading-6">{objective}</span>
                       </div>
                     ))}
                   </div>
