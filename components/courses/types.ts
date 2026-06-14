@@ -19,6 +19,7 @@ export type VideoSection = {
   id: string;
   title: string;
   imageUrl?: string;
+  folderImageUrl?: string;
   videoCount: number;
   videos: VideoItem[];
 };

@@ -55,6 +55,7 @@ export default function CoursesPage() {
       try {
         const response = await fetch(appPath("/api/urologics/videos/library"), {
           headers: { Authorization: `Bearer ${idToken}` },
+          cache: "no-store",
         });
         const payload = (await response.json()) as VideoLibraryResponse & {
           error?: string;
@@ -231,6 +232,7 @@ export default function CoursesPage() {
                       section.videos.filter(isUnlocked).length;
                     const firstThumbnail =
                       section.imageUrl ||
+                      section.folderImageUrl ||
                       section.videos
                         .map((video) => video.thumbnailUrl)
                         .find(Boolean);

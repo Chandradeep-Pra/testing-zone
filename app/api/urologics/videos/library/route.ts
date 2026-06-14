@@ -17,7 +17,12 @@ export async function GET(req: NextRequest) {
     });
     const payload = await response.json().catch(() => ({}));
 
-    return NextResponse.json(payload, { status: response.status });
+    return NextResponse.json(payload, {
+      status: response.status,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
   } catch (error) {
     console.error("Urologics video library proxy error:", error);
     return NextResponse.json(
