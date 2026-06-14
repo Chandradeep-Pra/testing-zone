@@ -16,6 +16,16 @@ function normalizeLevel(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
+function rmsToVoiceLevel(rms: number) {
+  if (rms <= 0.00001) return 0;
+
+  const db = 20 * Math.log10(rms);
+  const minDb = -58;
+  const maxDb = -18;
+
+  return normalizeLevel((db - minDb) / (maxDb - minDb));
+}
+
 export default function MicLevelMeter({
   level,
   active = true,
@@ -37,12 +47,38 @@ export default function MicLevelMeter({
     }
 
     let cancelled = false;
+    let smoothedLevel = 0;
 
     async function startMeter() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: deviceId ? { deviceId: { exact: deviceId } } : true,
-        });
+        let stream: MediaStream;
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: deviceId
+              ? {
+                  deviceId: { exact: deviceId },
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true,
+                }
+              : {
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true,
+                },
+          });
+        } catch (error) {
+          if (!deviceId) throw error;
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          });
+        }
+
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
           return;
@@ -51,9 +87,10 @@ export default function MicLevelMeter({
         const audioContext = new AudioContext();
         const source = audioContext.createMediaStreamSource(stream);
         const analyser = audioContext.createAnalyser();
-        const data = new Uint8Array(analyser.fftSize);
 
         analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.75;
+        const data = new Float32Array(analyser.fftSize);
         source.connect(analyser);
 
         streamRef.current = stream;
@@ -62,16 +99,17 @@ export default function MicLevelMeter({
         analyserRef.current = analyser;
 
         const tick = () => {
-          analyser.getByteTimeDomainData(data);
+          analyser.getFloatTimeDomainData(data);
           let sum = 0;
 
           for (let index = 0; index < data.length; index += 1) {
-            const centered = (data[index] - 128) / 128;
-            sum += centered * centered;
+            sum += data[index] * data[index];
           }
 
           const rms = Math.sqrt(sum / data.length);
-          setSelfLevel(normalizeLevel(rms * 4.5));
+          const nextLevel = rmsToVoiceLevel(rms);
+          smoothedLevel = smoothedLevel * 0.72 + nextLevel * 0.28;
+          setSelfLevel(smoothedLevel < 0.03 ? 0 : smoothedLevel);
           animationRef.current = window.requestAnimationFrame(tick);
         };
 

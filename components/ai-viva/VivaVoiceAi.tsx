@@ -299,7 +299,18 @@ export default function VivaVoiceAi({
     setCandidateStatusDot(answerPrefixRef.current ? "speaking" : "idle");
     setIsListening(true);
     void setAvatarListening(true);
-    void start();
+    void startSpeechCapture();
+  }
+
+  async function startSpeechCapture() {
+    try {
+      await start();
+    } catch (error) {
+      console.error("Viva microphone capture failed:", error);
+      setIsListening(false);
+      setCandidateStatusDot("idle");
+      void setAvatarListening(false);
+    }
   }
 
   function handleFastSpeechPause(answerText: string) {
@@ -718,7 +729,7 @@ export default function VivaVoiceAi({
       markSpeechEnded();
       setIsListening(true);
       void setAvatarListening(true);
-      void start();
+      void startSpeechCapture();
 
       warmupTimeoutRef.current = setTimeout(() => {
         warmupPendingRef.current = false;
