@@ -9,11 +9,25 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 
 function getReadableAuthError(message: string) {
-  if (message.includes("INVALID_LOGIN_CREDENTIALS")) {
-    return "Invalid email or password.";
+  const source = message.toLowerCase();
+
+  if (
+    source.includes("invalid_login_credentials") ||
+    source.includes("email_not_found") ||
+    source.includes("invalid_password")
+  ) {
+    return "Wrong email or password. Please try again, or sign up if you do not have an account.";
   }
 
-  if (message.includes("TOO_MANY_ATTEMPTS_TRY_LATER")) {
+  if (source.includes("user_disabled")) {
+    return "This account has been disabled. Please contact support.";
+  }
+
+  if (source.includes("invalid_email")) {
+    return "Please enter a valid email address.";
+  }
+
+  if (source.includes("too_many_attempts_try_later")) {
     return "Too many attempts. Please try again later.";
   }
 
