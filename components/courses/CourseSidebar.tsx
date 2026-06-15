@@ -119,7 +119,7 @@ export default function CourseSidebar({
                           type="button"
                           onClick={() => onVideoClick(video)}
                           title={!unlocked ? "Preview this lesson in available course plans" : undefined}
-                          className={`flex w-full items-start gap-3 rounded-[18px] px-3 py-2.5 text-left transition ${
+                          className={`relative flex w-full items-start gap-3 rounded-[18px] px-3 py-2.5 text-left transition ${
                             selected
                               ? "bg-[var(--accent)] text-[var(--accent-text)]"
                               : "hover:bg-[var(--accent-soft)]"
@@ -134,11 +134,6 @@ export default function CourseSidebar({
                                 <Video className="h-5 w-5" />
                               </span>
                             )}
-                            {!unlocked ? (
-                              <span className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-[var(--surface-raised)] text-[var(--accent-strong)] shadow-[0_4px_12px_var(--shadow-soft)]">
-                                <LockKeyhole className="h-3 w-3" />
-                              </span>
-                            ) : null}
                           </span>
                           <span className="min-w-0 flex-1">
                             <span
@@ -156,6 +151,11 @@ export default function CourseSidebar({
                               {playingId === video.id ? "Opening..." : unlocked ? "Available" : "Preview in plans"}
                             </span>
                           </span>
+                          {!unlocked ? (
+                            <span className="absolute bottom-2 right-2 grid h-6 w-6 place-items-center rounded-full bg-[var(--surface-raised)] text-[var(--accent-strong)] shadow-[0_4px_12px_var(--shadow-soft)]">
+                              <LockKeyhole className="h-3.5 w-3.5" />
+                            </span>
+                          ) : null}
                         </button>
                       );
                     })}
