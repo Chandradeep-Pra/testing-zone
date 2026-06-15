@@ -1,7 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, BookOpenCheck, Clock3, KeyRound, LogOut, ShieldCheck, TrendingUp, UserRound } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpenCheck,
+  Camera,
+  Clock3,
+  KeyRound,
+  LogOut,
+  Pencil,
+  ShieldCheck,
+  TrendingUp,
+  UserRound,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 
@@ -14,6 +25,7 @@ type AccessPayload = {
   profile?: {
     name?: string | null;
     email?: string | null;
+    profileImageUrl?: string | null;
     phone?: string | null;
     medicalInstitution?: string | null;
     activeCourseIds?: string[];
@@ -57,11 +69,16 @@ function numberValue(value: unknown) {
 }
 
 export default function UserPage() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, refreshUser, signOut } = useAuth();
   const [access, setAccess] = useState<AccessPayload | null>(null);
   const [progress, setProgress] = useState<ProgressPayload | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState("");
+  const [medicalInstitutionDraft, setMedicalInstitutionDraft] = useState("");
 
   useEffect(() => {
     const idToken = user?.idToken;
@@ -123,6 +140,11 @@ export default function UserPage() {
   const profilePhone = access?.profile?.phone || user?.phone || "";
   const profileMedicalInstitution =
     access?.profile?.medicalInstitution || user?.medicalInstitution || "";
+  const profileImagePreviewSrc = profileImagePreview || user?.profileImageUrl || "";
+
+  useEffect(() => {
+    setMedicalInstitutionDraft(profileMedicalInstitution || "");
+  }, [profileMedicalInstitution]);
 
   async function sendPasswordReset() {
     if (!user?.email) {
@@ -162,6 +184,101 @@ export default function UserPage() {
     }
   }
 
+  function startProfileEdit() {
+    setProfileImageFile(null);
+    setProfileImagePreview("");
+    setMedicalInstitutionDraft(profileMedicalInstitution || "");
+    setEditingProfile(true);
+  }
+
+  function cancelProfileEdit() {
+    setProfileImageFile(null);
+    setProfileImagePreview("");
+    setMedicalInstitutionDraft(profileMedicalInstitution || "");
+    setEditingProfile(false);
+  }
+
+  function handleProfileImageChange(file?: File | null) {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+
+    setProfileImageFile(file);
+    setProfileImagePreview(URL.createObjectURL(file));
+  }
+
+  async function saveProfile() {
+    if (!user?.idToken) {
+      toast.error("Please login again to update your profile.");
+      return;
+    }
+
+    try {
+      setSavingProfile(true);
+      let profileImageUrl = user.profileImageUrl || null;
+
+      if (profileImageFile) {
+        const formData = new FormData();
+        formData.append("file", profileImageFile);
+        formData.append("folder", "urologics-profile");
+
+        const uploadResponse = await fetch(appPath("/api/urologics/cloudinary-upload"), {
+          method: "POST",
+          body: formData,
+        });
+        const uploadPayload = await uploadResponse.json().catch(() => ({}));
+
+        if (!uploadResponse.ok || !uploadPayload?.url) {
+          throw new Error(uploadPayload?.error || "Unable to upload profile image.");
+        }
+
+        profileImageUrl = uploadPayload.url;
+      }
+
+      const response = await fetch(appPath("/api/urologics/profile"), {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${user.idToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          medicalInstitution: medicalInstitutionDraft.trim(),
+          profileImageUrl,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Unable to update profile.");
+      }
+
+      await refreshUser();
+      setAccess((current) =>
+        current
+          ? {
+              ...current,
+              profile: {
+                ...current.profile,
+                profileImageUrl,
+                medicalInstitution: medicalInstitutionDraft.trim() || null,
+              },
+            }
+          : current
+      );
+      setEditingProfile(false);
+      setProfileImageFile(null);
+      setProfileImagePreview("");
+      toast.success("Profile updated.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update profile.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
   return (
     <main className="urologics-shell min-h-screen">
       <div className="mobile-native-page mx-auto min-h-screen w-full max-w-7xl sm:px-6 sm:py-4">
@@ -182,11 +299,12 @@ export default function UserPage() {
           <section className="grid gap-4 pb-12 sm:gap-5 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="grid gap-4 sm:gap-5">
               <div className="urologics-panel p-5 sm:p-6">
-                <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                   <div className="grid h-16 w-16 place-items-center overflow-hidden rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-                    {user.profileImageUrl ? (
+                    {profileImagePreviewSrc ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={user.profileImageUrl} alt={user.name} className="h-full w-full object-cover" />
+                      <img src={profileImagePreviewSrc} alt={user.name} className="h-full w-full object-cover" />
                     ) : (
                       <UserRound className="h-8 w-8" />
                     )}
@@ -195,7 +313,59 @@ export default function UserPage() {
                     <p className="truncate text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">{user.name}</p>
                     <p className="truncate text-sm text-[var(--text-secondary)]">{user.email}</p>
                   </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={editingProfile ? cancelProfileEdit : startProfileEdit}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--accent-soft)]"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    {editingProfile ? "Cancel" : "Edit"}
+                  </button>
                 </div>
+
+                {editingProfile ? (
+                  <div className="mt-5 rounded-3xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+                    <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
+                      <label className="group relative grid h-24 w-24 cursor-pointer place-items-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--accent-strong)]">
+                        {profileImagePreviewSrc ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={profileImagePreviewSrc} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <UserRound className="h-9 w-9" />
+                        )}
+                        <span className="absolute inset-0 grid place-items-center bg-black/35 text-white opacity-0 transition group-hover:opacity-100">
+                          <Camera className="h-5 w-5" />
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={(event) => handleProfileImageChange(event.target.files?.[0])}
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+                          Medical Institution
+                        </span>
+                        <input
+                          value={medicalInstitutionDraft}
+                          onChange={(event) => setMedicalInstitutionDraft(event.target.value)}
+                          placeholder="NHS Trust, hospital, medical college..."
+                          className="mt-2 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]"
+                        />
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={saveProfile}
+                      disabled={savingProfile}
+                      className="urologics-button-primary mt-4 inline-flex w-full items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-70 sm:w-auto"
+                    >
+                      {savingProfile ? "Saving..." : "Save profile"}
+                    </button>
+                  </div>
+                ) : null}
 
                 {profilePhone || profileMedicalInstitution ? (
                   <div className="mt-5 grid gap-2 rounded-3xl bg-[var(--surface-muted)] p-3 sm:mt-6 sm:grid-cols-2">
