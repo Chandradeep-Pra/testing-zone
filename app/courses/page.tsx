@@ -253,8 +253,18 @@ export default function CoursesPage() {
                               className="h-full w-full object-cover"
                             />
                           ) : (
-                            <div className="grid h-full w-full place-items-center text-[var(--accent-strong)]">
-                              <FolderOpen className="h-12 w-12" />
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,var(--accent-muted),transparent_46%),linear-gradient(135deg,var(--surface-raised),var(--accent-soft))] px-5 text-center">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={appPath("/logo.png")}
+                                alt=""
+                                className="h-16 w-16 rounded-2xl object-contain shadow-[0_14px_34px_var(--shadow-soft)]"
+                              />
+                              <div className="max-w-[90%] rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)]/88 px-4 py-2 shadow-[0_10px_28px_var(--shadow-soft)] backdrop-blur">
+                                <p className="line-clamp-2 text-sm font-semibold leading-5 text-[var(--text-primary)]">
+                                  {section.title}
+                                </p>
+                              </div>
                             </div>
                           )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
