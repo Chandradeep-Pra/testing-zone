@@ -54,8 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const expiresSoon = stored.expiresAt - Date.now() < 5 * 60 * 1000;
-        const nextUser = expiresSoon ? await refreshStoredAuth(stored) : stored;
+        const nextUser = await refreshStoredAuth(stored);
         await syncPlaybackSession(nextUser.idToken);
         if (active) setUser(nextUser);
       } catch {
