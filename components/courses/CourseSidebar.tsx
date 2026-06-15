@@ -122,9 +122,7 @@ export default function CourseSidebar({
                           className={`flex w-full items-start gap-3 rounded-[18px] px-3 py-2.5 text-left transition ${
                             selected
                               ? "bg-[var(--accent)] text-[var(--accent-text)]"
-                              : unlocked
-                                ? "hover:bg-[var(--accent-soft)]"
-                                : "opacity-80 hover:bg-amber-50"
+                              : "hover:bg-[var(--accent-soft)]"
                           }`}
                         >
                           <span className="relative h-14 w-20 shrink-0 overflow-hidden rounded-2xl bg-[var(--accent-soft)] sm:h-12 sm:w-16 sm:rounded-sm">
@@ -136,14 +134,11 @@ export default function CourseSidebar({
                                 <Video className="h-5 w-5" />
                               </span>
                             )}
-                            {!unlocked ? <span className="absolute inset-0 bg-[var(--surface-raised)]/70" /> : null}
-                            <span
-                              className={`absolute left-1 top-1 grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold ${
-                                unlocked ? "hidden" : "bg-amber-100 text-amber-700"
-                              }`}
-                            >
-                              {!unlocked && <LockKeyhole className="h-3 w-3" />}
-                            </span>
+                            {!unlocked ? (
+                              <span className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-[var(--surface-raised)] text-[var(--accent-strong)] shadow-[0_4px_12px_var(--shadow-soft)]">
+                                <LockKeyhole className="h-3 w-3" />
+                              </span>
+                            ) : null}
                           </span>
                           <span className="min-w-0 flex-1">
                             <span
