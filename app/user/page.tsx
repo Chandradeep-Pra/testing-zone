@@ -14,6 +14,8 @@ type AccessPayload = {
   profile?: {
     name?: string | null;
     email?: string | null;
+    phone?: string | null;
+    medicalInstitution?: string | null;
     activeCourseIds?: string[];
     activePlanStatus?: string | null;
     planExpiresAt?: string | null;
@@ -118,6 +120,10 @@ export default function UserPage() {
     ];
   }, [progress?.stats]);
 
+  const profilePhone = access?.profile?.phone || user?.phone || "";
+  const profileMedicalInstitution =
+    access?.profile?.medicalInstitution || user?.medicalInstitution || "";
+
   async function sendPasswordReset() {
     if (!user?.email) {
       toast.error("No email found for this account.");
@@ -190,6 +196,15 @@ export default function UserPage() {
                     <p className="truncate text-sm text-[var(--text-secondary)]">{user.email}</p>
                   </div>
                 </div>
+
+                {profilePhone || profileMedicalInstitution ? (
+                  <div className="mt-5 grid gap-2 rounded-3xl bg-[var(--surface-muted)] p-3 sm:mt-6 sm:grid-cols-2">
+                    {profilePhone ? <ProfileInfo label="Phone" value={profilePhone} /> : null}
+                    {profileMedicalInstitution ? (
+                      <ProfileInfo label="Medical Institution" value={profileMedicalInstitution} />
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="mt-5 grid gap-2 sm:mt-6 sm:grid-cols-2 sm:gap-3">
                   <button
@@ -280,6 +295,17 @@ export default function UserPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function ProfileInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-2xl bg-[var(--surface)] px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">{value}</p>
+    </div>
   );
 }
 
