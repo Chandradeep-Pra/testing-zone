@@ -11,7 +11,7 @@ type CourseSidebarProps = {
   libraryLoading: boolean;
   onQueryChange: (query: string) => void;
   onBackToFolders: () => void;
-  onToggleSection: (sectionId: string) => void;
+  onSectionSelect: (section: VideoSection) => void;
   onVideoClick: (video: VideoItem) => void;
   playingId: string | null;
   query: string;
@@ -27,7 +27,7 @@ export default function CourseSidebar({
   libraryLoading,
   onBackToFolders,
   onQueryChange,
-  onToggleSection,
+  onSectionSelect,
   onVideoClick,
   playingId,
   query,
@@ -90,7 +90,7 @@ export default function CourseSidebar({
               <div key={section.id} className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)]">
                 <button
                   type="button"
-                  onClick={() => onToggleSection(section.id)}
+                  onClick={() => onSectionSelect(section)}
                   className="flex w-full items-center gap-3 px-3 py-3 text-left"
                 >
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">

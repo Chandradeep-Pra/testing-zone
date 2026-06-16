@@ -11,22 +11,53 @@ export async function GET(
       ? `Bearer ${req.cookies.get("urologics_id_token")?.value}`
       : null);
 
-  if (!authHeader) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const { id } = await context.params;
     const response = await fetch(
-      getUrologicsApiUrl(`/api/app/videos/${encodeURIComponent(id)}/stream`),
+      getUrologicsApiUrl(
+        authHeader
+          ? `/api/app/videos/${encodeURIComponent(id)}/stream`
+          : `/api/public/videos/${encodeURIComponent(id)}/stream`
+      ),
       {
         headers: {
-          Authorization: authHeader,
+          ...(authHeader ? { Authorization: authHeader } : {}),
           ...(req.headers.get("range") ? { Range: req.headers.get("range") as string } : {}),
         },
         cache: "no-store",
       }
     );
+
+    if (authHeader && response.status === 401) {
+      const publicResponse = await fetch(
+        getUrologicsApiUrl(`/api/public/videos/${encodeURIComponent(id)}/stream`),
+        {
+          headers: {
+            ...(req.headers.get("range") ? { Range: req.headers.get("range") as string } : {}),
+          },
+          cache: "no-store",
+        }
+      );
+
+      return new Response(publicResponse.body, {
+        status: publicResponse.status,
+        headers: {
+          "Content-Type": publicResponse.headers.get("content-type") || "video/mp4",
+          ...(publicResponse.headers.get("content-length")
+            ? { "Content-Length": publicResponse.headers.get("content-length") as string }
+            : {}),
+          ...(publicResponse.headers.get("content-range")
+            ? { "Content-Range": publicResponse.headers.get("content-range") as string }
+            : {}),
+          ...(publicResponse.headers.get("accept-ranges")
+            ? { "Accept-Ranges": publicResponse.headers.get("accept-ranges") as string }
+            : {}),
+          "Content-Disposition": "inline",
+          "Cache-Control": "private, no-store, max-age=0",
+          "X-Content-Type-Options": "nosniff",
+        },
+      });
+    }
 
     return new Response(response.body, {
       status: response.status,

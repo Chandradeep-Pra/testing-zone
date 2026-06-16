@@ -12,7 +12,6 @@ import toast from "react-hot-toast";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import CourseSidebar from "@/components/courses/CourseSidebar";
-import LoginRequiredPanel from "@/components/courses/LoginRequiredPanel";
 import ModernVideoPlayer from "@/components/courses/ModernVideoPlayer";
 import type {
   PlaybackResponse,
@@ -29,7 +28,7 @@ const COURSE_INQUIRY_MAIL =
   "mailto:ankitgoel042@gmail.com?subject=I%20want%20to%20inquire%20about%20your%20courses";
 
 export default function CoursesPage() {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   const [sections, setSections] = useState<VideoSection[]>([]);
   const [showPlayerView, setShowPlayerView] = useState(false);
   const [query, setQuery] = useState("");
@@ -44,7 +43,6 @@ export default function CoursesPage() {
 
   useEffect(() => {
     const idToken = user?.idToken;
-    if (!idToken) return;
 
     let active = true;
 
@@ -54,7 +52,7 @@ export default function CoursesPage() {
 
       try {
         const response = await fetch(appPath("/api/urologics/videos/library"), {
-          headers: { Authorization: `Bearer ${idToken}` },
+          headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
           cache: "no-store",
         });
         const payload = (await response.json()) as VideoLibraryResponse & {
@@ -119,15 +117,7 @@ export default function CoursesPage() {
     0,
   );
 
-  function toggleSection(sectionId: string) {
-    setExpandedSectionIds((current) =>
-      current.includes(sectionId)
-        ? current.filter((id) => id !== sectionId)
-        : [...current, sectionId],
-    );
-  }
-
-  function openSection(section: VideoSection) {
+  function selectSection(section: VideoSection) {
     setExpandedSectionIds([section.id]);
     setShowPlayerView(true);
 
@@ -143,12 +133,11 @@ export default function CoursesPage() {
     setSelectedLockedVideo(section.videos[0] || null);
   }
 
-  async function handleVideoClick(video: VideoItem) {
-    if (!user?.idToken) {
-      toast.error("Please login to access your course videos.");
-      return;
-    }
+  function openSection(section: VideoSection) {
+    selectSection(section);
+  }
 
+  async function handleVideoClick(video: VideoItem) {
     if (!isUnlocked(video)) {
       setSelectedPlayback(null);
       setSelectedLockedVideo(video);
@@ -161,7 +150,7 @@ export default function CoursesPage() {
       const response = await fetch(
         appPath(`/api/urologics/videos/${video.id}/play`),
         {
-          headers: { Authorization: `Bearer ${user.idToken}` },
+          headers: user?.idToken ? { Authorization: `Bearer ${user.idToken}` } : undefined,
         },
       );
       const payload = (await response.json()) as PlaybackResponse & {
@@ -193,9 +182,7 @@ export default function CoursesPage() {
           tag="Video library"
         />
 
-        {!loading && !user ? (
-          <LoginRequiredPanel />
-        ) : !showPlayerView ? (
+        {!showPlayerView ? (
           <section className="urologics-thin-scrollbar min-h-0 flex-1 overflow-y-auto py-2 sm:py-3">
             <div className="rounded-[30px] border border-[var(--border)] bg-[radial-gradient(circle_at_top_left,var(--accent-muted),transparent_34%),var(--surface-raised)] p-4 shadow-[0_16px_40px_var(--shadow-soft)] sm:rounded-[34px] sm:p-6">
               <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4">
@@ -301,7 +288,7 @@ export default function CoursesPage() {
               filteredSections={filteredSections}
               libraryLoading={libraryLoading}
               onQueryChange={setQuery}
-              onToggleSection={toggleSection}
+              onSectionSelect={selectSection}
               onVideoClick={(video) => void handleVideoClick(video)}
               onBackToFolders={() => {
                 setShowPlayerView(false);

@@ -7,22 +7,34 @@ export async function GET(
 ) {
   const authHeader = getAuthHeader(req);
 
-  if (!authHeader) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const { id } = await context.params;
     const response = await fetch(
-      getUrologicsApiUrl(`/api/app/videos/${encodeURIComponent(id)}/play`),
+      getUrologicsApiUrl(
+        authHeader
+          ? `/api/app/videos/${encodeURIComponent(id)}/play`
+          : `/api/public/videos/${encodeURIComponent(id)}/play`
+      ),
       {
-        headers: {
-          Authorization: authHeader,
-        },
+        headers: authHeader
+          ? {
+              Authorization: authHeader,
+            }
+          : undefined,
         cache: "no-store",
       }
     );
     const payload = await response.json().catch(() => ({}));
+
+    if (authHeader && response.status === 401) {
+      const publicResponse = await fetch(
+        getUrologicsApiUrl(`/api/public/videos/${encodeURIComponent(id)}/play`),
+        { cache: "no-store" }
+      );
+      const publicPayload = await publicResponse.json().catch(() => ({}));
+
+      return NextResponse.json(publicPayload, { status: publicResponse.status });
+    }
 
     return NextResponse.json(payload, { status: response.status });
   } catch (error) {
