@@ -28,6 +28,8 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
 
+  const selectedVideoId = playback?.video.id || "";
+
   useEffect(() => {
     function handleFullscreenChange() {
       setIsFullscreen(document.fullscreenElement === playerShellRef.current);
@@ -44,6 +46,21 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
       }
     };
   }, []);
+
+  useEffect(() => {
+    const video = playback?.video;
+    const storedDurationSeconds =
+      typeof video?.durationSeconds === "number" && Number.isFinite(video.durationSeconds)
+        ? video.durationSeconds
+        : typeof video?.durationMinutes === "number" && Number.isFinite(video.durationMinutes)
+          ? video.durationMinutes * 60
+          : 0;
+
+    setDuration(storedDurationSeconds);
+    setCurrentTime(0);
+    setPlaying(false);
+    setShowControls(true);
+  }, [selectedVideoId, playback?.video]);
 
   if (!playback) {
     return (
@@ -271,9 +288,14 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
       </div>
 
       <div className="p-4 sm:p-5">
-        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
-          <Video className="h-3.5 w-3.5" />
-          Playing
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+            <Video className="h-3.5 w-3.5" />
+            Playing
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-xs font-semibold text-[var(--text-secondary)]">
+            Duration: {duration > 0 ? formatTime(duration) : "Loading..."}
+          </div>
         </div>
         <h1 className="line-clamp-2 text-xl font-semibold tracking-[-0.03em] text-[var(--text-primary)] sm:text-2xl">
           {video.title}

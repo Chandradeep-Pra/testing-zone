@@ -12,6 +12,10 @@ export type VideoItem = {
   sectionId: string;
   thumbnailUrl?: string;
   videoUrl?: string;
+  accessTier?: "free" | "paid";
+  effectiveAccessTier?: "free" | "paid";
+  durationSeconds?: number;
+  durationMinutes?: number;
   access?: VideoAccess;
 };
 
