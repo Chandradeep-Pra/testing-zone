@@ -263,7 +263,11 @@ export default function Home() {
                       <p className="mt-2 text-sm font-semibold text-[var(--accent-strong)]">{announcement.subtitle}</p>
                     ) : null}
                     {announcement.description ? (
-                      <p className="mt-3 line-clamp-4 text-sm leading-7 text-[var(--text-secondary)]">{announcement.description}</p>
+                      <div className="urologics-minimal-scrollbar mt-3 max-h-44 overflow-y-auto overscroll-contain pr-2 sm:max-h-52">
+                        <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--text-secondary)]">
+                          {announcement.description}
+                        </p>
+                      </div>
                     ) : null}
                   </div>
                 </div>

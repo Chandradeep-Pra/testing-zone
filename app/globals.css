@@ -321,6 +321,28 @@
     border-radius: 999px;
   }
 
+  .urologics-minimal-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--accent) 48%, transparent) transparent;
+  }
+
+  .urologics-minimal-scrollbar::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .urologics-minimal-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .urologics-minimal-scrollbar::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--accent) 48%, transparent);
+    border-radius: 999px;
+  }
+
+  .urologics-minimal-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+  }
+
   .mobile-app-screen {
     @apply w-full;
   }
