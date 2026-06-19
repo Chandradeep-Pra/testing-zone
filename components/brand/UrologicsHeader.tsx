@@ -53,7 +53,7 @@ export default function UrologicsHeader({
     <>
       <header
         className={`fixed inset-x-0 top-2 z-50 mx-auto w-full max-w-7xl px-3 transition-all duration-500 ease-in-out sm:top-3 sm:px-6 ${
-          showHeader ? "translate-y-0 opacity-100" : "-translate-y-[130%] opacity-0"
+          showHeader || menuOpen ? "translate-y-0 opacity-100" : "-translate-y-[130%] opacity-0"
         }`}
       >
         <div className="urologics-header flex items-center justify-between gap-2 rounded-[28px] px-3 py-2.5 backdrop-blur-xl sm:gap-3 sm:rounded-full sm:px-5 sm:py-3 md:px-6">
@@ -91,8 +91,10 @@ export default function UrologicsHeader({
         </div>
 
         <div
-          className={`mt-2 overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_18px_46px_var(--shadow-soft)] transition-all duration-300 md:hidden ${
-            menuOpen ? "max-h-[520px] opacity-100" : "max-h-0 opacity-0"
+          className={`mt-2 rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_18px_46px_var(--shadow-soft)] transition-all duration-300 md:hidden ${
+            menuOpen
+              ? "max-h-[520px] overflow-visible opacity-100"
+              : "max-h-0 overflow-hidden opacity-0"
           }`}
         >
           <div className="grid gap-2 p-3">
