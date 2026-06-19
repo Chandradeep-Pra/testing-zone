@@ -1,10 +1,11 @@
 "use client";
 
-import { CalendarClock, CircleDot, Mail, ShieldCheck, Sparkles, TimerReset } from "lucide-react";
+import { CalendarClock, CircleDot, ShieldCheck, Sparkles, TimerReset, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
+import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
 import { appPath } from "@/lib/app-path";
@@ -21,13 +22,13 @@ interface Mock {
   startTime: string | number | TimestampLike;
   endTime?: string | number | TimestampLike;
   durationMinutes: number;
-}
-
-type MockAttempt = {
-  candidate?: {
-    email?: string;
+  hasAttempted?: boolean;
+  userAttempt?: {
+    score?: number;
+    marks?: number;
+    submittedAt?: string | null;
   };
-};
+}
 
 const getTimestamp = (value?: string | number | TimestampLike) => {
   if (typeof value === "object" && value?._seconds) {
@@ -40,14 +41,19 @@ const getTimestamp = (value?: string | number | TimestampLike) => {
 };
 
 export default function TodayMocksPage() {
+  const { user, loading: authLoading } = useAuth();
   const [mocks, setMocks] = useState<Mock[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMock, setSelectedMock] = useState<Mock | null>(null);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const router = useRouter();
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     const load = async () => {
       try {
         const res = await fetch(appPath("/api/mocks"));
@@ -62,13 +68,6 @@ export default function TodayMocksPage() {
         });
 
         setMocks(filtered);
-
-        const saved = localStorage.getItem("mockUser");
-        if (saved) {
-          const parsed = JSON.parse(saved) as { name?: string; email?: string };
-          setName(parsed.name || "");
-          setEmail(parsed.email || "");
-        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -77,49 +76,19 @@ export default function TodayMocksPage() {
     };
 
     void load();
-  }, []);
+  }, [authLoading, user]);
 
-  const handleContinue = async () => {
-    const trimmedName = name.trim();
-    const normalizedEmail = email.trim().toLowerCase();
-
-    if (!trimmedName || !normalizedEmail || !selectedMock) {
+  const handleContinue = () => {
+    if (!selectedMock) {
       return;
     }
 
-    try {
-      const res = await fetch(appPath(`/api/mocks/${selectedMock.id}`));
-      const data = (await res.json()) as { mock?: { attempts?: MockAttempt[] }; attempts?: MockAttempt[] };
-      const attempts = Array.isArray(data.mock?.attempts)
-        ? data.mock.attempts
-        : Array.isArray(data.attempts)
-          ? data.attempts
-          : [];
-
-      const alreadyAttempted = attempts.some(
-        (attempt) =>
-          String(attempt?.candidate?.email || "").trim().toLowerCase() === normalizedEmail
-      );
-
-      if (alreadyAttempted) {
-        toast.error("This email has already been used for this mock");
-        return;
-      }
-
-      localStorage.setItem(
-        "mockUser",
-        JSON.stringify({ name: trimmedName, email: normalizedEmail })
-      );
-      if (selectedMock.accessType === "public") {
-        router.push(`/public-mocks/${selectedMock.id}`);
-        return;
-      }
-
-      router.push(`/mocks/${selectedMock.id}/rules`);
-    } catch (error) {
-      console.error("Failed to validate mock attempt:", error);
-      toast.error("Unable to verify this mock right now");
+    if (selectedMock.hasAttempted) {
+      toast.error("You have already attended this test");
+      return;
     }
+
+    router.push(`/mocks/${selectedMock.id}/rules`);
   };
 
   return (
@@ -201,6 +170,11 @@ export default function TodayMocksPage() {
                       <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
                         {mock.title || "Grand Mock"}
                       </div>
+                      {mock.hasAttempted ? (
+                        <div className="mt-2 text-xs font-semibold text-emerald-600">
+                          Attended · Marks {mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}
+                        </div>
+                      ) : null}
                       <div className="mt-2 flex items-center gap-2">
                         <span className="rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
                           {mock.accessType === "public" ? "Public" : "Members"}
@@ -263,9 +237,11 @@ export default function TodayMocksPage() {
                   </p>
                   <button
                     onClick={() => setSelectedMock(mock)}
-                    className="urologics-button-primary mt-7 w-full sm:mt-8"
+                    className={`mt-7 w-full sm:mt-8 ${
+                      mock.hasAttempted ? "urologics-button-secondary" : "urologics-button-primary"
+                    }`}
                   >
-                    Register For Session
+                    {mock.hasAttempted ? "View Attempt" : "Start Session"}
                   </button>
                 </div>
               ))}
@@ -279,32 +255,36 @@ export default function TodayMocksPage() {
           <div className="w-full max-w-lg rounded-t-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-[0_24px_60px_var(--shadow-medium)] sm:rounded-[28px] sm:p-8">
             <UrologicsBrand compact product="Grand Mocks" tag="Candidate registration" />
             <div className="mt-5 text-2xl font-semibold text-[var(--text-primary)]">{selectedMock.title}</div>
-            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
-              Enter your details to continue.
-            </p>
-            <div className="mt-6 space-y-4">
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                  <ShieldCheck size={14} />
-                  Full Name
-                </label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" className="urologics-input" />
+            {selectedMock.hasAttempted ? (
+              <div className="mt-6 rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 text-center">
+                <Trophy className="mx-auto h-8 w-8 text-emerald-700" />
+                <p className="mt-3 font-semibold text-emerald-900">
+                  You have already attended this test
+                </p>
+                <p className="mt-2 text-sm text-emerald-700">
+                  Your marks: {selectedMock.userAttempt?.score ?? selectedMock.userAttempt?.marks ?? 0}
+                </p>
               </div>
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                  <Mail size={14} />
-                  Email
-                </label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email" className="urologics-input" />
+            ) : (
+              <div className="mt-6 rounded-[24px] border border-[var(--border)] bg-[var(--accent-soft)] p-4">
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="h-5 w-5 text-[var(--accent-strong)]" />
+                  <div>
+                    <p className="font-semibold text-[var(--text-primary)]">{user?.name}</p>
+                    <p className="text-sm text-[var(--text-secondary)]">{user?.email}</p>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <button onClick={() => setSelectedMock(null)} className="urologics-button-secondary flex-1">
                 Cancel
               </button>
-              <button onClick={handleContinue} className="urologics-button-primary flex-1">
-                Continue
-              </button>
+              {!selectedMock.hasAttempted ? (
+                <button onClick={handleContinue} className="urologics-button-primary flex-1">
+                  Continue
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

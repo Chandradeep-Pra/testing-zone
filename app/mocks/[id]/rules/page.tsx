@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ClipboardCheck, TimerReset } from "lucide-react";
+import { ArrowRight, ClipboardCheck, TimerReset, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
@@ -11,6 +11,11 @@ interface Mock {
   id: string;
   title: string;
   durationMinutes: number;
+  hasAttempted?: boolean;
+  userAttempt?: {
+    score?: number;
+    marks?: number;
+  };
 }
 
 export default function MockRulesPage() {
@@ -22,13 +27,6 @@ export default function MockRulesPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const publicRes = await fetch(appPath(`/api/public/mocks/${id}`));
-        if (publicRes.ok) {
-          const publicData = await publicRes.json();
-          setMock(publicData.mock);
-          return;
-        }
-
         const res = await fetch(appPath(`/api/mocks/${id}`));
         const data = await res.json();
         setMock(data.mock);
@@ -76,6 +74,18 @@ export default function MockRulesPage() {
             No Part of this mock test is intended for copying.
           </p>
 
+          {mock.hasAttempted ? (
+            <div className="mt-7 rounded-[26px] border border-emerald-200 bg-emerald-50 p-6 text-center">
+              <Trophy className="mx-auto h-9 w-9 text-emerald-700" />
+              <h2 className="mt-3 text-xl font-semibold text-emerald-950">
+                You have already attended this test
+              </h2>
+              <p className="mt-2 text-sm text-emerald-700">
+                Your marks: {mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}
+              </p>
+            </div>
+          ) : null}
+
           <div className="mobile-horizontal-snap mt-6 md:mt-7 md:grid md:grid-cols-2 md:gap-4 md:overflow-visible">
             <div className="urologics-subpanel p-4 sm:p-5">
               <TimerReset className="text-[var(--accent-strong)]" size={18} />
@@ -110,13 +120,15 @@ export default function MockRulesPage() {
             ))}
           </div>
 
-          <button
-            onClick={() => router.push(`/mocks/${id}`)}
-            className="urologics-button-primary mt-8 w-full gap-2 sm:mt-10 sm:w-auto"
-          >
-            Start Mock Session
-            <ArrowRight size={16} />
-          </button>
+          {!mock.hasAttempted ? (
+            <button
+              onClick={() => router.push(`/mocks/${id}`)}
+              className="urologics-button-primary mt-8 w-full gap-2 sm:mt-10 sm:w-auto"
+            >
+              Start Mock Session
+              <ArrowRight size={16} />
+            </button>
+          ) : null}
         </section>
       </div>
     </main>

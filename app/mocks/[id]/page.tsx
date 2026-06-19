@@ -1,6 +1,6 @@
 "use client";
 
-import { AlarmClock, Coffee, Send, ShieldCheck } from "lucide-react";
+import { AlarmClock, Coffee, Send, ShieldCheck, Trophy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { appPath } from "@/lib/app-path";
@@ -18,6 +18,11 @@ interface Mock {
   title: string;
   durationMinutes: number;
   questions: Question[];
+  hasAttempted?: boolean;
+  userAttempt?: {
+    score?: number;
+    marks?: number;
+  };
 }
 
 function normalizeQuestion(question: unknown, index: number): Question {
@@ -53,6 +58,11 @@ function normalizeMock(payload: unknown): Mock | null {
     questions: Array.isArray(source.questions)
       ? source.questions.map(normalizeQuestion)
       : [],
+    hasAttempted: source.hasAttempted === true,
+    userAttempt:
+      source.userAttempt && typeof source.userAttempt === "object"
+        ? (source.userAttempt as Mock["userAttempt"])
+        : undefined,
   };
 }
 
@@ -75,19 +85,11 @@ export default function Page() {
 
   useEffect(() => {
     const load = async () => {
-      const publicRes = await fetch(appPath(`/api/public/mocks/${id}`));
-      if (publicRes.ok) {
-        const publicData = await publicRes.json();
-        const nextMock = normalizeMock(publicData.mock);
-        setMock(nextMock);
-        setTimeLeft((nextMock?.durationMinutes || 0) * 60);
-      } else {
-        const res = await fetch(appPath(`/api/mocks/${id}`));
-        const data = await res.json();
-        const nextMock = normalizeMock(data.mock);
-        setMock(nextMock);
-        setTimeLeft((nextMock?.durationMinutes || 0) * 60);
-      }
+      const res = await fetch(appPath(`/api/mocks/${id}`));
+      const data = await res.json();
+      const nextMock = normalizeMock(data.mock);
+      setMock(nextMock);
+      setTimeLeft((nextMock?.durationMinutes || 0) * 60);
 
       const saved = localStorage.getItem(`mock-${id}-answers`);
       if (saved) {
@@ -148,6 +150,29 @@ export default function Page() {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
         <div className="urologics-panel px-8 py-6 text-[var(--text-primary)]">Loading session...</div>
+      </main>
+    );
+  }
+
+  if (mock.hasAttempted) {
+    return (
+      <main className="urologics-shell flex min-h-screen items-center justify-center px-4">
+        <div className="urologics-panel w-full max-w-lg p-8 text-center">
+          <Trophy className="mx-auto h-10 w-10 text-emerald-600" />
+          <h1 className="mt-4 text-2xl font-semibold text-[var(--text-primary)]">
+            You have already attended this test
+          </h1>
+          <p className="mt-3 text-[var(--text-secondary)]">
+            Your marks: {mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}
+          </p>
+          <button
+            type="button"
+            onClick={() => router.replace("/mocks")}
+            className="urologics-button-primary mt-6"
+          >
+            Back to mocks
+          </button>
+        </div>
       </main>
     );
   }

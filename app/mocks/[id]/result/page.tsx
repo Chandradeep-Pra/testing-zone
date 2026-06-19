@@ -82,15 +82,9 @@ export default function ResultPage() {
 
   useEffect(() => {
     const load = async () => {
-      const publicRes = await fetch(appPath(`/api/public/mocks/${id}`));
-      if (publicRes.ok) {
-        const publicData = (await publicRes.json()) as { mock?: MockDetail };
-        setMock(normalizeMock(publicData.mock));
-      } else {
-        const res = await fetch(appPath(`/api/mocks/${id}`));
-        const data = (await res.json()) as { mock?: MockDetail };
-        setMock(normalizeMock(data.mock));
-      }
+      const res = await fetch(appPath(`/api/mocks/${id}`));
+      const data = (await res.json()) as { mock?: MockDetail };
+      setMock(normalizeMock(data.mock));
 
       const saved = localStorage.getItem(`mock-${id}-final`);
       if (saved) {
@@ -136,40 +130,38 @@ export default function ResultPage() {
       return;
     }
 
-    const storedUser = localStorage.getItem("mockUser");
-    if (!storedUser) {
-      return;
-    }
-
-    const parsedUser = JSON.parse(storedUser) as { name?: string; email?: string };
-    if (!parsedUser.name || !parsedUser.email) {
-      return;
-    }
-
     const marks = Math.max(0, Math.min(score, mock.questions.length));
 
     const submitAttempt = async () => {
       toast.loading("Submitting mock attempt...", { id: "mock-attempt" });
 
       try {
-        const attemptEndpoint =
-          mock?.accessType === "public"
-            ? `/api/public/mocks/${id}/attempts`
-            : `/api/mocks/${id}/attempts`;
-        const res = await fetch(appPath(attemptEndpoint), {
+        const res = await fetch(appPath(`/api/mocks/${id}/attempts`), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: parsedUser.name,
-            email: parsedUser.email,
             marks,
+            correctCount: marks,
+            totalQuestions: mock.questions.length,
           }),
         });
 
         const data = await res.json();
         if (!res.ok) {
+          if (res.status === 409 && data?.hasAttempted) {
+            sessionStorage.setItem(`mock-${id}-attempt-submitted`, "true");
+            setSubmittedAttempt(true);
+            toast.error(
+              `You have already attended this test. Marks: ${
+                data?.attempt?.score ?? data?.attempt?.marks ?? 0
+              }`,
+              { id: "mock-attempt" },
+            );
+            return;
+          }
+
           const message =
             typeof data?.error === "string" ? data.error : "Failed to submit mock attempt";
           throw new Error(message);
@@ -180,8 +172,6 @@ export default function ResultPage() {
           JSON.stringify({
             mockId: id,
             title: mock.title || "Grand Mock",
-            name: parsedUser.name,
-            email: parsedUser.email,
             marks,
             attemptsCount: data.attemptsCount ?? null,
             attempt: data.attempt ?? null,

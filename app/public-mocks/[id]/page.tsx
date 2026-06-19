@@ -157,10 +157,6 @@ export default function PublicMockPage() {
             <h1 className="mobile-native-title mt-6 max-w-3xl font-semibold text-[var(--text-primary)] sm:mt-7 sm:text-4xl sm:tracking-[-0.04em] md:text-5xl">
               {mock.title || "Grand Mock"}
             </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--text-secondary)] sm:mt-5 sm:text-base sm:leading-8 md:text-lg">
-              Enter your details to continue. Your name and email are stored so we can record
-              attendance and marks.
-            </p>
 
             <div className="mobile-horizontal-snap mt-6 md:mt-7 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible">
               <div className="urologics-subpanel p-4 sm:p-5">
