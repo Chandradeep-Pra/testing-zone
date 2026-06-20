@@ -273,17 +273,7 @@ export default function ReviewPage() {
           </section>
         )}
 
-        <section className="urologics-panel flex items-center gap-4 p-5 sm:p-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896]">
-            <ShieldCheck size={20} />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-[#071014]">Report delivery is automatic</div>
-            <div className="mt-1 text-sm text-[#071014]/65">
-              Your branded Urologics report is sent to the candidate email on file.
-            </div>
-          </div>
-        </section>
+        
       </div>
     </main>
   );
