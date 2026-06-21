@@ -72,6 +72,136 @@ function getAnnouncementBadge(kind?: Announcement["kind"]) {
   return kind === "grand-mock" ? "Grand Mock" : "Announcement";
 }
 
+function renderInlineMarkdown(text: string) {
+  const tokens = text.split(/(\*\*[\s\S]+?\*\*|`[^`]+`|\*[^*]+\*)/g);
+
+  return tokens.map((token, index) => {
+    if (!token) return null;
+
+    if (token.startsWith("**") && token.endsWith("**")) {
+      return (
+        <strong key={`${index}-strong`} className="font-semibold text-[var(--text-primary)]">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    }
+
+    if (token.startsWith("`") && token.endsWith("`")) {
+      return (
+        <code
+          key={`${index}-code`}
+          className="rounded bg-[var(--surface-raised)] px-1.5 py-0.5 font-mono text-[0.92em] text-[var(--accent-strong)]"
+        >
+          {token.slice(1, -1)}
+        </code>
+      );
+    }
+
+    if (token.startsWith("*") && token.endsWith("*")) {
+      return (
+        <em key={`${index}-em`} className="italic text-[var(--text-primary)]">
+          {token.slice(1, -1)}
+        </em>
+      );
+    }
+
+    return token;
+  });
+}
+
+function renderMarkdownParagraphs(text: string) {
+  const normalized = text.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return null;
+
+  const lines = normalized.split("\n");
+  const blocks: Array<
+    | { type: "paragraph"; text: string }
+    | { type: "list"; ordered: boolean; items: string[] }
+  > = [];
+
+  let paragraphBuffer: string[] = [];
+  let listBuffer: string[] = [];
+  let listOrdered = false;
+
+  const flushParagraph = () => {
+    if (!paragraphBuffer.length) return;
+    blocks.push({ type: "paragraph", text: paragraphBuffer.join(" ") });
+    paragraphBuffer = [];
+  };
+
+  const flushList = () => {
+    if (!listBuffer.length) return;
+    blocks.push({ type: "list", ordered: listOrdered, items: [...listBuffer] });
+    listBuffer = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const unorderedMatch = line.match(/^[-*]\s+(.+)$/);
+    const orderedMatch = line.match(/^\d+\.\s+(.+)$/);
+
+    if (unorderedMatch || orderedMatch) {
+      flushParagraph();
+      const item = (unorderedMatch?.[1] || orderedMatch?.[1] || "").trim();
+
+      if (!item) continue;
+
+      const isOrdered = Boolean(orderedMatch);
+      if (listBuffer.length === 0) {
+        listOrdered = isOrdered;
+      }
+
+      if (listOrdered !== isOrdered && listBuffer.length) {
+        flushList();
+        listOrdered = isOrdered;
+      }
+
+      listBuffer.push(item);
+      continue;
+    }
+
+    flushList();
+    paragraphBuffer.push(line);
+  }
+
+  flushParagraph();
+  flushList();
+
+  if (!blocks.length) return null;
+
+  return blocks.map((block, blockIndex) => {
+    if (block.type === "paragraph") {
+      return (
+        <p key={`quiz-exp-${blockIndex}`} className="whitespace-pre-wrap leading-7">
+          {renderInlineMarkdown(block.text)}
+        </p>
+      );
+    }
+
+    const ListTag = block.ordered ? "ol" : "ul";
+
+    return (
+      <ListTag
+        key={`quiz-exp-${blockIndex}`}
+        className={`space-y-2 ${block.ordered ? "list-decimal pl-5" : "list-disc pl-5"}`}
+      >
+        {block.items.map((item, itemIndex) => (
+          <li key={`${blockIndex}-${itemIndex}`} className="leading-7">
+            {renderInlineMarkdown(item)}
+          </li>
+        ))}
+      </ListTag>
+    );
+  });
+}
+
 export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
@@ -411,9 +541,11 @@ export default function Home() {
                   ) : null}
 
                   {quizResult && dailyQuiz.explanation ? (
-                    <p className="mt-3 rounded-2xl bg-[var(--surface-muted)] p-3 text-sm leading-6 text-[var(--text-secondary)]">
-                      {dailyQuiz.explanation}
-                    </p>
+                    <div className="mt-3 rounded-2xl bg-[var(--surface-muted)] p-3 text-sm text-[var(--text-secondary)]">
+                      <div className="space-y-3">
+                        {renderMarkdownParagraphs(dailyQuiz.explanation)}
+                      </div>
+                    </div>
                   ) : null}
 
                   <button
