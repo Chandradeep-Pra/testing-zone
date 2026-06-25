@@ -198,7 +198,7 @@ export default function TodayMocksPage() {
           </div>
           {loading ? (
             <div className="urologics-panel p-8 sm:p-10">
-              <GlobalLoading label="Loading scheduled mocks..." />
+              <GlobalLoading  />
             </div>
           ) : mocks.length === 0 ? (
             <div className="urologics-panel p-8 text-center sm:p-10">

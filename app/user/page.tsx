@@ -287,7 +287,7 @@ export default function UserPage() {
 
         {loading || pageLoading ? (
           <section className="urologics-panel p-8">
-            <GlobalLoading label="Loading your account..." />
+            <GlobalLoading  />
           </section>
         ) : !user ? (
           <section className="urologics-panel p-8 text-center">

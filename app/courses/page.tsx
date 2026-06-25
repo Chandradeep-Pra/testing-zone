@@ -204,7 +204,7 @@ export default function CoursesPage() {
               <div className="mt-5 grid gap-4 sm:mt-7 md:grid-cols-2 xl:grid-cols-3">
                 {libraryLoading ? (
                   <div className="rounded-[26px] border border-[var(--border)] bg-[var(--surface)] p-6">
-                    <GlobalLoading label="Loading video folders..." />
+                    <GlobalLoading />
                   </div>
                 ) : error ? (
                   <div className="rounded-[26px] border border-red-100 bg-red-50 p-6 text-sm text-red-700">

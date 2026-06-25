@@ -297,7 +297,7 @@ export default function CompleteProfilePrompt() {
               </select>
               {countriesLoading ? (
                 <span className="mt-1 block">
-                  <GlobalLoading label="Loading country codes..." compact />
+                  <GlobalLoading  compact />
                 </span>
               ) : null}
             </label>

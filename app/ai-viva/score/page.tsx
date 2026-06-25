@@ -147,7 +147,7 @@ export default function ReviewPage() {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
         <div className="urologics-panel px-8 py-8">
-          <GlobalLoading label="Loading Urologics AI Viva score..." />
+          <GlobalLoading  />
         </div>
       </main>
     );
