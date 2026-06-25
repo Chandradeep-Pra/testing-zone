@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
 import { appPath } from "@/lib/app-path";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 
 type TimestampLike = {
   _seconds?: number;
@@ -134,12 +135,12 @@ export default function TodayMocksPage() {
               Sessions
             </div>
             <div className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[var(--text-primary)] sm:mt-4 sm:text-3xl">
-              {loading ? "Loading mock schedule" : `${mocks.length} live sessions now`}
+              {loading ? <GlobalLoading label="" compact className="items-start justify-start" /> : `${mocks.length} live sessions now`}
             </div>
             <div className="urologics-thin-scrollbar mt-4 max-h-[272px] space-y-3 overflow-y-auto pr-1 sm:mt-5 sm:pr-2">
               {loading ? (
-                <div className="rounded-[22px] border border-[var(--border)] bg-[var(--accent-soft)] p-4 text-sm text-[var(--text-secondary)]">
-                  Starting the test
+                <div className="rounded-[22px] border border-[var(--border)] bg-[var(--accent-soft)] p-4">
+                  <GlobalLoading label="Loading sessions..." compact />
                 </div>
               ) : mocks.length === 0 ? (
                 <div className="rounded-[22px] border border-[var(--border)] bg-[var(--accent-soft)] p-4 text-sm leading-6 text-[var(--text-secondary)]">
@@ -196,8 +197,8 @@ export default function TodayMocksPage() {
             All Sessions
           </div>
           {loading ? (
-            <div className="urologics-panel p-8 text-center text-[var(--text-secondary)] sm:p-10">
-              Loading scheduled mocks...
+            <div className="urologics-panel p-8 sm:p-10">
+              <GlobalLoading label="Loading scheduled mocks..." />
             </div>
           ) : mocks.length === 0 ? (
             <div className="urologics-panel p-8 text-center sm:p-10">

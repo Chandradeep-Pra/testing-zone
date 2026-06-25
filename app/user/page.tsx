@@ -18,6 +18,7 @@ import Link from "next/link";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 import { appPath } from "@/lib/app-path";
 
 type AccessPayload = {
@@ -285,7 +286,9 @@ export default function UserPage() {
         <UrologicsHeader current="Profile" product="Profile" tag="Access, plans, and progress" />
 
         {loading || pageLoading ? (
-          <section className="urologics-panel p-8 text-[var(--text-secondary)]">Loading your account...</section>
+          <section className="urologics-panel p-8">
+            <GlobalLoading label="Loading your account..." />
+          </section>
         ) : !user ? (
           <section className="urologics-panel p-8 text-center">
             <UserRound className="mx-auto h-12 w-12 text-[var(--accent-strong)]" />

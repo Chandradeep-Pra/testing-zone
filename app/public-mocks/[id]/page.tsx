@@ -4,6 +4,7 @@ import { CalendarClock, Mail, ShieldCheck, Sparkles, TimerReset } from "lucide-r
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
 import { appPath } from "@/lib/app-path";
@@ -124,7 +125,9 @@ export default function PublicMockPage() {
   if (loading) {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
-        <div className="urologics-panel px-8 py-6 font-semibold text-[var(--text-primary)]">Loading mock...</div>
+        <div className="urologics-panel px-8 py-8">
+          <GlobalLoading label="Loading mock..." />
+        </div>
       </main>
     );
   }

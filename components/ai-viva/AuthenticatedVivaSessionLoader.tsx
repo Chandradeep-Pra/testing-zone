@@ -6,6 +6,7 @@ import Link from "next/link";
 import VivaSessionClient from "@/components/ai-viva/VivaSessionClient";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 import { appPath } from "@/lib/app-path";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 
@@ -89,8 +90,8 @@ export default function AuthenticatedVivaSessionLoader({ id }: { id: string }) {
   if (loading || authLoading) {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
-        <div className="urologics-panel px-8 py-6 text-[var(--text-secondary)]">
-          Loading Urologics AI Viva...
+        <div className="urologics-panel px-8 py-8">
+          <GlobalLoading label="Loading Urologics AI Viva..." />
         </div>
       </main>
     );

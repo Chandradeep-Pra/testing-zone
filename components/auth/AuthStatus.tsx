@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LogOut, UserRound } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 
 export default function AuthStatus() {
   const { user, loading, signOut } = useAuth();
@@ -23,8 +24,8 @@ export default function AuthStatus() {
 
   if (loading) {
     return (
-      <span className="rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent-strong)]">
-        Checking session
+      <span className="inline-flex rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-4 py-2">
+        <GlobalLoading label="" compact className="min-w-16" />
       </span>
     );
   }

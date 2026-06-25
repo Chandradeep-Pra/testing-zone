@@ -16,6 +16,7 @@ import toast from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 import { appPath } from "@/lib/app-path";
 
 interface DomainReport {
@@ -145,8 +146,8 @@ export default function ReviewPage() {
   if (!report) {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
-        <div className="urologics-panel px-8 py-6 text-[#071014]/65">
-          Loading Urologics AI Viva score...
+        <div className="urologics-panel px-8 py-8">
+          <GlobalLoading label="Loading Urologics AI Viva score..." />
         </div>
       </main>
     );

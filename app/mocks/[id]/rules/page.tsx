@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { appPath } from "@/lib/app-path";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 
 interface Mock {
   id: string;
@@ -45,7 +46,9 @@ export default function MockRulesPage() {
   if (loading) {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
-        <div className="urologics-panel px-8 py-6 text-[var(--text-secondary)]">Loading mock briefing...</div>
+        <div className="urologics-panel px-8 py-8">
+          <GlobalLoading label="Loading mock briefing..." />
+        </div>
       </main>
     );
   }

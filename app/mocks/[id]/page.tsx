@@ -4,6 +4,7 @@ import { AlarmClock, Coffee, Send, ShieldCheck, Trophy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { appPath } from "@/lib/app-path";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 
 interface Question {
   id: string;
@@ -149,7 +150,9 @@ export default function Page() {
   if (!mock) {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
-        <div className="urologics-panel px-8 py-6 text-[var(--text-primary)]">Loading session...</div>
+        <div className="urologics-panel px-8 py-8">
+          <GlobalLoading label="Loading session..." />
+        </div>
       </main>
     );
   }

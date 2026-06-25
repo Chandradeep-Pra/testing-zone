@@ -5,6 +5,7 @@ import { CheckCircle2, Sparkles, UserRoundCheck, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 import { appPath } from "@/lib/app-path";
 import { updateAccountPassword } from "@/lib/urologics-auth";
 
@@ -295,8 +296,8 @@ export default function CompleteProfilePrompt() {
                 ))}
               </select>
               {countriesLoading ? (
-                <span className="mt-1 block text-xs text-[var(--text-tertiary)]">
-                  Loading country codes...
+                <span className="mt-1 block">
+                  <GlobalLoading label="Loading country codes..." compact />
                 </span>
               ) : null}
             </label>

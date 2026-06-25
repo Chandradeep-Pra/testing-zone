@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 import { appPath } from "@/lib/app-path";
 
 type VivaMode = "calm" | "fast";
@@ -174,8 +175,8 @@ const VivaCasesPage: React.FC = () => {
   if (loading) {
     return (
       <main className="urologics-shell flex min-h-screen items-center justify-center">
-        <div className="urologics-panel px-8 py-6 text-[var(--text-secondary)]">
-          Loading Urologics AI Viva cases...
+        <div className="urologics-panel px-8 py-8">
+          <GlobalLoading label="Loading Urologics AI Viva cases..." />
         </div>
       </main>
     );

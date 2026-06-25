@@ -21,6 +21,7 @@ import type {
 } from "@/components/courses/types";
 import { isUnlocked } from "@/components/courses/videoUtils";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 import { appPath } from "@/lib/app-path";
 
 const PRICING_URL = "https://urologics.co.uk/pricing";
@@ -202,8 +203,8 @@ export default function CoursesPage() {
 
               <div className="mt-5 grid gap-4 sm:mt-7 md:grid-cols-2 xl:grid-cols-3">
                 {libraryLoading ? (
-                  <div className="rounded-[26px] border border-[var(--border)] bg-[var(--surface)] p-6 text-sm font-medium text-[var(--accent-strong)]">
-                    Loading video folders...
+                  <div className="rounded-[26px] border border-[var(--border)] bg-[var(--surface)] p-6">
+                    <GlobalLoading label="Loading video folders..." />
                   </div>
                 ) : error ? (
                   <div className="rounded-[26px] border border-red-100 bg-red-50 p-6 text-sm text-red-700">
