@@ -119,6 +119,11 @@ export default function CoursesPage() {
   );
 
   function selectSection(section: VideoSection) {
+    if (showPlayerView && expandedSectionIds.includes(section.id)) {
+      setExpandedSectionIds((prev) => prev.filter((id) => id !== section.id));
+      return;
+    }
+
     setExpandedSectionIds([section.id]);
     setShowPlayerView(true);
 

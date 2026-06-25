@@ -19,10 +19,16 @@ interface Mock {
   id: string;
   quizId: string;
   title: string;
+  type?: "mock" | "grand-mock" | string;
   accessType?: "private" | "public" | string;
   startTime: string | number | TimestampLike;
   endTime?: string | number | TimestampLike;
   durationMinutes: number;
+  access?: {
+    allowed?: boolean;
+    mode?: string;
+    reason?: string | null;
+  };
   hasAttempted?: boolean;
   userAttempt?: {
     score?: number;
@@ -41,6 +47,9 @@ const getTimestamp = (value?: string | number | TimestampLike) => {
     : 0;
 };
 
+const isUserEntitledToMock = (mock: Mock) =>
+  mock.accessType === "public" || mock.access?.allowed === true;
+
 export default function TodayMocksPage() {
   const { user, loading: authLoading } = useAuth();
   const [mocks, setMocks] = useState<Mock[]>([]);
@@ -50,10 +59,6 @@ export default function TodayMocksPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
-      setLoading(false);
-      return;
-    }
 
     const load = async () => {
       try {
@@ -61,6 +66,8 @@ export default function TodayMocksPage() {
         const data = (await res.json()) as { mocks?: Mock[] };
 
         const filtered = (data.mocks || []).filter((mock) => {
+          if (!isUserEntitledToMock(mock)) return false;
+
           const start = getTimestamp(mock.startTime);
           const end = getTimestamp(mock.endTime) || start + mock.durationMinutes * 60 * 1000;
           const now = Date.now();
@@ -81,6 +88,17 @@ export default function TodayMocksPage() {
 
   const handleContinue = () => {
     if (!selectedMock) {
+      return;
+    }
+
+    if (!user && selectedMock.accessType === "public") {
+      router.push(`/public-mocks/${selectedMock.id}`);
+      return;
+    }
+
+    if (!user) {
+      toast.error("Please login to attend this mock.");
+      router.push("/login");
       return;
     }
 
@@ -271,8 +289,12 @@ export default function TodayMocksPage() {
                 <div className="flex items-center gap-3">
                   <ShieldCheck className="h-5 w-5 text-[var(--accent-strong)]" />
                   <div>
-                    <p className="font-semibold text-[var(--text-primary)]">{user?.name}</p>
-                    <p className="text-sm text-[var(--text-secondary)]">{user?.email}</p>
+                    <p className="font-semibold text-[var(--text-primary)]">
+                      {user?.name || "Public candidate"}
+                    </p>
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      {user?.email || "You can continue with this public mock."}
+                    </p>
                   </div>
                 </div>
               </div>
