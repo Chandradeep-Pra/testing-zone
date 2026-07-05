@@ -7,21 +7,12 @@ type MockPayload = {
     access?: {
       allowed?: boolean;
       mode?: string;
-      courseIds?: unknown;
     };
   }>;
 };
 
 function hasEntitledMemberAccess(mock: NonNullable<MockPayload["mocks"]>[number]) {
-  const courseIds = Array.isArray(mock.access?.courseIds)
-    ? mock.access.courseIds.filter((id) => typeof id === "string" && id.trim().length > 0)
-    : [];
-
-  return (
-    mock.access?.allowed === true &&
-    mock.access?.mode === "full" &&
-    courseIds.length > 0
-  );
+  return mock.access?.allowed === true;
 }
 
 function onlyVisibleMocks(payload: MockPayload) {

@@ -50,6 +50,9 @@ const getTimestamp = (value?: string | number | TimestampLike) => {
 const isUserEntitledToMock = (mock: Mock) =>
   mock.accessType === "public" || mock.access?.allowed === true;
 
+const getMockKindLabel = (mock: Mock) =>
+  mock.type === "grand-mock" ? "Grand Mock" : "Mock";
+
 export default function TodayMocksPage() {
   const { user, loading: authLoading } = useAuth();
   const [mocks, setMocks] = useState<Mock[]>([]);
@@ -180,7 +183,7 @@ export default function TodayMocksPage() {
                       <div className="flex items-center justify-between gap-3">
                         <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
                           <CircleDot size={9} />
-                          Live
+                          {getMockKindLabel(mock)}
                         </span>
                         <span className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
                           {mock.durationMinutes} min
@@ -238,7 +241,7 @@ export default function TodayMocksPage() {
                   <div className="flex items-center justify-between gap-3">
                     <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
                       <CircleDot size={10} />
-                      Live Today
+                      {getMockKindLabel(mock)}
                     </span>
                     <span className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--text-secondary)]">
                       {mock.durationMinutes} min
@@ -246,7 +249,7 @@ export default function TodayMocksPage() {
                   </div>
                   <h2 className="mt-4 text-xl font-semibold text-[var(--text-primary)] sm:mt-5 sm:text-2xl">{mock.title || "Grand Mock"}</h2>
                   <div className="mt-3 inline-flex rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">
-                    {mock.accessType === "public" ? "Public access" : "Members only"}
+                    {mock.accessType === "public" ? "Public access" : `Members ${getMockKindLabel(mock)}`}
                   </div>
                   <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
                     Available until{" "}
