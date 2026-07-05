@@ -25,6 +25,15 @@ export default function MockRulesPage() {
   const [mock, setMock] = useState<Mock | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const startSession = () => {
+    const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(`mock-${id}-run-id`, runId);
+    localStorage.removeItem(`mock-${id}-answers`);
+    localStorage.removeItem(`mock-${id}-final`);
+    sessionStorage.removeItem(`mock-${id}-${runId}-attempt-submitted`);
+    router.push(`/mocks/${id}`);
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -81,10 +90,13 @@ export default function MockRulesPage() {
             <div className="mt-7 rounded-[26px] border border-emerald-200 bg-emerald-50 p-6 text-center">
               <Trophy className="mx-auto h-9 w-9 text-emerald-700" />
               <h2 className="mt-3 text-xl font-semibold text-emerald-950">
-                You have already attended this test
+                Previous attempt recorded
               </h2>
               <p className="mt-2 text-sm text-emerald-700">
                 Your marks: {mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}
+              </p>
+              <p className="mt-2 text-sm text-emerald-700">
+                You can start a fresh reattempt below.
               </p>
             </div>
           ) : null}
@@ -123,15 +135,13 @@ export default function MockRulesPage() {
             ))}
           </div>
 
-          {!mock.hasAttempted ? (
-            <button
-              onClick={() => router.push(`/mocks/${id}`)}
-              className="urologics-button-primary mt-8 w-full gap-2 sm:mt-10 sm:w-auto"
-            >
-              Start Mock Session
-              <ArrowRight size={16} />
-            </button>
-          ) : null}
+          <button
+            onClick={startSession}
+            className="urologics-button-primary mt-8 w-full gap-2 sm:mt-10 sm:w-auto"
+          >
+            {mock.hasAttempted ? "Start Reattempt" : "Start Mock Session"}
+            <ArrowRight size={16} />
+          </button>
         </section>
       </div>
     </main>

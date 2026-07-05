@@ -1,6 +1,6 @@
 "use client";
 
-import { AlarmClock, Coffee, Send, ShieldCheck, Trophy } from "lucide-react";
+import { AlarmClock, Coffee, Send, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { appPath } from "@/lib/app-path";
@@ -86,7 +86,7 @@ export default function Page() {
 
   useEffect(() => {
     const load = async () => {
-      const res = await fetch(appPath(`/api/mocks/${id}`));
+      const res = await fetch(appPath(`/api/mocks/${id}`), { cache: "no-store" });
       const data = await res.json();
       const nextMock = normalizeMock(data.mock);
       setMock(nextMock);
@@ -152,29 +152,6 @@ export default function Page() {
       <main className="urologics-shell flex min-h-screen items-center justify-center">
         <div className="urologics-panel px-8 py-8">
           <GlobalLoading label="Loading session..." />
-        </div>
-      </main>
-    );
-  }
-
-  if (mock.hasAttempted) {
-    return (
-      <main className="urologics-shell flex min-h-screen items-center justify-center px-4">
-        <div className="urologics-panel w-full max-w-lg p-8 text-center">
-          <Trophy className="mx-auto h-10 w-10 text-emerald-600" />
-          <h1 className="mt-4 text-2xl font-semibold text-[var(--text-primary)]">
-            You have already attended this test
-          </h1>
-          <p className="mt-3 text-[var(--text-secondary)]">
-            Your marks: {mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}
-          </p>
-          <button
-            type="button"
-            onClick={() => router.replace("/mocks")}
-            className="urologics-button-primary mt-6"
-          >
-            Back to mocks
-          </button>
         </div>
       </main>
     );

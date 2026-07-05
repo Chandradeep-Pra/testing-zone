@@ -58,6 +58,7 @@ export default function TodayMocksPage() {
   const [mocks, setMocks] = useState<Mock[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMock, setSelectedMock] = useState<Mock | null>(null);
+  const [checkingMockId, setCheckingMockId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function TodayMocksPage() {
 
     const load = async () => {
       try {
-        const res = await fetch(appPath("/api/mocks"));
+        const res = await fetch(appPath("/api/mocks"), { cache: "no-store" });
         const data = (await res.json()) as { mocks?: Mock[] };
 
         const filtered = (data.mocks || []).filter((mock) => {
@@ -89,7 +90,7 @@ export default function TodayMocksPage() {
     void load();
   }, [authLoading, user]);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!selectedMock) {
       return;
     }
@@ -105,12 +106,21 @@ export default function TodayMocksPage() {
       return;
     }
 
-    if (selectedMock.hasAttempted) {
-      toast.error("You have already attended this test");
-      return;
-    }
+    setCheckingMockId(selectedMock.id);
+    try {
+      const res = await fetch(appPath(`/api/mocks/${selectedMock.id}`), { cache: "no-store" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setMocks((current) => current.filter((mock) => mock.id !== selectedMock.id));
+        setSelectedMock(null);
+        toast.error(data?.error || "You no longer have access to this mock.");
+        return;
+      }
 
-    router.push(`/mocks/${selectedMock.id}/rules`);
+      router.push(`/mocks/${selectedMock.id}/rules`);
+    } finally {
+      setCheckingMockId(null);
+    }
   };
 
   return (
@@ -263,7 +273,7 @@ export default function TodayMocksPage() {
                       mock.hasAttempted ? "urologics-button-secondary" : "urologics-button-primary"
                     }`}
                   >
-                    {mock.hasAttempted ? "View Attempt" : "Start Session"}
+                    {mock.hasAttempted ? "Reattempt" : "Start Session"}
                   </button>
                 </div>
               ))}
@@ -281,10 +291,13 @@ export default function TodayMocksPage() {
               <div className="mt-6 rounded-[24px] border border-emerald-200 bg-emerald-50 p-5 text-center">
                 <Trophy className="mx-auto h-8 w-8 text-emerald-700" />
                 <p className="mt-3 font-semibold text-emerald-900">
-                  You have already attended this test
+                  Previous attempt recorded
                 </p>
                 <p className="mt-2 text-sm text-emerald-700">
                   Your marks: {selectedMock.userAttempt?.score ?? selectedMock.userAttempt?.marks ?? 0}
+                </p>
+                <p className="mt-2 text-sm text-emerald-700">
+                  You can reattempt this session.
                 </p>
               </div>
             ) : (
@@ -306,11 +319,13 @@ export default function TodayMocksPage() {
               <button onClick={() => setSelectedMock(null)} className="urologics-button-secondary flex-1">
                 Cancel
               </button>
-              {!selectedMock.hasAttempted ? (
-                <button onClick={handleContinue} className="urologics-button-primary flex-1">
-                  Continue
-                </button>
-              ) : null}
+              <button
+                onClick={handleContinue}
+                disabled={checkingMockId === selectedMock.id}
+                className="urologics-button-primary flex-1 disabled:opacity-60"
+              >
+                {checkingMockId === selectedMock.id ? "Checking..." : selectedMock.hasAttempted ? "Reattempt" : "Continue"}
+              </button>
             </div>
           </div>
         </div>

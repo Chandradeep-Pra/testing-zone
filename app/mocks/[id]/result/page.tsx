@@ -124,7 +124,12 @@ export default function ResultPage() {
       return;
     }
 
-    const alreadySubmitted = sessionStorage.getItem(`mock-${id}-attempt-submitted`);
+    const runId =
+      localStorage.getItem(`mock-${id}-run-id`) ||
+      `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(`mock-${id}-run-id`, runId);
+    const submittedKey = `mock-${id}-${runId}-attempt-submitted`;
+    const alreadySubmitted = sessionStorage.getItem(submittedKey);
     if (alreadySubmitted === "true") {
       setSubmittedAttempt(true);
       return;
@@ -150,18 +155,6 @@ export default function ResultPage() {
 
         const data = await res.json();
         if (!res.ok) {
-          if (res.status === 409 && data?.hasAttempted) {
-            sessionStorage.setItem(`mock-${id}-attempt-submitted`, "true");
-            setSubmittedAttempt(true);
-            toast.error(
-              `You have already attended this test. Marks: ${
-                data?.attempt?.score ?? data?.attempt?.marks ?? 0
-              }`,
-              { id: "mock-attempt" },
-            );
-            return;
-          }
-
           const message =
             typeof data?.error === "string" ? data.error : "Failed to submit mock attempt";
           throw new Error(message);
@@ -175,11 +168,14 @@ export default function ResultPage() {
             marks,
             attemptsCount: data.attemptsCount ?? null,
             attempt: data.attempt ?? null,
+            replacedExisting: data.replacedExisting === true,
           })
         );
-        sessionStorage.setItem(`mock-${id}-attempt-submitted`, "true");
+        sessionStorage.setItem(submittedKey, "true");
         setSubmittedAttempt(true);
-        toast.success("Mock submitted successfully", { id: "mock-attempt" });
+        toast.success(data.replacedExisting ? "Reattempt score updated" : "Mock submitted successfully", {
+          id: "mock-attempt",
+        });
       } catch (error) {
         console.error("Mock attempt submission failed:", error);
         toast.error(
