@@ -30,6 +30,31 @@ function cleanResponse(text: string) {
     .trim();
 }
 
+async function generateFollowupText(prompt: string) {
+  const generation = geminiModel.generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: {
+      maxOutputTokens: 96,
+      temperature: 0.2,
+    },
+  });
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error("Follow-up generation timed out")),
+      8_000,
+    );
+  });
+  const result = await Promise.race([generation, timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+  const rawText = result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (typeof rawText !== "string") {
+    throw new Error("Unexpected Gemini response structure");
+  }
+  return rawText;
+}
+
 function formatRecentQA(previousQA: Array<{ question: string; answer: string }>) {
   return previousQA
     .slice(-2)
@@ -252,13 +277,7 @@ No quotes, commas, braces, markdown, or extra lines. Use false and null when no 
 `;
 
   try {
-    const result = await geminiModel.generateContent(prompt);
-    const rawText = result.response?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (typeof rawText !== "string") {
-      throw new Error("Unexpected Gemini response structure");
-    }
-
+    const rawText = await generateFollowupText(prompt);
     const text = cleanResponse(rawText);
 
     // detect imageUsed

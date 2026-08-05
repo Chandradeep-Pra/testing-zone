@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { appPath } from "@/lib/app-path";
 import { getStoredAuth } from "@/lib/urologics-auth";
 import type { VivaCaseRecord, VivaModeQuestion } from "@/lib/viva-case";
-import type { ActiveCalmVivaPhase } from "@/lib/viva-flow";
+import { CALM_VIVA_PHASES, type ActiveCalmVivaPhase } from "@/lib/viva-flow";
 
 type QA = { question: string; answer: string };
 type VivaMode = "calm" | "fast";
@@ -24,6 +24,64 @@ function compactTurnState(state: VivaTurnState): VivaTurnState {
     coveredTopics: state.coveredTopics.slice(-6),
     weakAreas: state.weakAreas.slice(-6),
   };
+}
+
+const CALM_STAGE_QUESTION_BUDGET: Record<ActiveCalmVivaPhase, number> = {
+  assessment: 1,
+  investigations: 2,
+  management: 2,
+  complications: 1,
+  follow_up: 1,
+};
+
+const CALM_FALLBACK_QUESTIONS: Record<ActiveCalmVivaPhase, string[]> = {
+  assessment: [
+    "Which features in the history are most important?",
+    "What focused examination would you perform?",
+  ],
+  investigations: [
+    "Which investigation would you request next?",
+    "How do these findings affect your diagnosis?",
+  ],
+  management: [
+    "What treatment would you recommend?",
+    "Why is that treatment appropriate?",
+    "What alternative would you discuss?",
+  ],
+  complications: ["What important complications would you discuss?"],
+  follow_up: ["How would you follow this patient after treatment?"],
+};
+
+function normalizeQuestion(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function areQuestionsSimilar(left: string, right: string) {
+  const leftTokens = new Set(normalizeQuestion(left).split(" ").filter(Boolean));
+  const rightTokens = new Set(normalizeQuestion(right).split(" ").filter(Boolean));
+  if (!leftTokens.size || !rightTokens.size) return false;
+  const shared = [...leftTokens].filter((token) => rightTokens.has(token)).length;
+  return shared / Math.min(leftTokens.size, rightTokens.size) >= 0.72;
+}
+
+function getNonRepeatingQuestion(
+  question: string,
+  stage: ActiveCalmVivaPhase,
+  history: QA[],
+) {
+  const recentQuestions = new Set(
+    history.slice(-4).map((item) => normalizeQuestion(item.question)),
+  );
+  const repeated =
+    recentQuestions.has(normalizeQuestion(question)) ||
+    history.slice(-4).some((item) => areQuestionsSimilar(item.question, question));
+  if (!repeated) return question;
+
+  return (
+    CALM_FALLBACK_QUESTIONS[stage].find(
+      (candidate) => !recentQuestions.has(normalizeQuestion(candidate)),
+    ) || CALM_FALLBACK_QUESTIONS[stage][0]
+  );
 }
 type VivaScorePayload = Record<string, unknown> & {
   basic_knowledge?: { score?: unknown };
@@ -182,6 +240,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   const fastQuestionIndexRef = useRef(0);
   const summaryUpdateInFlightRef = useRef(false);
   const pendingSummaryQARef = useRef<QA | null>(null);
+  const calmStageQuestionCountRef = useRef(0);
   const vivaTurnStateRef = useRef<VivaTurnState>({
     summary: "",
     currentStage: "assessment",
@@ -294,12 +353,26 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       !exit && history.length > 0 && userAnswer
         ? { ...history[history.length - 1] }
         : null;
-    const currentTurnState = compactTurnState(vivaTurnStateRef.current);
-    const recentHistory = exit ? history : history.slice(-1);
 
     if (latestAnsweredQA) {
-      updateVivaSummaryInBackground(latestAnsweredQA, currentTurnState);
+      const stage = vivaTurnStateRef.current.currentStage;
+      const budget = CALM_STAGE_QUESTION_BUDGET[stage];
+      if (calmStageQuestionCountRef.current >= budget) {
+        const stageIndex = CALM_VIVA_PHASES.indexOf(stage);
+        const nextStage = CALM_VIVA_PHASES[stageIndex + 1];
+        if (!nextStage) {
+          return { exit: true };
+        }
+        vivaTurnStateRef.current = {
+          ...vivaTurnStateRef.current,
+          currentStage: nextStage,
+        };
+        calmStageQuestionCountRef.current = 0;
+      }
     }
+
+    const currentTurnState = compactTurnState(vivaTurnStateRef.current);
+    const recentHistory = exit ? history : history.slice(-1);
 
     const res = await fetch(appPath("/api/viva/generateFollowup"), {
       method: "POST",
@@ -327,10 +400,22 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     }
 
     if (!exit && data?.question) {
+      data.question = getNonRepeatingQuestion(
+        data.question,
+        currentTurnState.currentStage,
+        history,
+      );
       history.push({
         question: data.question,
         answer: "",
       });
+      calmStageQuestionCountRef.current += 1;
+    }
+
+    // Summary maintenance starts only after the next question has returned, so
+    // it cannot compete with the latency-sensitive follow-up model request.
+    if (latestAnsweredQA) {
+      updateVivaSummaryInBackground(latestAnsweredQA, currentTurnState);
     }
 
     return data;
@@ -367,10 +452,9 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
             typeof data.summary === "string"
               ? data.summary
               : vivaTurnStateRef.current.summary,
-          currentStage:
-            typeof data.currentStage === "string"
-              ? (data.currentStage as ActiveCalmVivaPhase)
-              : vivaTurnStateRef.current.currentStage,
+          // Stage progression is controlled locally by fixed question budgets.
+          // The model maintains clinical memory but cannot trap or skip phases.
+          currentStage: vivaTurnStateRef.current.currentStage,
           coveredTopics: Array.isArray(data.coveredTopics)
             ? data.coveredTopics.filter((item): item is string => typeof item === "string")
             : vivaTurnStateRef.current.coveredTopics,
@@ -455,6 +539,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     fastQuestionIndexRef.current = 0;
     summaryUpdateInFlightRef.current = false;
     pendingSummaryQARef.current = null;
+    calmStageQuestionCountRef.current = 0;
     vivaTurnStateRef.current = {
       summary: "",
       currentStage: "assessment",
