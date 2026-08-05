@@ -21,10 +21,55 @@ export type VivaModeQuestion = {
   linkedExhibitIds: string[];
 };
 
+export type CalmPhaseConfig = {
+  objectives: string[];
+  criticalTopics: string[];
+  maxPrimaryQuestions?: number;
+};
+
+export type CalmInvestigationConfig = {
+  id: string;
+  name: string;
+  aliases: string[];
+  report: string;
+  exhibitId?: string;
+  interpretationPoints: string[];
+};
+
+export type CalmTreatmentConfig = {
+  id: string;
+  name: string;
+  indications: string[];
+  advantages: string[];
+  disadvantages: string[];
+  mechanism?: string;
+  complications: string[];
+  followUp: string[];
+};
+
+export type CalmDiagnosisConfig = {
+  name: string;
+  aliases: string[];
+  treatments: CalmTreatmentConfig[];
+};
+
+export type CalmAndComposedConfig = {
+  enabled?: boolean;
+  phases: {
+    assessment: CalmPhaseConfig;
+    investigations: CalmPhaseConfig;
+    management: CalmPhaseConfig;
+    complications: CalmPhaseConfig;
+    follow_up: CalmPhaseConfig;
+  };
+  investigations: CalmInvestigationConfig[];
+  diagnoses: CalmDiagnosisConfig[];
+};
+
 export type VivaCaseModes = {
   calmAndComposed?: {
     enabled?: boolean;
-  };
+  } & Partial<CalmAndComposedConfig>;
   fastAndFurious?: {
     enabled?: boolean;
     questionCount?: number;
@@ -148,6 +193,117 @@ function normalizeModeQuestion(
   };
 }
 
+const DEFAULT_CALM_PHASES: CalmAndComposedConfig["phases"] = {
+  assessment: {
+    objectives: ["presenting symptoms", "risk factors", "medical and surgical history", "clinical examination"],
+    criticalTopics: [],
+    maxPrimaryQuestions: 2,
+  },
+  investigations: {
+    objectives: ["appropriate investigations", "interpretation", "clinical relevance"],
+    criticalTopics: [],
+    maxPrimaryQuestions: 3,
+  },
+  management: {
+    objectives: ["treatment options", "treatment recommendation", "advantages and disadvantages"],
+    criticalTopics: ["safe management"],
+    maxPrimaryQuestions: 3,
+  },
+  complications: {
+    objectives: ["important complications", "recognition or management of complications"],
+    criticalTopics: [],
+    maxPrimaryQuestions: 2,
+  },
+  follow_up: {
+    objectives: ["review timing", "surveillance", "safety netting"],
+    criticalTopics: [],
+    maxPrimaryQuestions: 2,
+  },
+};
+
+function normalizePhaseConfig(value: unknown, fallback: CalmPhaseConfig): CalmPhaseConfig {
+  const source = asRecord(value);
+  const objectives = asStringArray(source?.objectives);
+  const criticalTopics = asStringArray(source?.criticalTopics);
+  return {
+    objectives: objectives.length ? objectives : fallback.objectives,
+    criticalTopics: criticalTopics.length ? criticalTopics : fallback.criticalTopics,
+    maxPrimaryQuestions:
+      typeof source?.maxPrimaryQuestions === "number"
+        ? Math.max(1, Math.floor(source.maxPrimaryQuestions))
+        : fallback.maxPrimaryQuestions,
+  };
+}
+
+function normalizeCalmInvestigation(value: unknown, index: number): CalmInvestigationConfig | null {
+  const source = asRecord(value);
+  if (!source) return null;
+  const name = typeof source.name === "string" ? source.name : `Investigation ${index + 1}`;
+  return {
+    id: typeof source.id === "string" ? source.id : toSlug(name),
+    name,
+    aliases: asStringArray(source.aliases),
+    report: typeof source.report === "string" ? source.report : "",
+    exhibitId: typeof source.exhibitId === "string" ? source.exhibitId : undefined,
+    interpretationPoints: asStringArray(source.interpretationPoints),
+  };
+}
+
+function normalizeCalmTreatment(value: unknown, index: number): CalmTreatmentConfig | null {
+  const source = asRecord(value);
+  if (!source) return null;
+  const name = typeof source.name === "string" ? source.name : `Treatment ${index + 1}`;
+  return {
+    id: typeof source.id === "string" ? source.id : toSlug(name),
+    name,
+    indications: asStringArray(source.indications),
+    advantages: asStringArray(source.advantages),
+    disadvantages: asStringArray(source.disadvantages),
+    mechanism: typeof source.mechanism === "string" ? source.mechanism : undefined,
+    complications: asStringArray(source.complications),
+    followUp: asStringArray(source.followUp),
+  };
+}
+
+function normalizeCalmDiagnosis(value: unknown): CalmDiagnosisConfig | null {
+  const source = asRecord(value);
+  if (!source || typeof source.name !== "string") return null;
+  return {
+    name: source.name,
+    aliases: asStringArray(source.aliases),
+    treatments: Array.isArray(source.treatments)
+      ? source.treatments
+          .map(normalizeCalmTreatment)
+          .filter((item): item is CalmTreatmentConfig => Boolean(item))
+      : [],
+  };
+}
+
+function normalizeCalmConfig(value: unknown): CalmAndComposedConfig {
+  const source = asRecord(value);
+  const phases = asRecord(source?.phases);
+  return {
+    enabled: source?.enabled === undefined ? true : Boolean(source.enabled),
+    phases: {
+      assessment: normalizePhaseConfig(phases?.assessment, DEFAULT_CALM_PHASES.assessment),
+      investigations: normalizePhaseConfig(phases?.investigations, DEFAULT_CALM_PHASES.investigations),
+      management: normalizePhaseConfig(phases?.management, DEFAULT_CALM_PHASES.management),
+      complications: normalizePhaseConfig(phases?.complications, DEFAULT_CALM_PHASES.complications),
+      follow_up: normalizePhaseConfig(phases?.follow_up, DEFAULT_CALM_PHASES.follow_up),
+    },
+    investigations: Array.isArray(source?.investigations)
+      ? source.investigations
+          .map(normalizeCalmInvestigation)
+          .filter((item): item is CalmInvestigationConfig => Boolean(item))
+      : [],
+    diagnoses: Array.isArray(source?.diagnoses)
+      ? source.diagnoses
+          .map(normalizeCalmDiagnosis)
+          .filter((item): item is CalmDiagnosisConfig => Boolean(item))
+      : [],
+  };
+}
+
 function normalizeModes(modes: unknown): VivaCaseModes | undefined {
   const source = asRecord(modes);
   if (!source) {
@@ -158,11 +314,7 @@ function normalizeModes(modes: unknown): VivaCaseModes | undefined {
   const fastAndFurious = asRecord(source.fastAndFurious);
 
   return {
-    calmAndComposed: calmAndComposed
-      ? {
-          enabled: Boolean(calmAndComposed.enabled),
-        }
-      : undefined,
+    calmAndComposed: normalizeCalmConfig(calmAndComposed),
     fastAndFurious: fastAndFurious
       ? {
           enabled: Boolean(fastAndFurious.enabled),
@@ -198,6 +350,9 @@ export function getDefaultVivaCase(): VivaCaseRecord {
     },
     viva_rules: {
       ...vivaContext.viva_rules,
+    },
+    modes: {
+      calmAndComposed: normalizeCalmConfig({ enabled: true }),
     },
   };
 }
@@ -281,7 +436,7 @@ export function normalizeVivaCase(payload: unknown): VivaCaseRecord {
       ? (source.attempts as VivaCaseAttempt[])
       : undefined,
     allowedUser: asStringArray(source.allowedUser),
-    modes: normalizeModes(source.modes),
+    modes: normalizeModes(source.modes) ?? fallback.modes,
     isActive:
       typeof source.isActive === "boolean" ? source.isActive : undefined,
     publicParticipants: Array.isArray(source.publicParticipants)

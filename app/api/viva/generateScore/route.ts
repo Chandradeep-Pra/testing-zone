@@ -31,6 +31,16 @@ Objectives: ${vivaCase.case.objectives.join("; ")}
 Must mention: ${vivaCase.marking_criteria.must_mention.join("; ")}
 Critical fail: ${vivaCase.marking_criteria.critical_fail.join("; ")}
 
+Assess coverage across the complete clinical pathway:
+1. Assessment: symptoms, history, risk factors, examination and relevant background.
+2. Investigations and interpretation: appropriate selection, interpretation and clinical relevance.
+3. Management: options, recommendation, trade-offs, justification and safety.
+4. Complications: important disease or chosen-treatment complications and their management.
+5. Follow-up: review timing, surveillance, monitoring and safety netting.
+
+Use the candidate's chosen safe treatment when judging whether their complications and follow-up are coherent.
+Penalise unresolved critical safety omissions in the relevant domain reasoning, but do not penalise harmless wording or likely speech-to-text errors.
+
 Score each domain from 4-8.
 
 Domains:
