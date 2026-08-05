@@ -6,24 +6,25 @@ import { useRouter } from "next/navigation";
 import { appPath } from "@/lib/app-path";
 import { getStoredAuth } from "@/lib/urologics-auth";
 import type { VivaCaseRecord, VivaModeQuestion } from "@/lib/viva-case";
+import type { ActiveCalmVivaPhase } from "@/lib/viva-flow";
 
 type QA = { question: string; answer: string };
 type VivaMode = "calm" | "fast";
-type VivaStage =
-  | "initial_assessment"
-  | "investigations"
-  | "interpretation"
-  | "management"
-  | "alternatives"
-  | "complications"
-  | "follow_up";
-
 type VivaTurnState = {
   summary: string;
-  currentStage: VivaStage;
+  currentStage: ActiveCalmVivaPhase;
   coveredTopics: string[];
   weakAreas: string[];
 };
+
+function compactTurnState(state: VivaTurnState): VivaTurnState {
+  return {
+    summary: state.summary.slice(0, 500),
+    currentStage: state.currentStage,
+    coveredTopics: state.coveredTopics.slice(-6),
+    weakAreas: state.weakAreas.slice(-6),
+  };
+}
 type VivaScorePayload = Record<string, unknown> & {
   basic_knowledge?: { score?: unknown };
   higher_order_processing?: { score?: unknown };
@@ -183,7 +184,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   const pendingSummaryQARef = useRef<QA | null>(null);
   const vivaTurnStateRef = useRef<VivaTurnState>({
     summary: "",
-    currentStage: "initial_assessment",
+    currentStage: "assessment",
     coveredTopics: [],
     weakAreas: [],
   });
@@ -293,7 +294,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       !exit && history.length > 0 && userAnswer
         ? { ...history[history.length - 1] }
         : null;
-    const currentTurnState = vivaTurnStateRef.current;
+    const currentTurnState = compactTurnState(vivaTurnStateRef.current);
     const recentHistory = exit ? history : history.slice(-1);
 
     if (latestAnsweredQA) {
@@ -347,10 +348,10 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        previousSummary: stateSnapshot.summary,
+        previousSummary: stateSnapshot.summary.slice(0, 500),
         currentStage: stateSnapshot.currentStage,
-        coveredTopics: stateSnapshot.coveredTopics,
-        weakAreas: stateSnapshot.weakAreas,
+        coveredTopics: stateSnapshot.coveredTopics.slice(-6),
+        weakAreas: stateSnapshot.weakAreas.slice(-6),
         latestQA,
         vivaCase,
       }),
@@ -368,7 +369,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
               : vivaTurnStateRef.current.summary,
           currentStage:
             typeof data.currentStage === "string"
-              ? (data.currentStage as VivaStage)
+              ? (data.currentStage as ActiveCalmVivaPhase)
               : vivaTurnStateRef.current.currentStage,
           coveredTopics: Array.isArray(data.coveredTopics)
             ? data.coveredTopics.filter((item): item is string => typeof item === "string")
@@ -456,7 +457,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     pendingSummaryQARef.current = null;
     vivaTurnStateRef.current = {
       summary: "",
-      currentStage: "initial_assessment",
+      currentStage: "assessment",
       coveredTopics: [],
       weakAreas: [],
     };
