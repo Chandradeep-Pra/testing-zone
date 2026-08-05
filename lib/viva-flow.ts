@@ -40,13 +40,82 @@ export type CalmPhaseConfigLike = {
   maxPrimaryQuestions?: number;
 };
 
-export const PHASE_TIME_SHARES: Record<ActiveCalmVivaPhase, number> = {
-  assessment: 0.2,
-  investigations: 0.25,
-  management: 0.3,
-  complications: 0.15,
-  follow_up: 0.1,
+export const CALM_VIVA_TOTAL_DURATION_SEC = 10 * 60;
+
+export const PHASE_DURATION_SEC: Record<ActiveCalmVivaPhase, number> = {
+  assessment: 90,
+  investigations: 180,
+  management: 240,
+  complications: 60,
+  follow_up: 30,
 };
+
+export const PHASE_TIME_SHARES: Record<ActiveCalmVivaPhase, number> = {
+  assessment: PHASE_DURATION_SEC.assessment / CALM_VIVA_TOTAL_DURATION_SEC,
+  investigations: PHASE_DURATION_SEC.investigations / CALM_VIVA_TOTAL_DURATION_SEC,
+  management: PHASE_DURATION_SEC.management / CALM_VIVA_TOTAL_DURATION_SEC,
+  complications: PHASE_DURATION_SEC.complications / CALM_VIVA_TOTAL_DURATION_SEC,
+  follow_up: PHASE_DURATION_SEC.follow_up / CALM_VIVA_TOTAL_DURATION_SEC,
+};
+
+export const CALM_PHASE_GUIDANCE: Record<
+  ActiveCalmVivaPhase,
+  { title: string; shortTime: string; explainer: string; prompts: string[] }
+> = {
+  assessment: {
+    title: "Assessment",
+    shortTime: "1 min 30 sec",
+    explainer: "Build a focused clinical picture from the case description.",
+    prompts: ["Symptoms and duration", "Risk factors", "Medical and surgical history", "Examination, imaging and lifestyle clues"],
+  },
+  investigations: {
+    title: "Investigation and Interpretation",
+    shortTime: "3 min",
+    explainer: "Choose relevant tests, interpret the supplied findings, and explain how they refine the diagnosis.",
+    prompts: ["Key image or report findings", "Relevant blood, urine or specialist tests", "Most likely diagnosis and differentials", "Clinical meaning of each result"],
+  },
+  management: {
+    title: "Management",
+    shortTime: "4 min",
+    explainer: "Present a patient-specific treatment plan based on the diagnosis and history.",
+    prompts: ["Medical, lifestyle and surgical options", "Preferred treatment and rationale", "Advantages, disadvantages and alternatives", "Expected treatment outcomes"],
+  },
+  complications: {
+    title: "Complications",
+    shortTime: "1 min",
+    explainer: "Identify an important or common treatment complication and explain how you would manage it.",
+    prompts: ["Frequency and risk factors", "Recognition and initial assessment", "Medical or surgical treatment"],
+  },
+  follow_up: {
+    title: "Follow Up",
+    shortTime: "30 sec",
+    explainer: "Set out when and how the patient will be reviewed after treatment.",
+    prompts: ["Review interval", "Symptoms, tests or imaging to monitor", "Safety-net advice and triggers for earlier review"],
+  },
+};
+
+export function getCalmPhaseAtElapsedSec(elapsedSec: number): ActiveCalmVivaPhase {
+  let boundary = 0;
+  for (const phase of CALM_VIVA_PHASES) {
+    boundary += PHASE_DURATION_SEC[phase];
+    if (elapsedSec < boundary) return phase;
+  }
+  return "follow_up";
+}
+
+export function getCalmPhaseTiming(elapsedSec: number) {
+  const phase = getCalmPhaseAtElapsedSec(elapsedSec);
+  const phaseIndex = CALM_VIVA_PHASES.indexOf(phase);
+  const startedAt = CALM_VIVA_PHASES.slice(0, phaseIndex).reduce(
+    (total, item) => total + PHASE_DURATION_SEC[item],
+    0,
+  );
+  return {
+    phase,
+    elapsedInPhaseSec: Math.max(0, elapsedSec - startedAt),
+    remainingInPhaseSec: Math.max(0, PHASE_DURATION_SEC[phase] - (elapsedSec - startedAt)),
+  };
+}
 
 export function createInitialCalmVivaState(): CalmVivaState {
   return {

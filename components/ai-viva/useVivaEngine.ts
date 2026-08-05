@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { appPath } from "@/lib/app-path";
 import { getStoredAuth } from "@/lib/urologics-auth";
 import type { VivaCaseRecord, VivaModeQuestion } from "@/lib/viva-case";
-import { CALM_VIVA_PHASES, type ActiveCalmVivaPhase } from "@/lib/viva-flow";
+import { getCalmPhaseAtElapsedSec, type ActiveCalmVivaPhase } from "@/lib/viva-flow";
 
 type QA = { question: string; answer: string };
 type VivaMode = "calm" | "fast";
@@ -26,14 +26,6 @@ function compactTurnState(state: VivaTurnState): VivaTurnState {
   };
 }
 
-const CALM_STAGE_QUESTION_BUDGET: Record<ActiveCalmVivaPhase, number> = {
-  assessment: 1,
-  investigations: 2,
-  management: 2,
-  complications: 1,
-  follow_up: 1,
-};
-
 const CALM_FALLBACK_QUESTIONS: Record<ActiveCalmVivaPhase, string[]> = {
   assessment: [
     "Which features in the history are most important?",
@@ -50,6 +42,10 @@ const CALM_FALLBACK_QUESTIONS: Record<ActiveCalmVivaPhase, string[]> = {
   ],
   complications: ["What important complications would you discuss?"],
   follow_up: ["How would you follow this patient after treatment?"],
+};
+type CachedCalmQuestion = {
+  stage: ActiveCalmVivaPhase;
+  request: Promise<VivaApiResponse>;
 };
 
 function normalizeQuestion(value: string) {
@@ -241,6 +237,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   const summaryUpdateInFlightRef = useRef(false);
   const pendingSummaryQARef = useRef<QA | null>(null);
   const calmStageQuestionCountRef = useRef(0);
+  const cachedCalmQuestionRef = useRef<CachedCalmQuestion | null>(null);
   const vivaTurnStateRef = useRef<VivaTurnState>({
     summary: "",
     currentStage: "assessment",
@@ -342,7 +339,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     };
   }
 
-  async function nextCalm(userAnswer: string, exit = false): Promise<VivaApiResponse> {
+  async function nextCalm(userAnswer: string, exit = false, elapsedSec = 0): Promise<VivaApiResponse> {
     const history = previousQARef.current;
 
     if (history.length > 0 && userAnswer) {
@@ -354,46 +351,34 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
         ? { ...history[history.length - 1] }
         : null;
 
-    if (latestAnsweredQA) {
-      const stage = vivaTurnStateRef.current.currentStage;
-      const budget = CALM_STAGE_QUESTION_BUDGET[stage];
-      if (calmStageQuestionCountRef.current >= budget) {
-        const stageIndex = CALM_VIVA_PHASES.indexOf(stage);
-        const nextStage = CALM_VIVA_PHASES[stageIndex + 1];
-        if (!nextStage) {
-          return { exit: true };
-        }
-        vivaTurnStateRef.current = {
-          ...vivaTurnStateRef.current,
-          currentStage: nextStage,
-        };
-        calmStageQuestionCountRef.current = 0;
-      }
+    const timedStage = getCalmPhaseAtElapsedSec(elapsedSec);
+    if (timedStage !== vivaTurnStateRef.current.currentStage) {
+      vivaTurnStateRef.current = {
+        ...vivaTurnStateRef.current,
+        currentStage: timedStage,
+      };
+      calmStageQuestionCountRef.current = 0;
     }
 
     const currentTurnState = compactTurnState(vivaTurnStateRef.current);
     const recentHistory = exit ? history : history.slice(-1);
-
-    const res = await fetch(appPath("/api/viva/generateFollowup"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        previousQA: recentHistory,
-        shownExhibitIds: Array.from(shownExhibitIdsRef.current),
-        vivaCase,
-        exit,
-        vivaSummary: currentTurnState.summary,
-        currentStage: currentTurnState.currentStage,
-        coveredTopics: currentTurnState.coveredTopics,
-        weakAreas: currentTurnState.weakAreas,
-      }),
-    });
-
-    if (!res.ok) {
-      throw new Error("API error");
+    const cachedQuestion = cachedCalmQuestionRef.current;
+    const canUseCachedQuestion =
+      !exit && cachedQuestion?.stage === currentTurnState.currentStage;
+    let data: VivaApiResponse;
+    if (canUseCachedQuestion) {
+      try {
+        data = await cachedQuestion.request;
+      } catch {
+        data = await requestCalmQuestion(currentTurnState, recentHistory, exit);
+      }
+    } else {
+      data = await requestCalmQuestion(currentTurnState, recentHistory, exit);
     }
 
-    const data: VivaApiResponse = await res.json();
+    if (canUseCachedQuestion) {
+      cachedCalmQuestionRef.current = null;
+    }
 
     if (data.imageUsed && data.imageId) {
       shownExhibitIdsRef.current.add(data.imageId);
@@ -419,6 +404,57 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     }
 
     return data;
+  }
+
+  async function requestCalmQuestion(
+    turnState: VivaTurnState,
+    previousQA: QA[],
+    exit = false,
+  ): Promise<VivaApiResponse> {
+    const res = await fetch(appPath("/api/viva/generateFollowup"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        previousQA,
+        shownExhibitIds: Array.from(shownExhibitIdsRef.current),
+        vivaCase,
+        exit,
+        vivaSummary: turnState.summary,
+        currentStage: turnState.currentStage,
+        coveredTopics: turnState.coveredTopics,
+        weakAreas: turnState.weakAreas,
+      }),
+    });
+
+    if (!res.ok) throw new Error("API error");
+    return res.json();
+  }
+
+  function prefetchNextCalmPhase(elapsedSec: number) {
+    if (selectedMode !== "calm") return;
+
+    const stage = getCalmPhaseAtElapsedSec(elapsedSec);
+    if (
+      stage === vivaTurnStateRef.current.currentStage ||
+      cachedCalmQuestionRef.current?.stage === stage
+    ) {
+      return;
+    }
+
+    const stateSnapshot = compactTurnState({
+      ...vivaTurnStateRef.current,
+      currentStage: stage,
+    });
+    const request = requestCalmQuestion(stateSnapshot, []).catch((error) => {
+      if (cachedCalmQuestionRef.current?.request === request) {
+        cachedCalmQuestionRef.current = null;
+      }
+      throw error;
+    });
+    // Attach a rejection handler immediately because consumption may happen
+    // after the network request has already failed.
+    void request.catch(() => undefined);
+    cachedCalmQuestionRef.current = { stage, request };
   }
 
   function updateVivaSummaryInBackground(latestQA: QA, stateSnapshot: VivaTurnState) {
@@ -477,13 +513,13 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       });
   }
 
-  async function next(userAnswer: string, exit = false): Promise<VivaApiResponse> {
+  async function next(userAnswer: string, exit = false, elapsedSec = 0): Promise<VivaApiResponse> {
     try {
       if (selectedMode === "fast") {
         return await nextFast(userAnswer, exit);
       }
 
-      return await nextCalm(userAnswer, exit);
+      return await nextCalm(userAnswer, exit, elapsedSec);
     } catch (err) {
       console.error("Viva engine error:", err);
 
@@ -540,6 +576,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     summaryUpdateInFlightRef.current = false;
     pendingSummaryQARef.current = null;
     calmStageQuestionCountRef.current = 0;
+    cachedCalmQuestionRef.current = null;
     vivaTurnStateRef.current = {
       summary: "",
       currentStage: "assessment",
@@ -561,5 +598,6 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     getCurrentFastQuestion,
     getCurrentFastQuestionKeywordProgress,
     doesAnswerMatchCurrentFastQuestion,
+    prefetchNextCalmPhase,
   };
 }

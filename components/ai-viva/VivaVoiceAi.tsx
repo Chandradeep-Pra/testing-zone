@@ -13,10 +13,12 @@ import ReadyOverlay from "./ReadyOverlay";
 import { useCountdown } from "./useCountdown";
 import ChatTimeline from "./ChatTimeline";
 import { useLiveAvatar } from "./useLiveAvatar";
+import CalmPhaseGuide from "./CalmPhaseGuide";
 
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
+import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
 
 type VivaMode = "calm" | "fast";
 type QaHistoryItem = { question?: string; answer?: string };
@@ -96,6 +98,7 @@ export default function VivaVoiceAi({
     doesAnswerMatchCurrentFastQuestion,
     getCurrentFastQuestionKeywordProgress,
     getHistory,
+    prefetchNextCalmPhase,
   } = useVivaEngine(vivaCase, selectedMode);
 
   useEffect(() => {
@@ -166,8 +169,7 @@ export default function VivaVoiceAi({
     ? getCurrentFastQuestionKeywordProgress(candidateTranscript)
     : { matchedKeywords: [], totalKeywords: 0, allMatched: false };
 
-  const vivaDurationMinutes = vivaCase.viva_rules?.max_duration_minutes || 10;
-  const vivaDurationSec = vivaDurationMinutes * 60;
+  const vivaDurationSec = CALM_VIVA_TOTAL_DURATION_SEC;
   const countdownRunning = (isFastMode ? fastTimerStarted : vivaStarted) && !ending;
   const countdownTotal = isFastMode ? fastModeTotalDurationSec : vivaDurationSec;
 
@@ -231,12 +233,24 @@ export default function VivaVoiceAi({
         return;
       }
 
-      if (isFastMode) {
-        void concludeVivaFromTimer();
-      }
+      void concludeVivaFromTimer();
     },
     isFastMode ? `fast-total-timer-${fastTimerResetKey}` : vivaDurationSec
   );
+  const elapsedSec = Math.max(0, countdownTotal - (minutes * 60 + seconds));
+  const calmPhaseTiming = getCalmPhaseTiming(elapsedSec);
+
+  useEffect(() => {
+    if (isFastMode || !vivaStarted || ending) return;
+    prefetchNextCalmPhase(elapsedSec);
+  }, [
+    calmPhaseTiming.phase,
+    elapsedSec,
+    isFastMode,
+    vivaStarted,
+    ending,
+    prefetchNextCalmPhase,
+  ]);
 
   const fillers = [
     "Okay, let us continue further",
@@ -474,23 +488,6 @@ export default function VivaVoiceAi({
   );
 
   useEffect(() => {
-    if (isFastMode || !vivaStarted || ending) return;
-
-    const remaining = minutes * 60 + seconds;
-
-    if (remaining === 20 && !endingRef.current) {
-      endingRef.current = true;
-
-      speakAsExaminer(
-        "Thank you. We are concluding the viva now. Generating your score.",
-        async () => {
-          await endViva();
-        }
-      );
-    }
-  }, [isFastMode, minutes, seconds, vivaStarted, ending]);
-
-  useEffect(() => {
     if (
       !isFastMode ||
       !vivaStarted ||
@@ -549,7 +546,7 @@ export default function VivaVoiceAi({
   }
 
   async function askNextQuestion(userAnswer: string) {
-    const data = await next(userAnswer);
+    const data = await next(userAnswer, false, elapsedSec);
 
     if (fillerTimeoutRef.current) {
       clearTimeout(fillerTimeoutRef.current);
@@ -616,7 +613,7 @@ export default function VivaVoiceAi({
     syncCandidateMessage(finalAnswer, false);
 
     try {
-      await next(finalAnswer, true);
+      await next(finalAnswer, true, elapsedSec);
     } catch (error) {
       console.error("Error concluding viva on timer:", error);
     }
@@ -930,6 +927,13 @@ export default function VivaVoiceAi({
           </div>
         </div>
       </div>
+
+      {!isFastMode && vivaStarted && (
+        <CalmPhaseGuide
+          activePhase={calmPhaseTiming.phase}
+          remainingInPhaseSec={calmPhaseTiming.remainingInPhaseSec}
+        />
+      )}
 
       <div className="min-h-0 flex-1 p-3 sm:p-4 md:p-5">
         <div className="h-full min-h-0">
