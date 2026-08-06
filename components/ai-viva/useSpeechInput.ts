@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { normalizeMedicalTranscript, type MedicalTerm } from "@/lib/medical-terminology";
 
 type SttMessage = {
   transcript?: string;
@@ -21,7 +22,8 @@ export function useSpeechInput(
   onInterim: (text: string) => void,
   onFinal: (text: string) => void | Promise<void>,
   onSpeechEndedWithoutFinal?: () => void | Promise<void>,
-  getMicDeviceId?: () => string | undefined
+  getMicDeviceId?: () => string | undefined,
+  getMedicalTerminology?: () => MedicalTerm[],
 ) {
   const wsRef = useRef<WebSocket | null>(null);
   const transcriptBuffer = useRef("");
@@ -81,7 +83,10 @@ export function useSpeechInput(
 
       if (data.transcript) {
         if (data.final) {
-          const normalizedFinal = data.transcript.trim();
+          const normalizedFinal = normalizeMedicalTranscript(
+            data.transcript.trim(),
+            getMedicalTerminology?.() || [],
+          );
           if (normalizedFinal) {
             transcriptBuffer.current = [transcriptBuffer.current, normalizedFinal]
               .filter(Boolean)
@@ -92,7 +97,10 @@ export function useSpeechInput(
           interimTranscriptRef.current = "";
           onInterimRef.current(transcriptBuffer.current);
         } else {
-          interimTranscriptRef.current = data.transcript.trim();
+          interimTranscriptRef.current = normalizeMedicalTranscript(
+            data.transcript.trim(),
+            getMedicalTerminology?.() || [],
+          );
           const combinedTranscript = [transcriptBuffer.current, interimTranscriptRef.current]
             .filter(Boolean)
             .join(" ")
@@ -121,6 +129,11 @@ export function useSpeechInput(
 
     ws.onopen = () => {
       console.info("[Viva STT WebSocket] open");
+      const terminology = getMedicalTerminology?.() || [];
+      ws.send(JSON.stringify({
+        type: "configure",
+        phrases: terminology.flatMap((term) => [term.canonical, ...term.spokenVariants]).slice(0, 300),
+      }));
     };
 
     ws.onerror = (event) => {

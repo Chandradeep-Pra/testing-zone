@@ -69,10 +69,12 @@
 import { useRef, useState } from "react";
 
 import { appPath } from "@/lib/app-path";
+import type { MedicalTerm } from "@/lib/medical-terminology";
 
 type SpeechOptions = {
   voiceName?: string;
   languageCode?: string;
+  terminology?: MedicalTerm[];
 };
 
 export function useSpeechOutput() {
@@ -103,6 +105,7 @@ try {
       text,
       voiceName: options?.voiceName,
       languageCode: options?.languageCode,
+      terminology: options?.terminology,
     }),
   });
 

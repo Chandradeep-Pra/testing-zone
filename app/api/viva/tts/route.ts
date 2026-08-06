@@ -1,4 +1,5 @@
 import textToSpeech from "@google-cloud/text-to-speech";
+import { normalizeMedicalTerms, prepareTextForMedicalTts } from "@/lib/medical-terminology";
 
 type GoogleCredentials = {
   client_email: string;
@@ -10,6 +11,7 @@ type TtsRequestBody = {
   text: string;
   voiceName?: string;
   languageCode?: string;
+  terminology?: unknown;
 };
 
 function createTtsClient() {
@@ -47,10 +49,11 @@ function getTtsClient() {
 }
 
 export async function POST(req: Request) {
-  const { text, voiceName, languageCode } = (await req.json()) as TtsRequestBody;
+  const { text, voiceName, languageCode, terminology } = (await req.json()) as TtsRequestBody;
+  const spokenText = prepareTextForMedicalTts(text, normalizeMedicalTerms(terminology));
 
   const [response] = await getTtsClient().synthesizeSpeech({
-    input: { text },
+    input: { text: spokenText },
     voice: {
       languageCode: languageCode || "en-GB",
       name: voiceName || "en-GB-Chirp3-HD-Leda",

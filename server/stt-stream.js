@@ -38,6 +38,7 @@ wss.on("connection", (ws) => {
   let silenceTimer = null;
   let restartTimer = null;
   let streamClosed = false;
+  let speechPhrases = [];
 
   function send(data) {
 
@@ -67,11 +68,14 @@ wss.on("connection", (ws) => {
           audioChannelCount: 1,
           languageCode: "en-US",
 
-          model: "default",
+          model: process.env.GOOGLE_STT_MODEL || "medical_conversation",
           useEnhanced: true,
 
           enableAutomaticPunctuation: false,
           profanityFilter: false,
+          speechContexts: speechPhrases.length
+            ? [{ phrases: speechPhrases, boost: 18 }]
+            : undefined,
         },
 
         interimResults: true
@@ -158,6 +162,19 @@ wss.on("connection", (ws) => {
   -------------------------------------------------- */
 
   ws.on("message", (msg) => {
+
+    if (!Buffer.isBuffer(msg) || msg.length < 4096) {
+      try {
+        const payload = JSON.parse(msg.toString());
+        if (payload?.type === "configure" && Array.isArray(payload.phrases)) {
+          speechPhrases = [...new Set(payload.phrases.filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim()))].slice(0, 300);
+          console.log(`Configured ${speechPhrases.length} medical speech phrases`);
+          return;
+        }
+      } catch {
+        // Binary audio frames are expected after the optional config message.
+      }
+    }
 
     if (!recognizeStream || streamClosed) {
       startStream();

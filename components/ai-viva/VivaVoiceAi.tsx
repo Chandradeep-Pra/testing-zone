@@ -20,6 +20,7 @@ import type { VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
 import { CALM_PHASE_GUIDANCE } from "@/lib/viva-flow";
 import { appPath } from "@/lib/app-path";
+import { prepareTextForMedicalTts } from "@/lib/medical-terminology";
 
 type VivaMode = "calm" | "fast";
 type QaHistoryItem = { question?: string; answer?: string };
@@ -106,6 +107,7 @@ export default function VivaVoiceAi({
     getHistory,
     prefetchNextCalmPhase,
     prepareCalmCase,
+    getMedicalTerminology,
   } = useVivaEngine(vivaCase, selectedMode);
 
   useEffect(() => {
@@ -186,6 +188,7 @@ export default function VivaVoiceAi({
     return {
       voiceName: selectedExaminer.voiceName,
       languageCode: selectedExaminer.languageCode,
+      terminology: getMedicalTerminology(),
     };
   }
 
@@ -210,7 +213,10 @@ export default function VivaVoiceAi({
       try {
         await liveAvatar.stopListening();
         await liveAvatar.interrupt();
-        await liveAvatar.speakText(text, onEnd);
+        await liveAvatar.speakText(
+          prepareTextForMedicalTts(text, getMedicalTerminology()),
+          onEnd,
+        );
         return;
       } catch (err) {
         console.error("LiveAvatar speak failed:", err);
@@ -495,7 +501,8 @@ export default function VivaVoiceAi({
     async () => {
       await finalizeFastModeFromTranscriptFallback();
     },
-    () => selectedMicDeviceIdRef.current
+    () => selectedMicDeviceIdRef.current,
+    () => getMedicalTerminology(),
   );
 
   useEffect(() => {

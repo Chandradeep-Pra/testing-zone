@@ -7,6 +7,7 @@ import { appPath } from "@/lib/app-path";
 import { getStoredAuth } from "@/lib/urologics-auth";
 import type { VivaCaseRecord, VivaModeQuestion } from "@/lib/viva-case";
 import { getCalmPhaseAtElapsedSec, type ActiveCalmVivaPhase } from "@/lib/viva-flow";
+import { normalizeMedicalTerms, type MedicalTerm } from "@/lib/medical-terminology";
 
 type QA = { question: string; answer: string };
 type VivaMode = "calm" | "fast";
@@ -191,6 +192,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   const calmStageQuestionCountRef = useRef(0);
   const cachedCalmQuestionRef = useRef<CachedCalmQuestion | null>(null);
   const calmCaseStoryRef = useRef("");
+  const medicalTerminologyRef = useRef<MedicalTerm[]>([]);
   const vivaTurnStateRef = useRef<VivaTurnState>({
     summary: "",
     currentStage: "assessment",
@@ -423,8 +425,13 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       body: JSON.stringify({ vivaCase }),
     });
     if (!res.ok) throw new Error("Case preparation failed");
-    const data = (await res.json()) as { story?: unknown };
+    const data = (await res.json()) as { story?: unknown; terminology?: unknown };
     calmCaseStoryRef.current = typeof data.story === "string" ? data.story.slice(0, 6000) : "";
+    medicalTerminologyRef.current = normalizeMedicalTerms(data.terminology);
+  }
+
+  function getMedicalTerminology() {
+    return medicalTerminologyRef.current;
   }
 
   function updateVivaSummaryInBackground(latestQA: QA, stateSnapshot: VivaTurnState) {
@@ -548,6 +555,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     calmStageQuestionCountRef.current = 0;
     cachedCalmQuestionRef.current = null;
     calmCaseStoryRef.current = "";
+    medicalTerminologyRef.current = [];
     vivaTurnStateRef.current = {
       summary: "",
       currentStage: "assessment",
@@ -571,5 +579,6 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     doesAnswerMatchCurrentFastQuestion,
     prefetchNextCalmPhase,
     prepareCalmCase,
+    getMedicalTerminology,
   };
 }
