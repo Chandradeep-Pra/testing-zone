@@ -13,12 +13,12 @@ import ReadyOverlay from "./ReadyOverlay";
 import { useCountdown } from "./useCountdown";
 import ChatTimeline from "./ChatTimeline";
 import { useLiveAvatar } from "./useLiveAvatar";
-import CalmPhaseGuide from "./CalmPhaseGuide";
 
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
+import { CALM_PHASE_GUIDANCE } from "@/lib/viva-flow";
 
 type VivaMode = "calm" | "fast";
 type QaHistoryItem = { question?: string; answer?: string };
@@ -99,6 +99,7 @@ export default function VivaVoiceAi({
     getCurrentFastQuestionKeywordProgress,
     getHistory,
     prefetchNextCalmPhase,
+    prepareCalmCase,
   } = useVivaEngine(vivaCase, selectedMode);
 
   useEffect(() => {
@@ -165,6 +166,7 @@ export default function VivaVoiceAi({
   const [fastTimerStarted, setFastTimerStarted] = useState(false);
   const [fastTimerResetKey, setFastTimerResetKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [preparingCase, setPreparingCase] = useState(false);
 
   const fastKeywordProgress = isFastMode
     ? getCurrentFastQuestionKeywordProgress(candidateTranscript)
@@ -760,8 +762,13 @@ export default function VivaVoiceAi({
     selectedMicDeviceIdRef.current = micDeviceId;
     setReadyVisible(false);
     setThinking(true);
+    setPreparingCase(!isFastMode);
 
     try {
+      await prepareCalmCase().catch((error) => {
+        console.warn("Using the original case stem because preparation failed:", error);
+      });
+      setPreparingCase(false);
       const greeting = `Hello ${candidate.name}, welcome to the Urologics AI Examiner viva. Please wait while we prepare your session.`;
       setSelectedExaminer(examinerChoice);
       const stored = localStorage.getItem("candidateInfo");
@@ -786,6 +793,7 @@ export default function VivaVoiceAi({
       });
     } catch (error) {
       console.error("Error in greeting:", error);
+      setPreparingCase(false);
       setThinking(false);
     }
   }
@@ -862,6 +870,16 @@ export default function VivaVoiceAi({
         </div>
       )}
 
+      {preparingCase && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/95 backdrop-blur-sm">
+          <div className="rounded-[28px] border border-[#0f7896]/12 bg-white px-8 py-7 text-center shadow-[0_24px_60px_rgba(15,120,150,0.18)]">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-cyan-100 border-t-[#0f7896]" />
+            <p className="mt-4 text-lg font-semibold text-[#071014]">Getting case ready…</p>
+            <p className="mt-1 text-sm text-[#071014]/55">Preparing a consistent patient scenario</p>
+          </div>
+        </div>
+      )}
+
       {historyOpen && (
         <div className="pointer-events-none absolute bottom-[64px] right-0 top-[73px] z-40 flex w-full justify-end sm:bottom-[68px] md:top-[77px]">
           <div className="pointer-events-auto flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.16)]">
@@ -932,13 +950,7 @@ export default function VivaVoiceAi({
       </div>
 
       <div className="min-h-0 flex-1 p-3 sm:p-4 md:p-5">
-        <div className="flex h-full min-h-0 flex-col gap-3 lg:flex-row lg:gap-4">
-          {!isFastMode && vivaStarted && (
-            <CalmPhaseGuide
-              activePhase={calmPhaseTiming.phase}
-              remainingInPhaseSec={calmPhaseTiming.remainingInPhaseSec}
-            />
-          )}
+        <div className="flex h-full min-h-0">
           <div className="relative min-h-0 flex-1 overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
           <AiPanel
             amplitude={amplitude}
@@ -946,6 +958,8 @@ export default function VivaVoiceAi({
             thinking={thinking}
             transcript={transcript}
             keywordDetected={keywordDetected}
+            stageLabel={!isFastMode && vivaStarted ? CALM_PHASE_GUIDANCE[calmPhaseTiming.phase].title : undefined}
+            stageRemainingSec={!isFastMode && vivaStarted ? calmPhaseTiming.remainingInPhaseSec : undefined}
             avatarVideo={
               liveAvatar.isReady ? (
                 <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.28),_rgba(2,6,23,0.96))]">

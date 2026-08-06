@@ -238,6 +238,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   const pendingSummaryQARef = useRef<QA | null>(null);
   const calmStageQuestionCountRef = useRef(0);
   const cachedCalmQuestionRef = useRef<CachedCalmQuestion | null>(null);
+  const calmCaseStoryRef = useRef("");
   const vivaTurnStateRef = useRef<VivaTurnState>({
     summary: "",
     currentStage: "assessment",
@@ -423,6 +424,8 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
         currentStage: turnState.currentStage,
         coveredTopics: turnState.coveredTopics,
         weakAreas: turnState.weakAreas,
+        caseStory: calmCaseStoryRef.current,
+        askedQuestions: previousQARef.current.map((item) => item.question),
       }),
     });
 
@@ -463,6 +466,18 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     // after the network request has already failed.
     void request.catch(() => undefined);
     cachedCalmQuestionRef.current = { stage, request };
+  }
+
+  async function prepareCalmCase() {
+    if (selectedMode !== "calm") return;
+    const res = await fetch(appPath("/api/viva/prepareCase"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ vivaCase }),
+    });
+    if (!res.ok) throw new Error("Case preparation failed");
+    const data = (await res.json()) as { story?: unknown };
+    calmCaseStoryRef.current = typeof data.story === "string" ? data.story.slice(0, 6000) : "";
   }
 
   function updateVivaSummaryInBackground(latestQA: QA, stateSnapshot: VivaTurnState) {
@@ -585,6 +600,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     pendingSummaryQARef.current = null;
     calmStageQuestionCountRef.current = 0;
     cachedCalmQuestionRef.current = null;
+    calmCaseStoryRef.current = "";
     vivaTurnStateRef.current = {
       summary: "",
       currentStage: "assessment",
@@ -607,5 +623,6 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     getCurrentFastQuestionKeywordProgress,
     doesAnswerMatchCurrentFastQuestion,
     prefetchNextCalmPhase,
+    prepareCalmCase,
   };
 }

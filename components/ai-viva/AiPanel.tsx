@@ -11,6 +11,8 @@ type Props = {
   amplitude?: number;
   keywordDetected?: boolean;
   avatarVideo?: React.ReactNode;
+  stageLabel?: string;
+  stageRemainingSec?: number;
 };
 
 // const fillers = [
@@ -50,6 +52,8 @@ export function AiPanel({
   amplitude = 0,
   keywordDetected = false,
   avatarVideo,
+  stageLabel,
+  stageRemainingSec,
 }: Props) {
   const [filler, setFiller] = useState("");
   // Keep an investigation visible while the examiner asks the candidate to
@@ -121,6 +125,17 @@ export function AiPanel({
       {activeExhibit && (
         <div className="absolute inset-0 z-20 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6">
           {activeExhibit}
+        </div>
+      )}
+
+      {stageLabel && typeof stageRemainingSec === "number" && (
+        <div className="absolute bottom-5 left-5 z-30 flex items-center gap-2 rounded-full border border-white/15 bg-black/55 px-3.5 py-2 text-xs font-medium text-white shadow-lg backdrop-blur-xl">
+          <span className="h-2 w-2 rounded-full bg-orange-400" />
+          <span>{stageLabel}</span>
+          <span className="text-white/35">•</span>
+          <span className="font-mono text-cyan-200">
+            {Math.floor(stageRemainingSec / 60)}:{Math.max(0, stageRemainingSec % 60).toString().padStart(2, "0")}
+          </span>
         </div>
       )}
 

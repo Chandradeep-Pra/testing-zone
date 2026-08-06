@@ -25,6 +25,8 @@ type FollowupRequest = {
   currentStage?: string;
   coveredTopics?: string[];
   weakAreas?: string[];
+  caseStory?: string;
+  askedQuestions?: string[];
 };
 
 const PHASE_FALLBACK_QUESTIONS: Record<string, string[]> = {
@@ -145,6 +147,8 @@ export async function POST(req: NextRequest) {
     currentStage = "assessment",
     coveredTopics = [],
     weakAreas = [],
+    caseStory = "",
+    askedQuestions = [],
   } = (await req.json()) as FollowupRequest;
 
   const vivaCase = rawVivaCase ? normalizeVivaCase(rawVivaCase) : getDefaultVivaCase();
@@ -250,6 +254,12 @@ ${recentQA}
 Available exhibits:
 ${availableExhibits || "none"}
 
+Hidden patient narrative:
+${caseStory || "Use the case stem as the patient narrative."}
+
+Questions already asked:
+${askedQuestions.slice(-10).map((question, index) => `${index + 1}. ${question}`).join("\n") || "none"}
+
 -----------------------
 FEW-SHOT EXAMINER FLOW
 -----------------------
@@ -354,6 +364,11 @@ Examples:
 "What counselling would you provide?"
 
 End after follow-up unless unresolved safety concerns remain.
+
+The viva must feel like a clinical discussion about the same patient.
+Use the latest answer to challenge an assumption, test application, or explore the next uncovered issue.
+Never repeat, paraphrase, or reframe a question already listed under Questions already asked.
+Do not ask for the same list twice. If the candidate has answered adequately, advance the discussion within the current stage.
 
 -----------------------
 OUTPUT FORMAT
