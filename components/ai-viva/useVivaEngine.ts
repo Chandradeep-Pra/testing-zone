@@ -8,8 +8,14 @@ import { getStoredAuth } from "@/lib/urologics-auth";
 import type { VivaCaseRecord, VivaModeQuestion } from "@/lib/viva-case";
 import { getCalmPhaseAtElapsedSec, type ActiveCalmVivaPhase } from "@/lib/viva-flow";
 import { normalizeMedicalTerms, type MedicalTerm } from "@/lib/medical-terminology";
+import {
+  EMPTY_CLINICAL_STATE,
+  mergeClinicalState,
+  normalizeClinicalEvaluation,
+  type VivaClinicalState,
+} from "@/lib/viva-clinical-state";
 
-type QA = { question: string; answer: string };
+type QA = { question: string; answer: string; stage?: ActiveCalmVivaPhase };
 type VivaMode = "calm" | "fast";
 type VivaTurnState = {
   summary: string;
@@ -193,6 +199,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   const cachedCalmQuestionRef = useRef<CachedCalmQuestion | null>(null);
   const calmCaseStoryRef = useRef("");
   const medicalTerminologyRef = useRef<MedicalTerm[]>([]);
+  const clinicalStateRef = useRef<VivaClinicalState>({ ...EMPTY_CLINICAL_STATE });
   const vivaTurnStateRef = useRef<VivaTurnState>({
     summary: "",
     currentStage: "assessment",
@@ -306,6 +313,13 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
         ? { ...history[history.length - 1] }
         : null;
 
+    if (latestAnsweredQA) {
+      await evaluateCalmAnswer(
+        latestAnsweredQA,
+        latestAnsweredQA.stage || vivaTurnStateRef.current.currentStage,
+      );
+    }
+
     const timedStage = getCalmPhaseAtElapsedSec(elapsedSec);
     if (timedStage !== vivaTurnStateRef.current.currentStage) {
       vivaTurnStateRef.current = {
@@ -319,7 +333,12 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     const recentHistory = exit ? history : history.slice(-1);
     const cachedQuestion = cachedCalmQuestionRef.current;
     const canUseCachedQuestion =
-      !exit && cachedQuestion?.stage === currentTurnState.currentStage;
+      !exit &&
+      cachedQuestion?.stage === currentTurnState.currentStage &&
+      (!latestAnsweredQA || clinicalStateRef.current.recommendedAction === "advance_topic");
+    if (cachedQuestion && !canUseCachedQuestion && cachedQuestion.stage === currentTurnState.currentStage) {
+      cachedCalmQuestionRef.current = null;
+    }
     let data: VivaApiResponse;
     if (canUseCachedQuestion) {
       try {
@@ -343,6 +362,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       history.push({
         question: data.question,
         answer: "",
+        stage: currentTurnState.currentStage,
       });
       calmStageQuestionCountRef.current += 1;
     }
@@ -375,6 +395,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
         weakAreas: turnState.weakAreas,
         caseStory: calmCaseStoryRef.current,
         askedQuestions: previousQARef.current.map((item) => item.question),
+        clinicalState: clinicalStateRef.current,
       }),
     });
 
@@ -432,6 +453,31 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
 
   function getMedicalTerminology() {
     return medicalTerminologyRef.current;
+  }
+
+  async function evaluateCalmAnswer(qa: QA, stage: ActiveCalmVivaPhase) {
+    try {
+      const res = await fetch(appPath("/api/viva/evaluateAnswer"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vivaCase,
+          caseStory: calmCaseStoryRef.current,
+          stage,
+          question: qa.question,
+          answer: qa.answer,
+          clinicalState: clinicalStateRef.current,
+        }),
+      });
+      if (!res.ok) throw new Error("Answer evaluation failed");
+      const data = (await res.json()) as { evaluation?: unknown };
+      clinicalStateRef.current = mergeClinicalState(
+        clinicalStateRef.current,
+        normalizeClinicalEvaluation(data.evaluation),
+      );
+    } catch (error) {
+      console.warn("Clinical answer evaluation skipped:", error);
+    }
   }
 
   function updateVivaSummaryInBackground(latestQA: QA, stateSnapshot: VivaTurnState) {
@@ -556,6 +602,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     cachedCalmQuestionRef.current = null;
     calmCaseStoryRef.current = "";
     medicalTerminologyRef.current = [];
+    clinicalStateRef.current = { ...EMPTY_CLINICAL_STATE };
     vivaTurnStateRef.current = {
       summary: "",
       currentStage: "assessment",

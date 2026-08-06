@@ -15,6 +15,11 @@ import {
   getVivaStage,
   parseFollowupResponse,
 } from "@/lib/viva-followup";
+import {
+  EMPTY_CLINICAL_STATE,
+  getDeterministicDiscussionInstruction,
+  type VivaClinicalState,
+} from "@/lib/viva-clinical-state";
 
 type FollowupRequest = {
   previousQA: Array<{ question: string; answer: string }>;
@@ -27,6 +32,7 @@ type FollowupRequest = {
   weakAreas?: string[];
   caseStory?: string;
   askedQuestions?: string[];
+  clinicalState?: VivaClinicalState;
 };
 
 const PHASE_FALLBACK_QUESTIONS: Record<string, string[]> = {
@@ -85,9 +91,33 @@ function questionsAreSimilar(left: string, right: string) {
   return shared / Math.min(leftTokens.size, rightTokens.size) >= 0.6;
 }
 
-function getPhaseFallbackQuestion(stage: string, askedQuestions: string[], latestAnswer = "") {
+function getPhaseFallbackQuestion(
+  stage: string,
+  askedQuestions: string[],
+  latestAnswer = "",
+  clinicalState: VivaClinicalState = EMPTY_CLINICAL_STATE,
+) {
   const candidates = PHASE_FALLBACK_QUESTIONS[stage] || PHASE_FALLBACK_QUESTIONS.assessment;
   const normalizedAnswer = latestAnswer.toLowerCase();
+
+  const stateChallenges = [
+    clinicalState.unsafeClaims[0]
+      ? `You proposed ${clinicalState.unsafeClaims[0]}. How would you make that plan safe?`
+      : "",
+    clinicalState.incorrectClaims[0]
+      ? `What clinical evidence supports ${clinicalState.incorrectClaims[0]} in this patient?`
+      : "",
+    clinicalState.incompleteClaims[0]
+      ? `Can you clarify ${clinicalState.incompleteClaims[0]} for this patient?`
+      : "",
+    clinicalState.nextDiscussionTarget
+      ? `How would you approach ${clinicalState.nextDiscussionTarget} in this patient?`
+      : "",
+  ].filter(Boolean);
+  const unusedChallenge = stateChallenges.find(
+    (question) => !askedQuestions.some((asked) => questionsAreSimilar(question, asked)),
+  );
+  if (unusedChallenge) return unusedChallenge;
 
   if (
     stage === "investigations" &&
@@ -98,11 +128,18 @@ function getPhaseFallbackQuestion(stage: string, askedQuestions: string[], lates
     if (!askedQuestions.some((asked) => questionsAreSimilar(challenge, asked))) return challenge;
   }
 
-  return (
-    candidates.find(
-      (question) => !askedQuestions.some((asked) => questionsAreSimilar(question, asked)),
-    ) || "Please summarise your current clinical conclusion for this patient."
+  const phaseQuestion = candidates.find(
+    (question) => !askedQuestions.some((asked) => questionsAreSimilar(question, asked)),
   );
+  if (phaseQuestion) return phaseQuestion;
+
+  // Never fall back to a fixed question that may already have been asked.
+  // If a phase has been exhausted, move the discussion forward using an
+  // unused question from the remaining viva rather than rephrasing a topic.
+  const unusedQuestion = Object.values(PHASE_FALLBACK_QUESTIONS)
+    .flat()
+    .find((question) => !askedQuestions.some((asked) => questionsAreSimilar(question, asked)));
+  return unusedQuestion || "What remaining safety-netting advice is most important for this patient?";
 }
 
 function ensureDiscussionQuestion(params: {
@@ -110,6 +147,7 @@ function ensureDiscussionQuestion(params: {
   stage: string;
   askedQuestions: string[];
   latestAnswer: string;
+  clinicalState: VivaClinicalState;
 }) {
   const repeated = params.askedQuestions.some((asked) =>
     questionsAreSimilar(params.response.question, asked),
@@ -121,6 +159,7 @@ function ensureDiscussionQuestion(params: {
       params.stage,
       params.askedQuestions,
       params.latestAnswer,
+      params.clinicalState,
     ),
     imageUsed: false,
     imageLink: null,
@@ -158,7 +197,9 @@ function attachRequestedExhibit(params: {
     /\b(exhibit|image|scan|film|x-?ray|ct|mri|ultrasound|urogram|report)\b/i.test(
       params.response.question,
     );
-  const exhibit = linked || ((params.response.imageUsed || requestsInterpretation) ? available[0] : undefined);
+  // Exhibit sequencing is application-controlled: present each available case
+  // exhibit once during investigations, independent of model URL formatting.
+  const exhibit = linked || available[0];
   if (!exhibit) return params.response;
 
   const imageLink = exhibit.url || (exhibit.file ? `/exhibits/${exhibit.file}` : null);
@@ -169,8 +210,10 @@ function attachRequestedExhibit(params: {
     .replace(/\b(?:the|this|an?)\s+exhibit\b/gi, `this ${displayName}`)
     .replace(/\bexhibit\b/gi, displayName);
 
-  if (requestsInterpretation && !question.toLowerCase().includes(displayName.toLowerCase())) {
-    question = `Please interpret this ${displayName}.`;
+  if (!requestsInterpretation || !question.toLowerCase().includes(displayName.toLowerCase())) {
+    question = params.shownExhibitIds.length === 0
+      ? `I am showing you the ${displayName}. Please describe the key findings and explain their clinical significance.`
+      : `Now review the ${displayName}. How does it change your working diagnosis and immediate next step?`;
   }
 
   return {
@@ -220,6 +263,7 @@ export async function POST(req: NextRequest) {
     weakAreas = [],
     caseStory = "",
     askedQuestions = [],
+    clinicalState = EMPTY_CLINICAL_STATE,
   } = (await req.json()) as FollowupRequest;
 
   const vivaCase = rawVivaCase ? normalizeVivaCase(rawVivaCase) : getDefaultVivaCase();
@@ -285,6 +329,7 @@ Return JSON only.
   const stage = getVivaStage(currentStage);
   const referenceText = `${vivaSummary}\n${recentQA}`;
   const phaseContext = formatPhaseContext({ stage, config: calmConfig, referenceText });
+  const discussionInstruction = getDeterministicDiscussionInstruction(stage, clinicalState);
 
   const prompt = `
 You are an experienced FRCS (Urology) viva examiner.
@@ -329,8 +374,14 @@ ${availableExhibits || "none"}
 Hidden patient narrative:
 ${caseStory || "Use the case stem as the patient narrative."}
 
-Questions already asked:
-${askedQuestions.slice(-10).map((question, index) => `${index + 1}. ${question}`).join("\n") || "none"}
+Questions already asked (absolute exclusion list):
+${askedQuestions.map((question, index) => `${index + 1}. ${question}`).join("\n") || "none"}
+
+Structured clinical state:
+${JSON.stringify(clinicalState)}
+
+Controller decision:
+${discussionInstruction}
 
 -----------------------
 FEW-SHOT EXAMINER FLOW
@@ -438,8 +489,10 @@ Examples:
 End after follow-up unless unresolved safety concerns remain.
 
 The viva must feel like a clinical discussion about the same patient.
+Follow the Controller decision above. It has priority over the example questions.
 Use the latest answer to challenge an assumption, test application, or explore the next uncovered issue.
 Never repeat, paraphrase, or reframe a question already listed under Questions already asked.
+Treat the exclusion list as a hard constraint. Choose a genuinely new clinical target; changing wording does not make a question new.
 Do not ask for the same list twice. If the candidate has answered adequately, advance the discussion within the current stage.
 
 -----------------------
@@ -470,6 +523,7 @@ No additional text.
       stage,
       askedQuestions,
       latestAnswer: previousQA.at(-1)?.answer || "",
+      clinicalState,
     });
     return NextResponse.json(
       attachRequestedExhibit({
@@ -489,6 +543,7 @@ No additional text.
           stage,
           askedQuestions,
           previousQA.at(-1)?.answer || "",
+          clinicalState,
         ),
         imageUsed: false,
         imageLink: null,
