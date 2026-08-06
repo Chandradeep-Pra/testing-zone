@@ -29,7 +29,7 @@ type FollowupRequest = {
 
 const PHASE_FALLBACK_QUESTIONS: Record<string, string[]> = {
   assessment: [
-    "Using SRAM, what focused history would you take?",
+    "What additional history would you obtain?",
     "What relevant examination would you perform?",
   ],
   investigations: [
@@ -54,6 +54,60 @@ function getPhaseFallbackQuestion(stage: string, previousQA: FollowupRequest["pr
   const candidates = PHASE_FALLBACK_QUESTIONS[stage] || PHASE_FALLBACK_QUESTIONS.assessment;
   const asked = new Set(previousQA.map((item) => item.question.trim().toLowerCase()));
   return candidates.find((question) => !asked.has(question.toLowerCase())) || candidates[0];
+}
+
+function getExhibitDisplayName(label: string, kind: string) {
+  const cleaned = label.trim().replace(/^(the|an?|exhibit)\s+/i, "");
+  if (cleaned && !/^exhibit\s*\d*$/i.test(cleaned)) return cleaned;
+  return kind.toLowerCase().includes("image") ? "image" : cleaned || "image";
+}
+
+function attachRequestedExhibit(params: {
+  response: ReturnType<typeof parseFollowupResponse>;
+  vivaCase: VivaCaseRecord;
+  shownExhibitIds: string[];
+  stage: string;
+}) {
+  if (params.stage !== "investigations") return params.response;
+
+  const shown = new Set(params.shownExhibitIds.map((id) => id.toLowerCase()));
+  const available = params.vivaCase.exhibits.filter(
+    (item) => !shown.has(item.id.toLowerCase()),
+  );
+  const linked = params.response.imageLink
+    ? available.find((item) => {
+        const link = item.url || (item.file ? `/exhibits/${item.file}` : null);
+        return link === params.response.imageLink;
+      })
+    : undefined;
+  const requestsInterpretation =
+    /\b(interpret|describe|review|findings?)\b/i.test(params.response.question) &&
+    /\b(exhibit|image|scan|film|x-?ray|ct|mri|ultrasound|urogram|report)\b/i.test(
+      params.response.question,
+    );
+  const exhibit = linked || ((params.response.imageUsed || requestsInterpretation) ? available[0] : undefined);
+  if (!exhibit) return params.response;
+
+  const imageLink = exhibit.url || (exhibit.file ? `/exhibits/${exhibit.file}` : null);
+  if (!imageLink) return params.response;
+
+  const displayName = getExhibitDisplayName(exhibit.label, exhibit.kind);
+  let question = params.response.question
+    .replace(/\b(?:the|this|an?)\s+exhibit\b/gi, `this ${displayName}`)
+    .replace(/\bexhibit\b/gi, displayName);
+
+  if (requestsInterpretation && !question.toLowerCase().includes(displayName.toLowerCase())) {
+    question = `Please interpret this ${displayName}.`;
+  }
+
+  return {
+    ...params.response,
+    question,
+    imageUsed: true,
+    imageLink,
+    imageDescription: exhibit.description || null,
+    imageId: exhibit.id,
+  };
 }
 
 async function generateFollowupText(prompt: string) {
@@ -324,7 +378,15 @@ No additional text.
     const rawText = await generateFollowupText(prompt);
     const text = cleanFollowupResponse(rawText);
 
-    return NextResponse.json(parseFollowupResponse(text, vivaCase));
+    const parsed = parseFollowupResponse(text, vivaCase);
+    return NextResponse.json(
+      attachRequestedExhibit({
+        response: parsed,
+        vivaCase,
+        shownExhibitIds,
+        stage,
+      }),
+    );
 
   } catch (error) {
     console.error("Viva generation error:", error);

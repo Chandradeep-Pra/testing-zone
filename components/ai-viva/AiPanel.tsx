@@ -52,7 +52,9 @@ export function AiPanel({
   avatarVideo,
 }: Props) {
   const [filler, setFiller] = useState("");
-  const activeExhibit = !speaking && !thinking ? exhibit : null;
+  // Keep an investigation visible while the examiner asks the candidate to
+  // interpret it. Previously it was hidden for the entire spoken question.
+  const activeExhibit = exhibit;
 
   useEffect(() => {
     if (!thinking || speaking) {

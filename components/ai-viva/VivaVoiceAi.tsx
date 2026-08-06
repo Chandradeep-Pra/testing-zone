@@ -931,16 +931,15 @@ export default function VivaVoiceAi({
         </div>
       </div>
 
-      {!isFastMode && vivaStarted && (
-        <CalmPhaseGuide
-          activePhase={calmPhaseTiming.phase}
-          remainingInPhaseSec={calmPhaseTiming.remainingInPhaseSec}
-        />
-      )}
-
       <div className="min-h-0 flex-1 p-3 sm:p-4 md:p-5">
-        <div className="h-full min-h-0">
-          <div className="relative h-full min-h-0 overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
+        <div className="flex h-full min-h-0 flex-col gap-3 lg:flex-row lg:gap-4">
+          {!isFastMode && vivaStarted && (
+            <CalmPhaseGuide
+              activePhase={calmPhaseTiming.phase}
+              remainingInPhaseSec={calmPhaseTiming.remainingInPhaseSec}
+            />
+          )}
+          <div className="relative min-h-0 flex-1 overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
           <AiPanel
             amplitude={amplitude}
             speaking={examinerSpeaking}

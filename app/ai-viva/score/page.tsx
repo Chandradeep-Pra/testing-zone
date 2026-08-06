@@ -6,7 +6,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  ShieldCheck,
+  MessageSquareText,
   Target,
   Trophy,
   AlertTriangle,
@@ -35,8 +35,30 @@ interface Report {
   improvementPlan: string[];
 }
 
-function buildConversationFromQaHistory(history = []) {
-  return history.flatMap((item: { question?: string; answer?: string }) => {
+interface QaHistoryItem {
+  question: string;
+  answer: string;
+}
+
+function normalizeQaHistory(value: unknown): QaHistoryItem[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const source = item as { question?: unknown; answer?: unknown };
+      const question = typeof source.question === "string" ? source.question.trim() : "";
+      if (!question) return null;
+      return {
+        question,
+        answer: typeof source.answer === "string" ? source.answer.trim() : "",
+      };
+    })
+    .filter((item): item is QaHistoryItem => Boolean(item));
+}
+
+function buildConversationFromQaHistory(history: QaHistoryItem[] = []) {
+  return history.flatMap((item) => {
     const entries = [];
 
     if (item.question?.trim()) {
@@ -62,6 +84,7 @@ function buildConversationFromQaHistory(history = []) {
 export default function ReviewPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [qaHistory, setQaHistory] = useState<QaHistoryItem[]>([]);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("viva-final-score");
@@ -114,7 +137,8 @@ export default function ReviewPage() {
         }
 
         const parsed = JSON.parse(storedCandidate);
-        const qaHistory = Array.isArray(parsed.qaHistory) ? parsed.qaHistory : [];
+        const qaHistory = normalizeQaHistory(parsed.qaHistory);
+        setQaHistory(qaHistory);
         parsed.report = finalReport;
         if (!Array.isArray(parsed.conversation) || parsed.conversation.length === 0) {
           parsed.conversation = buildConversationFromQaHistory(qaHistory);
@@ -269,6 +293,49 @@ export default function ReviewPage() {
                 <Badge key={i} className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-4 py-2 text-[#071014]">
                   {item}
                 </Badge>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {qaHistory.length > 0 && (
+          <section className="urologics-panel overflow-hidden">
+            <div className="border-b border-[#0f7896]/12 bg-cyan-50/70 px-5 py-5 sm:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#0f7896] text-white">
+                    <MessageSquareText size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-semibold text-[#071014]">Questions and Answers</h2>
+                    <p className="mt-0.5 text-xs text-[#071014]/55">Your complete viva discussion</p>
+                  </div>
+                </div>
+                <Badge className="rounded-full border border-[#0f7896]/15 bg-white px-3 py-1.5 text-[#0f7896]">
+                  {qaHistory.length} {qaHistory.length === 1 ? "question" : "questions"}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-4 sm:p-6">
+              {qaHistory.map((item, index) => (
+                <article key={`${index}-${item.question}`} className="overflow-hidden rounded-2xl border border-[#0f7896]/12 bg-white">
+                  <div className="flex gap-3 bg-slate-50/80 px-4 py-4 sm:px-5">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#0f7896] text-xs font-semibold text-white">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#0f7896]">Examiner</p>
+                      <p className="mt-1.5 text-sm font-medium leading-6 text-[#071014]">{item.question}</p>
+                    </div>
+                  </div>
+                  <div className="border-t border-[#0f7896]/10 px-4 py-4 sm:px-5 sm:pl-[4.25rem]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-orange-600">Your answer</p>
+                    <p className={`mt-1.5 whitespace-pre-wrap text-sm leading-6 ${item.answer ? "text-[#071014]/75" : "italic text-[#071014]/40"}`}>
+                      {item.answer || "No answer recorded"}
+                    </p>
+                  </div>
+                </article>
               ))}
             </div>
           </section>

@@ -65,7 +65,7 @@ export const CALM_PHASE_GUIDANCE: Record<
   assessment: {
     title: "Assessment",
     shortTime: "1 min 30 sec",
-    explainer: "Take a focused patient history using SRAM, then describe the relevant examination.",
+    explainer: "Take a focused history covering the key clinical domains, then describe the relevant examination.",
     prompts: ["Symptoms", "Risk factors", "Associated symptoms", "Medical and surgical history", "Relevant examination"],
   },
   investigations: {
