@@ -27,6 +27,48 @@ type FollowupRequest = {
   weakAreas?: string[];
 };
 
+const PHASE_FALLBACK_QUESTIONS: Record<string, string[]> = {
+  assessment: [
+    "Using SRAM, what focused history would you take?",
+    "What relevant examination would you perform?",
+  ],
+  investigations: [
+    "What are the key findings on the available investigation?",
+    "What diagnostic possibilities do these results suggest?",
+  ],
+  management: [
+    "What medical, lifestyle, or surgical treatment would you recommend?",
+    "What are the advantages and disadvantages of the alternatives?",
+  ],
+  complications: [
+    "Which treatment complications would you discuss, including their approximate incidence?",
+    "How would you manage those complications medically or surgically?",
+  ],
+  follow_up: [
+    "How would you follow this patient after treatment?",
+    "What would prompt an earlier review?",
+  ],
+};
+
+const PHASE_EXAMINER_FOCUS: Record<string, string> = {
+  assessment:
+    "Cover SRAM: symptoms, risk factors, associated symptoms, medical/surgical history, then relevant examination.",
+  investigations:
+    "Cover image findings or case-relevant blood/urine tests, then ask what diagnoses or differentials the results suggest.",
+  management:
+    "Cover relevant medical, lifestyle and surgical treatments, advantages/disadvantages of alternatives, and expected outcomes.",
+  complications:
+    "Cover treatment complications, their approximate percentage/incidence, and medical or surgical management.",
+  follow_up:
+    "Cover review timing, surveillance tests, safety-netting, and triggers for earlier review.",
+};
+
+function getPhaseFallbackQuestion(stage: string, previousQA: FollowupRequest["previousQA"]) {
+  const candidates = PHASE_FALLBACK_QUESTIONS[stage] || PHASE_FALLBACK_QUESTIONS.assessment;
+  const asked = new Set(previousQA.map((item) => item.question.trim().toLowerCase()));
+  return candidates.find((question) => !asked.has(question.toLowerCase())) || candidates[0];
+}
+
 async function generateFollowupText(prompt: string) {
   const generation = geminiModel.generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -139,6 +181,7 @@ Covered: ${coveredTopics.slice(-6).join(", ") || "none"}
 Safety gaps: ${weakAreas.slice(-6).join(", ") || "none"}
 
 Phase context: ${phaseContext}
+Required phase focus: ${PHASE_EXAMINER_FOCUS[stage] || PHASE_EXAMINER_FOCUS.assessment}
 Recent exchange: ${recentQA}
 Available exhibits: ${availableExhibits || "none"}
 
@@ -173,7 +216,12 @@ No markdown, quotes, braces, commas, or extra lines. Use false and null when no 
     console.error("Viva generation error:", error);
 
     return NextResponse.json(
-      { question: "Please summarise your next clinical step." },
+      {
+        question: getPhaseFallbackQuestion(stage, previousQA),
+        imageUsed: false,
+        imageLink: null,
+        imageDescription: null,
+      },
       { status: 200 }
     );
   }

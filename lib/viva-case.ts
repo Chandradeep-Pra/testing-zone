@@ -195,22 +195,22 @@ function normalizeModeQuestion(
 
 const DEFAULT_CALM_PHASES: CalmAndComposedConfig["phases"] = {
   assessment: {
-    objectives: ["presenting symptoms", "risk factors", "medical and surgical history", "clinical examination"],
+    objectives: ["symptoms", "risk factors", "associated symptoms", "medical and surgical history", "relevant clinical examination"],
     criticalTopics: [],
     maxPrimaryQuestions: 2,
   },
   investigations: {
-    objectives: ["appropriate investigations", "interpretation", "clinical relevance"],
+    objectives: ["image findings", "case-relevant blood urine or other tests", "interpretation of results", "diagnostic possibilities and differentials"],
     criticalTopics: [],
     maxPrimaryQuestions: 3,
   },
   management: {
-    objectives: ["treatment options", "treatment recommendation", "advantages and disadvantages"],
+    objectives: ["medical lifestyle and surgical treatment options", "case-specific treatment recommendation", "advantages and disadvantages of alternatives", "treatment outcomes"],
     criticalTopics: ["safe management"],
     maxPrimaryQuestions: 3,
   },
   complications: {
-    objectives: ["important complications", "recognition or management of complications"],
+    objectives: ["important treatment complications", "percentage or approximate incidence", "medical or surgical management of complications"],
     criticalTopics: [],
     maxPrimaryQuestions: 2,
   },

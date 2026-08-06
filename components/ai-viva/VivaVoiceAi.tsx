@@ -149,6 +149,7 @@ export default function VivaVoiceAi({
   const answerPrefixRef = useRef("");
   const messagesRef = useRef<CandidateConversationMessage[]>([]);
   const selectedMicDeviceIdRef = useRef<string | undefined>(undefined);
+  const prefetchedPhaseRef = useRef("assessment");
 
   const [readyVisible, setReadyVisible] = useState(true);
   const [ending, setEnding] = useState(false);
@@ -242,6 +243,8 @@ export default function VivaVoiceAi({
 
   useEffect(() => {
     if (isFastMode || !vivaStarted || ending) return;
+    if (prefetchedPhaseRef.current === calmPhaseTiming.phase) return;
+    prefetchedPhaseRef.current = calmPhaseTiming.phase;
     prefetchNextCalmPhase(elapsedSec);
   }, [
     calmPhaseTiming.phase,

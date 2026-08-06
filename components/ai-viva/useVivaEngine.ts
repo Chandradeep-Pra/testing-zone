@@ -445,7 +445,15 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       ...vivaTurnStateRef.current,
       currentStage: stage,
     });
-    const request = requestCalmQuestion(stateSnapshot, []).catch((error) => {
+    // Include the active question so the API does not mistake this background
+    // request for the first turn of a brand-new viva. Its answer may still be
+    // blank; the question itself provides enough context for a phase transition.
+    const activeQuestionContext = previousQARef.current.slice(-1).map((item) => ({
+      ...item,
+    }));
+    if (!activeQuestionContext.length) return;
+
+    const request = requestCalmQuestion(stateSnapshot, activeQuestionContext).catch((error) => {
       if (cachedCalmQuestionRef.current?.request === request) {
         cachedCalmQuestionRef.current = null;
       }
