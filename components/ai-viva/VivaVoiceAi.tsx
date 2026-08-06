@@ -19,6 +19,7 @@ import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
 import { CALM_PHASE_GUIDANCE } from "@/lib/viva-flow";
+import { appPath } from "@/lib/app-path";
 
 type VivaMode = "calm" | "fast";
 type QaHistoryItem = { question?: string; answer?: string };
@@ -74,6 +75,11 @@ function buildConversationFromQaHistory(history: QaHistoryItem[]) {
 
     return entries;
   });
+}
+
+function resolveExhibitSrc(src: string) {
+  if (/^https?:\/\//i.test(src) || src.startsWith("/web/")) return src;
+  return src.startsWith("/") ? appPath(src) : src;
 }
 
 export default function VivaVoiceAi({
@@ -580,7 +586,7 @@ export default function VivaVoiceAi({
             {
               id: crypto.randomUUID(),
               role: "image" as const,
-              src: data.imageLink,
+              src: resolveExhibitSrc(data.imageLink),
               description: data.imageDescription || undefined,
             },
           ]
@@ -695,7 +701,7 @@ export default function VivaVoiceAi({
               {
                 id: crypto.randomUUID(),
                 role: "image" as const,
-                src: data.imageLink,
+                src: resolveExhibitSrc(data.imageLink),
                 description: data.imageDescription || undefined,
               },
             ]

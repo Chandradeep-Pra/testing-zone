@@ -31,31 +31,102 @@ type FollowupRequest = {
 
 const PHASE_FALLBACK_QUESTIONS: Record<string, string[]> = {
   assessment: [
-    "What additional history would you obtain?",
-    "What relevant examination would you perform?",
+    "Which features in this history increase the risk of malignancy?",
+    "What important associated symptoms would you clarify?",
+    "Which examination findings would change your immediate approach?",
+    "How do his comorbidities and medication affect your assessment?",
+    "What is your clinical problem representation for this patient?",
   ],
   investigations: [
-    "What are the key findings on the available investigation?",
-    "What diagnostic possibilities do these results suggest?",
+    "What is your working diagnosis based on these findings?",
+    "Which differential diagnoses remain after these findings?",
+    "How do these findings alter your assessment of malignancy risk?",
+    "What important information is still missing before treatment?",
+    "How would you confirm the diagnosis and obtain histology?",
+    "Which findings would determine subsequent risk stratification?",
+    "How would normal upper tracts affect your interpretation?",
   ],
   management: [
     "What medical, lifestyle, or surgical treatment would you recommend?",
     "What are the advantages and disadvantages of the alternatives?",
+    "How would you adapt treatment to this patient's comorbidities?",
+    "What outcome would you expect from your preferred treatment?",
+    "What would make you choose an alternative approach?",
+    "How would histology alter your subsequent management?",
   ],
   complications: [
     "Which treatment complications would you discuss, including their approximate incidence?",
     "How would you manage those complications medically or surgically?",
+    "Which complication requires the most urgent recognition?",
+    "How would you investigate suspected postoperative bleeding?",
+    "Which patient factors increase the complication risk?",
   ],
   follow_up: [
     "How would you follow this patient after treatment?",
     "What would prompt an earlier review?",
+    "Which surveillance tests would you arrange and when?",
+    "What recurrence symptoms should the patient report?",
+    "How would follow-up change with the final risk category?",
   ],
 };
 
-function getPhaseFallbackQuestion(stage: string, previousQA: FollowupRequest["previousQA"]) {
+function normalizeQuestion(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function questionsAreSimilar(left: string, right: string) {
+  const ignored = new Set(["a", "an", "the", "this", "that", "what", "which", "would", "you", "your", "how", "do", "is", "are"]);
+  const tokens = (value: string) =>
+    new Set(normalizeQuestion(value).split(" ").filter((token) => token && !ignored.has(token)));
+  const leftTokens = tokens(left);
+  const rightTokens = tokens(right);
+  if (!leftTokens.size || !rightTokens.size) return normalizeQuestion(left) === normalizeQuestion(right);
+  const shared = [...leftTokens].filter((token) => rightTokens.has(token)).length;
+  return shared / Math.min(leftTokens.size, rightTokens.size) >= 0.6;
+}
+
+function getPhaseFallbackQuestion(stage: string, askedQuestions: string[], latestAnswer = "") {
   const candidates = PHASE_FALLBACK_QUESTIONS[stage] || PHASE_FALLBACK_QUESTIONS.assessment;
-  const asked = new Set(previousQA.map((item) => item.question.trim().toLowerCase()));
-  return candidates.find((question) => !asked.has(question.toLowerCase())) || candidates[0];
+  const normalizedAnswer = latestAnswer.toLowerCase();
+
+  if (
+    stage === "investigations" &&
+    /\b(turbt|resection|mitomycin|mmc|treatment|manage|surgery)\b/i.test(normalizedAnswer) &&
+    !/\b(diagnos|carcinoma|cancer|tumou?r|malignan)\b/i.test(normalizedAnswer)
+  ) {
+    const challenge = "Before discussing treatment, what is your working diagnosis?";
+    if (!askedQuestions.some((asked) => questionsAreSimilar(challenge, asked))) return challenge;
+  }
+
+  return (
+    candidates.find(
+      (question) => !askedQuestions.some((asked) => questionsAreSimilar(question, asked)),
+    ) || "Please summarise your current clinical conclusion for this patient."
+  );
+}
+
+function ensureDiscussionQuestion(params: {
+  response: ReturnType<typeof parseFollowupResponse>;
+  stage: string;
+  askedQuestions: string[];
+  latestAnswer: string;
+}) {
+  const repeated = params.askedQuestions.some((asked) =>
+    questionsAreSimilar(params.response.question, asked),
+  );
+  if (!repeated) return params.response;
+  return {
+    ...params.response,
+    question: getPhaseFallbackQuestion(
+      params.stage,
+      params.askedQuestions,
+      params.latestAnswer,
+    ),
+    imageUsed: false,
+    imageLink: null,
+    imageDescription: null,
+    imageId: null,
+  };
 }
 
 function getExhibitDisplayName(label: string, kind: string) {
@@ -199,8 +270,9 @@ Return JSON only.
   }
 
   if (previousQA.length === 0) {
+    const stem = vivaCase.case.stem.trim();
     return NextResponse.json({
-      question: `${vivaCase.case.stem} How would you evaluate this patient?`,
+      question: /\?\s*$/.test(stem) ? stem : `${stem} How would you evaluate this patient?`,
       imageUsed: false,
       imageLink: null,
       imageDescription: null,
@@ -393,7 +465,12 @@ No additional text.
     const rawText = await generateFollowupText(prompt);
     const text = cleanFollowupResponse(rawText);
 
-    const parsed = parseFollowupResponse(text, vivaCase);
+    const parsed = ensureDiscussionQuestion({
+      response: parseFollowupResponse(text, vivaCase),
+      stage,
+      askedQuestions,
+      latestAnswer: previousQA.at(-1)?.answer || "",
+    });
     return NextResponse.json(
       attachRequestedExhibit({
         response: parsed,
@@ -408,7 +485,11 @@ No additional text.
 
     return NextResponse.json(
       {
-        question: getPhaseFallbackQuestion(stage, previousQA),
+        question: getPhaseFallbackQuestion(
+          stage,
+          askedQuestions,
+          previousQA.at(-1)?.answer || "",
+        ),
         imageUsed: false,
         imageLink: null,
         imageDescription: null,

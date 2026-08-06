@@ -26,59 +26,11 @@ function compactTurnState(state: VivaTurnState): VivaTurnState {
   };
 }
 
-const CALM_FALLBACK_QUESTIONS: Record<ActiveCalmVivaPhase, string[]> = {
-  assessment: [
-    "Which features in the history are most important?",
-    "What focused examination would you perform?",
-  ],
-  investigations: [
-    "Which investigation would you request next?",
-    "How do these findings affect your diagnosis?",
-  ],
-  management: [
-    "What treatment would you recommend?",
-    "Why is that treatment appropriate?",
-    "What alternative would you discuss?",
-  ],
-  complications: ["What important complications would you discuss?"],
-  follow_up: ["How would you follow this patient after treatment?"],
-};
 type CachedCalmQuestion = {
   stage: ActiveCalmVivaPhase;
   request: Promise<VivaApiResponse>;
 };
 
-function normalizeQuestion(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function areQuestionsSimilar(left: string, right: string) {
-  const leftTokens = new Set(normalizeQuestion(left).split(" ").filter(Boolean));
-  const rightTokens = new Set(normalizeQuestion(right).split(" ").filter(Boolean));
-  if (!leftTokens.size || !rightTokens.size) return false;
-  const shared = [...leftTokens].filter((token) => rightTokens.has(token)).length;
-  return shared / Math.min(leftTokens.size, rightTokens.size) >= 0.72;
-}
-
-function getNonRepeatingQuestion(
-  question: string,
-  stage: ActiveCalmVivaPhase,
-  history: QA[],
-) {
-  const recentQuestions = new Set(
-    history.slice(-4).map((item) => normalizeQuestion(item.question)),
-  );
-  const repeated =
-    recentQuestions.has(normalizeQuestion(question)) ||
-    history.slice(-4).some((item) => areQuestionsSimilar(item.question, question));
-  if (!repeated) return question;
-
-  return (
-    CALM_FALLBACK_QUESTIONS[stage].find(
-      (candidate) => !recentQuestions.has(normalizeQuestion(candidate)),
-    ) || CALM_FALLBACK_QUESTIONS[stage][0]
-  );
-}
 type VivaScorePayload = Record<string, unknown> & {
   basic_knowledge?: { score?: unknown };
   higher_order_processing?: { score?: unknown };
@@ -386,11 +338,6 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     }
 
     if (!exit && data?.question) {
-      data.question = getNonRepeatingQuestion(
-        data.question,
-        currentTurnState.currentStage,
-        history,
-      );
       history.push({
         question: data.question,
         answer: "",

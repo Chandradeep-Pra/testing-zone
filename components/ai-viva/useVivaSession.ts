@@ -80,6 +80,7 @@
 
 
 import { useState } from "react";
+import { appPath } from "@/lib/app-path";
 
 export type VivaExhibit =
   | {
@@ -95,6 +96,11 @@ type VivaApiResponse = {
   imageLink?: string | null;
   imageDescription?: string | null;
 };
+
+function resolveExhibitSrc(src: string) {
+  if (/^https?:\/\//i.test(src) || src.startsWith("/web/")) return src;
+  return src.startsWith("/") ? appPath(src) : src;
+}
 
 export function useVivaSession() {
   const [transcript, setTranscript] = useState("");
@@ -118,7 +124,7 @@ export function useVivaSession() {
     if (data.imageUsed === true && data.imageLink) {
       setExhibit({
         type: "image",
-        src: data.imageLink,
+        src: resolveExhibitSrc(data.imageLink),
         description: data.imageDescription ?? undefined,
       });
     }
