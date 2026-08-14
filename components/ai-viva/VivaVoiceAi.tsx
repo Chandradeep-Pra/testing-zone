@@ -474,6 +474,9 @@ export default function VivaVoiceAi({
       }
     },
 
+    // The STT hook invokes this only after its server reports speechEnded.
+    // Calm mode therefore waits for the candidate's full answer and advances
+    // on silence; keyword-triggered advancement remains Fast-only above.
     async (finalText) => {
       if (ending || endingRef.current || advanceLockRef.current) return;
 

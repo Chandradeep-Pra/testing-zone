@@ -125,10 +125,18 @@ function getMatchedKeywords(answer: string, keywords: string[]) {
 }
 
 function getFastModeQuestions(vivaCase: VivaCaseRecord): VivaModeQuestion[] {
-  return vivaCase.modes?.fastAndFurious?.questions || [];
+  return (vivaCase.modes?.fastAndFurious?.questions || []).filter(
+    (item) => item.question.trim().length > 0,
+  );
 }
 
-function getFastModeExhibit(vivaCase: VivaCaseRecord, question: VivaModeQuestion) {
+function getCalmModeQuestions(vivaCase: VivaCaseRecord): VivaModeQuestion[] {
+  return (vivaCase.modes?.calmAndComposed?.questions || []).filter(
+    (item) => item.question.trim().length > 0,
+  );
+}
+
+function getQuestionExhibit(vivaCase: VivaCaseRecord, question: VivaModeQuestion) {
   const linkedExhibitId = question.linkedExhibitIds?.[0];
 
   if (linkedExhibitId) {
@@ -193,6 +201,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   const previousQARef = useRef<QA[]>([]);
   const shownExhibitIdsRef = useRef<Set<string>>(new Set());
   const fastQuestionIndexRef = useRef(0);
+  const calmQuestionIndexRef = useRef(0);
   const summaryUpdateInFlightRef = useRef(false);
   const pendingSummaryQARef = useRef<QA | null>(null);
   const calmStageQuestionCountRef = useRef(0);
@@ -275,7 +284,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       return { exit: true };
     }
 
-    const linkedExhibit = getFastModeExhibit(vivaCase, currentQuestion);
+    const linkedExhibit = getQuestionExhibit(vivaCase, currentQuestion);
     const imageLink = linkedExhibit
       ? linkedExhibit.url || (linkedExhibit.file ? `/exhibits/${linkedExhibit.file}` : null)
       : null;
@@ -302,6 +311,51 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   }
 
   async function nextCalm(userAnswer: string, exit = false, elapsedSec = 0): Promise<VivaApiResponse> {
+    const history = previousQARef.current;
+
+    if (history.length > 0) {
+      history[history.length - 1].answer = userAnswer;
+    }
+
+    if (exit) {
+      return { exit: true };
+    }
+
+    const questions = getCalmModeQuestions(vivaCase);
+    const currentQuestion = questions[calmQuestionIndexRef.current];
+
+    if (!currentQuestion) {
+      return { exit: true };
+    }
+
+    const linkedExhibit = getQuestionExhibit(vivaCase, currentQuestion);
+    const imageLink = linkedExhibit
+      ? linkedExhibit.url || (linkedExhibit.file ? `/exhibits/${linkedExhibit.file}` : null)
+      : null;
+    const stage = getCalmPhaseAtElapsedSec(elapsedSec);
+
+    if (linkedExhibit?.id) {
+      shownExhibitIdsRef.current.add(linkedExhibit.id);
+    }
+
+    history.push({
+      question: currentQuestion.question,
+      answer: "",
+      stage,
+    });
+    calmQuestionIndexRef.current += 1;
+
+    return {
+      question: currentQuestion.question,
+      imageUsed: Boolean(imageLink),
+      imageLink,
+      imageDescription: linkedExhibit?.description || null,
+      imageId: linkedExhibit?.id || null,
+      exit: false,
+    };
+  }
+
+  async function nextLegacyCalm(userAnswer: string, exit = false, elapsedSec = 0): Promise<VivaApiResponse> {
     const history = previousQARef.current;
 
     if (history.length > 0 && userAnswer) {
@@ -405,6 +459,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
 
   function prefetchNextCalmPhase(elapsedSec: number) {
     if (selectedMode !== "calm") return;
+    if (getCalmModeQuestions(vivaCase).length > 0) return;
 
     const stage = getCalmPhaseAtElapsedSec(elapsedSec);
     if (
@@ -440,6 +495,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
 
   async function prepareCalmCase() {
     if (selectedMode !== "calm") return;
+    if (getCalmModeQuestions(vivaCase).length > 0) return;
     const res = await fetch(appPath("/api/viva/prepareCase"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -542,7 +598,9 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
         return await nextFast(userAnswer, exit);
       }
 
-      return await nextCalm(userAnswer, exit, elapsedSec);
+      return getCalmModeQuestions(vivaCase).length > 0
+        ? await nextCalm(userAnswer, exit, elapsedSec)
+        : await nextLegacyCalm(userAnswer, exit, elapsedSec);
     } catch (err) {
       console.error("Viva engine error:", err);
 
@@ -596,6 +654,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     previousQARef.current = [];
     shownExhibitIdsRef.current = new Set();
     fastQuestionIndexRef.current = 0;
+    calmQuestionIndexRef.current = 0;
     summaryUpdateInFlightRef.current = false;
     pendingSummaryQARef.current = null;
     calmStageQuestionCountRef.current = 0;

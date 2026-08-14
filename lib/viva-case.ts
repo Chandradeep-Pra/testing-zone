@@ -55,6 +55,8 @@ export type CalmDiagnosisConfig = {
 
 export type CalmAndComposedConfig = {
   enabled?: boolean;
+  questionCount?: number;
+  questions?: VivaModeQuestion[];
   phases: {
     assessment: CalmPhaseConfig;
     investigations: CalmPhaseConfig;
@@ -284,6 +286,13 @@ function normalizeCalmConfig(value: unknown): CalmAndComposedConfig {
   const phases = asRecord(source?.phases);
   return {
     enabled: source?.enabled === undefined ? true : Boolean(source.enabled),
+    questionCount:
+      typeof source?.questionCount === "number"
+        ? Math.max(0, Math.floor(source.questionCount))
+        : 0,
+    questions: Array.isArray(source?.questions)
+      ? source.questions.map((question, index) => normalizeModeQuestion(question, index))
+      : [],
     phases: {
       assessment: normalizePhaseConfig(phases?.assessment, DEFAULT_CALM_PHASES.assessment),
       investigations: normalizePhaseConfig(phases?.investigations, DEFAULT_CALM_PHASES.investigations),
