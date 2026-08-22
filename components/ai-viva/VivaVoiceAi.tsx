@@ -150,6 +150,7 @@ export default function VivaVoiceAi({
   const fillerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fastSilenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestCandidateTranscriptRef = useRef("");
+  const lastSpeechActivityAtRef = useRef(0);
   const fastSilenceGenerationRef = useRef(0);
   const fillerIndexRef = useRef(0);
   const liveCandidateMsgId = useRef<string | null>(null);
@@ -326,6 +327,7 @@ export default function VivaVoiceAi({
     resetTranscriptBuffer();
     advanceLockRef.current = false;
     latestCandidateTranscriptRef.current = answerPrefixRef.current;
+    lastSpeechActivityAtRef.current = 0;
     setCandidateTranscript(answerPrefixRef.current);
     setCandidateStatusDot(answerPrefixRef.current ? "speaking" : "idle");
     setIsListening(true);
@@ -344,16 +346,15 @@ export default function VivaVoiceAi({
     }
   }
 
-  function handleFastSpeechPause(answerText: string) {
+  function handleSpeechPause(answerText: string) {
     const latestAnswer = answerText.trim();
 
     if (
-      !isFastMode ||
       !vivaStarted ||
       endingRef.current ||
       advanceLockRef.current ||
       !latestAnswer ||
-      doesAnswerMatchCurrentFastQuestion(latestAnswer)
+      (isFastMode && doesAnswerMatchCurrentFastQuestion(latestAnswer))
     ) {
       return;
     }
@@ -363,20 +364,23 @@ export default function VivaVoiceAi({
     void submitCurrentAnswer(latestAnswer);
   }
 
-  function scheduleFastSilenceAdvance(answerText: string) {
+  function scheduleSilenceAdvance(answerText: string, markSpeechActivity = false) {
     const latestAnswer = answerText.trim();
 
     clearFastSilencePromptTimer();
     latestCandidateTranscriptRef.current = latestAnswer;
 
+    if (markSpeechActivity || !lastSpeechActivityAtRef.current) {
+      lastSpeechActivityAtRef.current = Date.now();
+    }
+
     if (
-      !isFastMode ||
       !vivaStarted ||
       endingRef.current ||
       advanceLockRef.current ||
       warmupPendingRef.current ||
       !latestAnswer ||
-      doesAnswerMatchCurrentFastQuestion(latestAnswer)
+      (isFastMode && doesAnswerMatchCurrentFastQuestion(latestAnswer))
     ) {
       return;
     }
@@ -385,6 +389,11 @@ export default function VivaVoiceAi({
     setCandidateStatusDot("speaking");
     const generation = fastSilenceGenerationRef.current + 1;
     fastSilenceGenerationRef.current = generation;
+    const inactivityDelayMs = isFastMode ? 2500 : 4000;
+    const remainingDelayMs = Math.max(
+      0,
+      inactivityDelayMs - (Date.now() - lastSpeechActivityAtRef.current),
+    );
 
     fastSilenceTimeoutRef.current = setTimeout(() => {
       fastSilenceTimeoutRef.current = null;
@@ -392,8 +401,8 @@ export default function VivaVoiceAi({
         return;
       }
 
-      handleFastSpeechPause(latestCandidateTranscriptRef.current || latestAnswer);
-    }, 3000);
+      handleSpeechPause(latestCandidateTranscriptRef.current || latestAnswer);
+    }, remainingDelayMs);
   }
 
   function tryAdvanceFastMode(answerText: string) {
@@ -416,9 +425,8 @@ export default function VivaVoiceAi({
     return true;
   }
 
-  async function finalizeFastModeFromTranscriptFallback() {
+  async function finalizeFromTranscriptFallback() {
     if (
-      !isFastMode ||
       ending ||
       endingRef.current ||
       advanceLockRef.current ||
@@ -444,7 +452,7 @@ export default function VivaVoiceAi({
 
     answerPrefixRef.current = fallbackText;
     syncCandidateMessage(fallbackText, false);
-    handleFastSpeechPause(fallbackText);
+    scheduleSilenceAdvance(fallbackText);
   }
 
   const {
@@ -470,7 +478,7 @@ export default function VivaVoiceAi({
       );
 
       if (!tryAdvanceFastMode(combinedInterim)) {
-        scheduleFastSilenceAdvance(combinedInterim);
+        scheduleSilenceAdvance(combinedInterim, true);
       }
     },
 
@@ -495,14 +503,16 @@ export default function VivaVoiceAi({
 
         answerPrefixRef.current = combinedFinalText;
         syncCandidateMessage(combinedFinalText, false);
-        scheduleFastSilenceAdvance(combinedFinalText);
+        scheduleSilenceAdvance(combinedFinalText);
         return;
       }
 
-      await submitCurrentAnswer(combinedFinalText);
+      answerPrefixRef.current = combinedFinalText;
+      syncCandidateMessage(combinedFinalText, false);
+      scheduleSilenceAdvance(combinedFinalText);
     },
     async () => {
-      await finalizeFastModeFromTranscriptFallback();
+      await finalizeFromTranscriptFallback();
     },
     () => selectedMicDeviceIdRef.current,
     () => getMedicalTerminology(),
