@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, PhoneOff, Camera, CameraOff, Sparkles, ShieldCheck, History, X } from "lucide-react";
+import { Clock, PhoneOff, Camera, CameraOff, ShieldCheck, History, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CandidatePanel } from "./CandidatePanel";
@@ -976,8 +976,8 @@ export default function VivaVoiceAi({
       </div>
 
       <div className="min-h-0 flex-1 p-3 sm:p-4 md:p-5">
-        <div className="flex h-full min-h-0">
-          <div className="relative min-h-0 flex-1 overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)]">
+        <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 md:grid-cols-[minmax(0,4fr)_minmax(220px,1fr)] md:grid-rows-1 md:gap-4">
+          <section className="relative min-h-0 overflow-hidden rounded-[24px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)] md:rounded-[28px]">
           <AiPanel
             amplitude={amplitude}
             speaking={examinerSpeaking}
@@ -1024,70 +1024,68 @@ export default function VivaVoiceAi({
                 ) : null
               }
             />
+          </section>
 
-            {/* <div className="absolute left-4 top-4 z-30 flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs text-slate-300 backdrop-blur">
-              <Sparkles size={13} className="text-emerald-300" />
-              <span>{selectedExaminer.personality}</span>
-            </div> */}
+          <aside className="flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)] md:rounded-[28px]">
+            <div className="hidden border-b border-[#0f7896]/10 px-4 py-3 md:block">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#0f7896]">Candidate</p>
+              <p className="mt-0.5 truncate text-sm font-semibold text-[#071014]">{candidate.name || "You"}</p>
+            </div>
 
-          
-
-            <div className="absolute right-2 top-2 h-24 w-20 overflow-hidden rounded-2xl md:right-4 md:top-4 md:h-auto md:w-[260px] md:aspect-video">
+            <div className="aspect-video min-h-[112px] w-full overflow-hidden bg-slate-950 md:min-h-0 md:flex-1 md:aspect-auto">
               <CandidatePanel
                 cameraOn={cameraOn}
                 listening={isListening}
                 statusDot={candidateStatusDot}
               />
             </div>
-          </div>
+
+            <div className="border-t border-[#0f7896]/10 bg-[#f8fcfd] p-3 md:p-4">
+              <p className="mb-3 hidden text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#071014]/40 md:block">Call controls</p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setCameraOn((v) => !v)}
+                  disabled={!cameraEnabled}
+                  className={`group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium transition-colors ${
+                    cameraEnabled
+                      ? "text-[#071014]/70 hover:bg-cyan-50"
+                      : "cursor-not-allowed text-[#071014]/25"
+                  }`}
+                  title={cameraEnabled ? "Toggle camera" : "Camera not enabled in system check"}
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#0f7896]/15 bg-white shadow-sm transition group-hover:border-[#0f7896]/30">
+                    {cameraOn ? <CameraOff size={17} /> : <Camera size={17} />}
+                  </span>
+                  <span>{cameraOn ? "Camera off" : "Camera on"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen(true)}
+                  className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium text-[#071014]/70 transition-colors hover:bg-cyan-50"
+                  title="Show session transcript"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#0f7896]/15 bg-white shadow-sm transition group-hover:border-[#0f7896]/30">
+                    <History size={17} />
+                  </span>
+                  <span>Transcript</span>
+                </button>
+
+                <button
+                  onClick={endViva}
+                  disabled={!vivaStarted || ending}
+                  className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="End viva examination"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white shadow-[0_6px_16px_rgba(220,38,38,0.25)] transition group-hover:bg-red-700">
+                    <PhoneOff size={17} />
+                  </span>
+                  <span>End viva</span>
+                </button>
+              </div>
+            </div>
+          </aside>
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-center gap-2 border-t border-[#0f7896]/12 bg-white px-3 py-3 shadow-[0_-8px_24px_rgba(15,120,150,0.07)] sm:gap-3 md:gap-6">
-        <button
-          onClick={() => setCameraOn((v) => !v)}
-          disabled={!cameraEnabled}
-          className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0 ${
-            cameraEnabled
-              ? "bg-white border-[#0f7896]/12 text-[#071014] hover:bg-cyan-50 cursor-pointer"
-              : "bg-white border-[#0f7896]/12 text-[#071014]/35 opacity-50 cursor-not-allowed"
-          }`}
-          title={cameraEnabled ? "Toggle camera" : "Camera not enabled in system check"}
-        >
-          {cameraOn ? (
-            <>
-              <CameraOff size={14} className="sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Camera Off</span>
-            </>
-          ) : (
-            <>
-              <Camera size={14} className="sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Camera On</span>
-            </>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setHistoryOpen(true)}
-          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border border-[#0f7896]/12 bg-white text-[#071014] transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0 hover:bg-cyan-50"
-          title="Show session transcript"
-        >
-          <History size={14} className="sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Transcript</span>
-          <span className="inline sm:hidden">Transcript</span>
-        </button>
-
-        <button
-          onClick={endViva}
-          disabled={!vivaStarted || ending}
-          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-5 py-1.5 sm:py-2 rounded-full bg-red-600/80 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
-          title="End viva examination"
-        >
-          <PhoneOff size={14} className="sm:h-[18px] sm:w-[18px]" />
-          <span className="hidden sm:inline">End Viva</span>
-          <span className="inline sm:hidden">End</span>
-        </button>
       </div>
     </main>
   );
