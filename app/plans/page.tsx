@@ -4,17 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Check,
-  CreditCard,
-  LockKeyhole,
+  Gift,
   RefreshCw,
-  ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
 import type {
   PricingPlan,
   PricingPlanVersion,
+  PricingCoupon,
   PricingResponse,
 } from "@/components/pricing/types";
 import { appPath } from "@/lib/app-path";
@@ -29,6 +27,27 @@ function money(value: number) {
 
 function currentPrice(version: PricingPlanVersion) {
   return version.discountedPrice || version.price;
+}
+
+function couponIsCurrentlyActive(coupon: PricingCoupon) {
+  const now = Date.now();
+  const startsAt = coupon.startsAt ? new Date(coupon.startsAt).getTime() : null;
+  const endsAt = coupon.endsAt ? new Date(coupon.endsAt).getTime() : null;
+
+  return (
+    coupon.isActive &&
+    (!startsAt || Number.isNaN(startsAt) || startsAt <= now) &&
+    (!endsAt || Number.isNaN(endsAt) || endsAt >= now)
+  );
+}
+
+function priceAfterCoupon(price: number, coupon: PricingCoupon | null) {
+  if (!coupon) return price;
+  const discount =
+    coupon.discountType === "percent"
+      ? price * (coupon.discountValue / 100)
+      : coupon.discountValue;
+  return Math.max(0, price - discount);
 }
 
 function fallbackVersion(plan: PricingPlan): PricingPlanVersion {
@@ -46,18 +65,59 @@ function fallbackVersion(plan: PricingPlan): PricingPlanVersion {
   };
 }
 
-function PlanCard({ plan, featured }: { plan: PricingPlan; featured: boolean }) {
+function PlanCard({
+  plan,
+  featured,
+  coupons,
+}: {
+  plan: PricingPlan;
+  featured: boolean;
+  coupons: PricingCoupon[];
+}) {
   const options = plan.versions?.length ? plan.versions : [fallbackVersion(plan)];
   const [selectedId, setSelectedId] = useState(options[0].id);
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<PricingCoupon | null>(null);
+  const [couponError, setCouponError] = useState("");
   const selected = options.find((version) => version.id === selectedId) || options[0];
-  const price = currentPrice(selected);
+  const basePrice = currentPrice(selected);
+  const price = priceAfterCoupon(basePrice, appliedCoupon);
   const original = selected.originalPrice || selected.price;
   const saving = Math.max(0, original - price);
   const checkoutUrl = selected.embeddedLink || plan.embeddedLink;
 
   function beginCheckout() {
     if (!checkoutUrl) return;
-    window.location.assign(checkoutUrl);
+    if (!appliedCoupon) {
+      window.location.assign(checkoutUrl);
+      return;
+    }
+
+    const paymentUrl = new URL(checkoutUrl, window.location.href);
+    paymentUrl.searchParams.set("coupon", appliedCoupon.code);
+    window.location.assign(paymentUrl.toString());
+  }
+
+  function applyCoupon() {
+    const normalizedCode = couponInput.trim().toLowerCase();
+    const coupon = coupons.find(
+      (item) => item.code.trim().toLowerCase() === normalizedCode,
+    );
+    const eligibleByCoupon =
+      !coupon?.allowedPlanIds?.length || coupon.allowedPlanIds.includes(plan.id);
+    const eligibleByPlan =
+      !plan.eligibleCouponIds.length ||
+      (coupon ? plan.eligibleCouponIds.includes(coupon.id) : false);
+
+    if (!coupon || !couponIsCurrentlyActive(coupon) || !eligibleByCoupon || !eligibleByPlan) {
+      setAppliedCoupon(null);
+      setCouponError("This coupon is invalid or not available for this plan.");
+      return;
+    }
+
+    setAppliedCoupon(coupon);
+    setCouponInput(coupon.code);
+    setCouponError("");
   }
 
   return (
@@ -70,18 +130,12 @@ function PlanCard({ plan, featured }: { plan: PricingPlan; featured: boolean }) 
     >
       <div className="flex min-h-7 items-start justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          {plan.category && (
-            <span className="rounded-full bg-[var(--surface-muted)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-              {plan.category}
-            </span>
-          )}
           {plan.tag && (
             <span className="rounded-full bg-[var(--accent)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
               {plan.tag}
             </span>
           )}
         </div>
-        {featured && <Sparkles className="h-5 w-5 shrink-0 text-[var(--accent)]" />}
       </div>
 
       <h2 className="mt-5 text-2xl font-semibold tracking-[-0.035em] text-[var(--text-primary)]">
@@ -144,17 +198,51 @@ function PlanCard({ plan, featured }: { plan: PricingPlan; featured: boolean }) 
       {plan.availabilityNote && (
         <p className="mt-5 text-xs leading-5 text-[var(--text-tertiary)]">{plan.availabilityNote}</p>
       )}
-      {selected.couponCode && (
-        <div className="mt-4 rounded-2xl border border-dashed border-[var(--accent)] bg-[var(--accent-soft)] px-4 py-3 text-xs text-[var(--accent-strong)]">
-          Coupon <strong>{selected.couponCode}</strong> is included in this price.
-        </div>
-      )}
+
+      <div className="mt-5 rounded-[22px] border border-[var(--border)] bg-[var(--surface)] p-3.5">
+        <label htmlFor={`coupon-${plan.id}`} className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
+          <Gift className="h-4 w-4 text-[var(--accent)]" /> Have a coupon?
+        </label>
+        {appliedCoupon ? (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-emerald-500/10 px-3 py-2.5 text-xs text-emerald-700 dark:text-emerald-300">
+            <span><strong>{appliedCoupon.code}</strong> applied · You save {money(basePrice - price)}</span>
+            <button
+              type="button"
+              className="shrink-0 font-semibold underline underline-offset-2"
+              onClick={() => { setAppliedCoupon(null); setCouponInput(""); }}
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="mt-3 flex gap-2">
+            <input
+              id={`coupon-${plan.id}`}
+              value={couponInput}
+              onChange={(event) => { setCouponInput(event.target.value.toUpperCase()); setCouponError(""); }}
+              onKeyDown={(event) => { if (event.key === "Enter") applyCoupon(); }}
+              placeholder="Enter code"
+              autoCapitalize="characters"
+              className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2.5 text-sm uppercase text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--focus)]"
+            />
+            <button
+              type="button"
+              onClick={applyCoupon}
+              disabled={!couponInput.trim()}
+              className="rounded-xl bg-[var(--accent-soft)] px-4 text-xs font-semibold text-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Apply
+            </button>
+          </div>
+        )}
+        {couponError && <p className="mt-2 text-xs leading-5 text-red-600 dark:text-red-400">{couponError}</p>}
+      </div>
 
       <button
         type="button"
         onClick={beginCheckout}
         disabled={!plan.isActive || !checkoutUrl}
-        className={`mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold transition ${
+        className={`mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold transition ${
           plan.isActive && checkoutUrl
             ? "bg-[var(--accent)] text-white shadow-[0_14px_30px_var(--shadow-brand)] hover:-translate-y-0.5 hover:bg-[var(--accent-hover)]"
             : "cursor-not-allowed bg-[var(--surface-muted)] text-[var(--text-tertiary)]"
@@ -195,30 +283,19 @@ export default function PlansPage() {
     () => [...(data?.plans || [])].sort((a, b) => a.sortOrder - b.sortOrder),
     [data],
   );
+  const planGroups = useMemo(() => {
+    const groups = new Map<string, PricingPlan[]>();
+    for (const plan of plans) {
+      const category = plan.category?.trim() || "Other plans";
+      groups.set(category, [...(groups.get(category) || []), plan]);
+    }
+    return [...groups.entries()];
+  }, [plans]);
 
   return (
     <main className="urologics-shell min-h-screen overflow-x-hidden">
       <div className="mx-auto min-h-screen w-full max-w-[1400px] px-3 pb-14 sm:px-6 lg:px-8">
         <UrologicsHeader current="Plans" product="Plans" tag="Membership & access" />
-
-        <section className="relative overflow-hidden rounded-[34px] border border-[var(--border)] bg-[radial-gradient(circle_at_18%_8%,var(--accent-muted),transparent_30%),var(--surface-raised)] px-5 py-10 text-center shadow-[0_18px_48px_var(--shadow-soft)] sm:px-10 sm:py-14">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--accent-strong)]">
-            <Sparkles className="h-4 w-4" />
-            Invest in confident exam preparation
-          </div>
-          <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.06em] text-[var(--text-primary)] sm:text-6xl">
-            Pick the plan that fits your next milestone.
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-            Focused learning, realistic practice, and AI-powered feedback. Choose your access period and continue to secure checkout.
-          </p>
-          <div className="mt-7 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs font-medium text-[var(--text-secondary)] sm:text-sm">
-            <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[var(--accent)]" /> Secure checkout</span>
-            <span className="inline-flex items-center gap-2"><CreditCard className="h-4 w-4 text-[var(--accent)]" /> GBP payments</span>
-            <span className="inline-flex items-center gap-2"><LockKeyhole className="h-4 w-4 text-[var(--accent)]" /> Instant access</span>
-          </div>
-        </section>
-
         <section className="mt-7">
           {loading ? (
             <div className="grid gap-5 lg:grid-cols-3" aria-label="Loading pricing plans">
@@ -245,9 +322,29 @@ export default function PlansPage() {
               No plans are available right now. Please check back soon.
             </div>
           ) : (
-            <div className={`grid items-stretch gap-5 ${plans.length === 1 ? "mx-auto max-w-md" : plans.length === 2 ? "mx-auto max-w-4xl md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-3"}`}>
-              {plans.map((plan, index) => (
-                <PlanCard key={plan.id} plan={plan} featured={Boolean(plan.tag) || (plans.length === 3 && index === 1)} />
+            <div className="space-y-10 sm:space-y-12">
+              {planGroups.map(([category, categoryPlans]) => (
+                <section key={category} aria-labelledby={`category-${category.replace(/\s+/g, "-").toLowerCase()}`}>
+                  <div className="mb-4 flex items-center gap-3 sm:mb-5">
+                    <h2 id={`category-${category.replace(/\s+/g, "-").toLowerCase()}`} className="text-xl font-semibold tracking-[-0.035em] text-[var(--text-primary)] sm:text-2xl">
+                      {category}
+                    </h2>
+                    <span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent-strong)]">
+                      {categoryPlans.length} {categoryPlans.length === 1 ? "plan" : "plans"}
+                    </span>
+                    <div className="h-px flex-1 bg-[var(--border)]" />
+                  </div>
+                  <div className={`grid items-stretch gap-4 sm:gap-5 ${categoryPlans.length === 1 ? "max-w-md" : categoryPlans.length === 2 ? "max-w-4xl md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-3"}`}>
+                    {categoryPlans.map((plan) => (
+                      <PlanCard
+                        key={plan.id}
+                        plan={plan}
+                        coupons={data?.coupons || []}
+                        featured={Boolean(plan.tag)}
+                      />
+                    ))}
+                  </div>
+                </section>
               ))}
             </div>
           )}
