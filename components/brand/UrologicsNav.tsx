@@ -7,6 +7,7 @@ export const NAV_ITEMS = [
   { href: "/courses", label: "Courses" },
   { href: "/ai-viva/cases", label: "AI Viva" },
   { href: "/mocks", label: "Mocks" },
+  { href: "/plans", label: "Plans" },
 ];
 
 export default function UrologicsNav({ current }: { current?: string }) {
