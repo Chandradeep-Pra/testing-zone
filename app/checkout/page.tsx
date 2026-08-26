@@ -24,7 +24,7 @@ function CheckoutContent() {
   const [couponError, setCouponError] = useState("");
   const [applied, setApplied] = useState<AppliedPricing | null>(null);
   const [verifying, setVerifying] = useState(false);
-  const [paymentState, setPaymentState] = useState<"idle" | "processing" | "checking" | "success" | "failed">("idle");
+  const [paymentState, setPaymentState] = useState<"idle" | "processing" | "failed">("idle");
   const [paymentMessage, setPaymentMessage] = useState("");
 
   const verifyCoupon = useCallback(async (checkout: CheckoutDetails, code: string) => {
@@ -45,16 +45,6 @@ function CheckoutContent() {
     let active = true;
     async function load() {
       try {
-        if (params.get("paypalCancelled")) { setPaymentState("failed"); setPaymentMessage("Payment was cancelled. You can try again."); return; }
-        if (params.get("paypalReturn") && params.get("purchaseId")) {
-          setPaymentState("checking");
-          const response = await fetch(appPath("/api/payment/capture-order"), { method: "POST", headers: { Authorization: `Bearer ${user!.idToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ purchaseId: params.get("purchaseId") }) });
-          const data = await response.json();
-          if (!active) return;
-          if (data.status === "COMPLETED") { setPaymentState("success"); setPaymentMessage("Payment successful. Your course access is active."); }
-          else { setPaymentState(data.status === "PENDING_VERIFICATION" ? "checking" : "failed"); setPaymentMessage(data.error || "Payment is still being verified."); }
-          return;
-        }
         const response = await fetch(`${appPath("/api/checkout")}?planId=${encodeURIComponent(params.get("planId") || "")}&versionId=${encodeURIComponent(params.get("versionId") || "")}`, { headers: { Authorization: `Bearer ${user!.idToken}` }, cache: "no-store" });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Unable to open checkout");
@@ -72,18 +62,16 @@ function CheckoutContent() {
     finally { setVerifying(false); }
   }
 
-  async function startPayment() {
-    if (!details || !user) return;
+  function startPayment() {
+    if (!details?.checkoutUrl) return;
     try {
       setPaymentState("processing"); setPaymentMessage("");
-      const response = await fetch(appPath("/api/payment/create-order"), { method: "POST", headers: { Authorization: `Bearer ${user.idToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ courseId: details.plan.id, ...(applied?.couponCode ? { couponCode: applied.couponCode } : {}) }) });
-      const data = await response.json();
-      if (!response.ok || !data.approvalUrl) throw new Error(data.error || "Unable to start payment");
-      window.location.assign(data.approvalUrl);
-    } catch (nextError) { setPaymentState("failed"); setPaymentMessage(nextError instanceof Error ? nextError.message : "Payment failed"); }
+      const paymentUrl = new URL(details.checkoutUrl, window.location.href);
+      if (applied?.couponCode) paymentUrl.searchParams.set("coupon", applied.couponCode);
+      window.location.assign(paymentUrl.toString());
+    } catch { setPaymentState("failed"); setPaymentMessage("The configured payment link is invalid."); }
   }
 
-  if (paymentState === "success" || (paymentState === "checking" && !details)) return <div className="py-12 text-center"><ShieldCheck className="mx-auto h-10 w-10 text-emerald-600" /><h1 className="mt-5 text-2xl font-semibold text-slate-950">{paymentState === "success" ? "Payment successful" : "Checking payment..."}</h1><p className="mt-3 text-slate-600">{paymentMessage}</p>{paymentState === "success" ? <a href={appPath("/user")} className="mt-6 inline-flex rounded-full bg-[#0f7896] px-6 py-3 font-semibold text-white">View your account</a> : null}</div>;
   if (error) return <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-700">{error}</div>;
   if (!details) return <div className="flex items-center justify-center gap-3 py-16 text-slate-600"><Loader2 className="h-5 w-5 animate-spin" />Checking your account and plan...</div>;
 
@@ -106,7 +94,7 @@ function CheckoutContent() {
     </section>
     <section className="rounded-2xl border border-slate-200 p-5"><div className="mb-4 flex items-center gap-2"><ReceiptText className="h-5 w-5 text-cyan-700" /><h2 className="font-semibold text-slate-950">Bill details</h2></div><div className="space-y-3 text-sm"><div className="flex justify-between gap-4 text-slate-600"><span>{details.plan.name} · {details.version.durationLabel || `${details.version.months} months`}</span><span>{money(details.version.originalPrice)}</span></div>{applied ? <div className="flex justify-between gap-4 text-emerald-700"><span>Coupon discount ({applied.couponCode})</span><span>−{money(applied.discountAmount)}</span></div> : null}<div className="flex justify-between gap-4 text-slate-500"><span>Taxes + platform fee</span><span>+{money(platformFee)}</span></div><div className="border-t border-slate-200 pt-3"><div className="flex items-end justify-between"><span className="font-semibold text-slate-950">Total</span><div className="text-right">{applied ? <p className="text-sm text-slate-400 line-through">{money(details.version.originalPrice)}</p> : null}<span className="block text-2xl font-bold text-slate-950">{wholeMoney(total)}</span></div></div><p className="mt-1 text-right text-xs text-slate-500">Currency: {details.version.currency}</p></div></div></section>
     {paymentMessage ? <p className="text-center text-sm text-rose-600">{paymentMessage}</p> : null}
-    <button type="button" onClick={() => void startPayment()} disabled={paymentState === "processing"} className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#0f7896] px-6 text-base font-semibold text-white hover:bg-[#0b647d] disabled:opacity-60">{paymentState === "processing" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing payment...</> : <>{paymentState === "failed" ? "Try again" : "Pay securely with PayPal"}<ArrowRight className="ml-2 h-4 w-4" /></>}</button>
+    <button type="button" onClick={startPayment} disabled={paymentState === "processing" || !details.checkoutUrl} className="inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#0f7896] px-6 text-base font-semibold text-white hover:bg-[#0b647d] disabled:opacity-60">{paymentState === "processing" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Opening payment...</> : <>{paymentState === "failed" ? "Try again" : "Continue to secure payment"}<ArrowRight className="ml-2 h-4 w-4" /></>}</button>
   </div>;
 }
 
