@@ -97,7 +97,7 @@ export default function PlansPage() {
     return [...map.entries()];
   }, [data]);
   return (
-    <main className="min-h-screen overflow-x-hidden bg-cyan-50 text-[#071014]">
+    <main className="pricing-experience min-h-screen overflow-x-hidden bg-cyan-50 text-[#071014]">
       <div className="mx-auto w-full max-w-[1400px] px-3 pb-16 sm:px-6 lg:px-8">
         <UrologicsHeader current="Plans" product="Plans" tag="Membership & access" />
         <header className="mb-10 mt-10 max-w-4xl sm:mb-14"><p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0f7896]">Plans & payment</p><h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[#071014] sm:text-6xl">Simple plans for serious FRCS preparation.</h1><p className="mt-5 max-w-2xl text-base leading-7 text-[#071014]/60">Choose the access that fits your preparation, apply an eligible offer, and continue to secure payment.</p></header>

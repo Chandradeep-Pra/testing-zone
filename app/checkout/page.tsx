@@ -111,5 +111,5 @@ function CheckoutContent() {
 }
 
 export default function CheckoutPage() {
-  return <main className="min-h-screen bg-gradient-to-b from-cyan-50 to-white px-4 py-12 sm:py-16"><div className="mx-auto max-w-xl rounded-[30px] border border-cyan-900/10 bg-white p-6 shadow-xl sm:p-10"><Suspense fallback={<p className="py-16 text-center text-slate-500">Loading checkout...</p>}><CheckoutContent /></Suspense></div></main>;
+  return <main className="pricing-experience min-h-screen bg-gradient-to-b from-cyan-50 to-white px-4 py-12 sm:py-16"><div className="checkout-surface mx-auto max-w-xl rounded-[30px] border border-cyan-900/10 bg-white p-6 shadow-xl sm:p-10"><Suspense fallback={<p className="py-16 text-center text-slate-500">Loading checkout...</p>}><CheckoutContent /></Suspense></div></main>;
 }

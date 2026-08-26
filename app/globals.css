@@ -215,6 +215,104 @@
     background: color-mix(in srgb, var(--accent) 35%, transparent);
   }
 
+  /* Plans and checkout share the editorial pricing palette. These scoped
+     overrides preserve its hierarchy when the application theme is dark. */
+  .dark .pricing-experience {
+    background: #071014 !important;
+    color: #f8fafc !important;
+  }
+
+  .dark .pricing-experience .checkout-surface,
+  .dark .pricing-experience article,
+  .dark .pricing-experience section {
+    border-color: rgba(45, 212, 191, 0.16) !important;
+    background-color: #111827 !important;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28) !important;
+  }
+
+  .dark .pricing-experience [aria-expanded] {
+    background: linear-gradient(90deg, #111827, #102528, #111827) !important;
+  }
+
+  .dark .pricing-experience [aria-expanded]:hover {
+    background: #102f32 !important;
+  }
+
+  .dark .pricing-experience h1,
+  .dark .pricing-experience h2,
+  .dark .pricing-experience h3 {
+    color: #f8fafc !important;
+  }
+
+  .dark .pricing-experience p,
+  .dark .pricing-experience span {
+    border-color: rgba(45, 212, 191, 0.16);
+  }
+
+  .dark .pricing-experience .text-slate-950,
+  .dark .pricing-experience .text-slate-900 {
+    color: #f8fafc !important;
+  }
+
+  .dark .pricing-experience .text-slate-700,
+  .dark .pricing-experience .text-slate-600,
+  .dark .pricing-experience .text-slate-500 {
+    color: #cbd5e1 !important;
+  }
+
+  .dark .pricing-experience [class*="text-[#071014]"] {
+    color: #cbd5e1 !important;
+  }
+
+  .dark .pricing-experience h1[class*="text-[#071014]"],
+  .dark .pricing-experience h2[class*="text-[#071014]"],
+  .dark .pricing-experience h3[class*="text-[#071014]"] {
+    color: #f8fafc !important;
+  }
+
+  .dark .pricing-experience .bg-white,
+  .dark .pricing-experience .bg-slate-50 {
+    background-color: #172033 !important;
+  }
+
+  .dark .pricing-experience .bg-cyan-50 {
+    background-color: #102f32 !important;
+  }
+
+  .dark .pricing-experience [class*="bg-[#fbfeff]"],
+  .dark .pricing-experience [class*="bg-[#f8fdff]"] {
+    background-color: #111827 !important;
+  }
+
+  .dark .pricing-experience .border-slate-200,
+  .dark .pricing-experience .border-slate-300,
+  .dark .pricing-experience .border-cyan-900\/10 {
+    border-color: #334155 !important;
+  }
+
+  .dark .pricing-experience input {
+    border-color: #334155 !important;
+    background: #172033 !important;
+    color: #f8fafc !important;
+  }
+
+  .dark .pricing-experience input::placeholder {
+    color: #94a3b8;
+  }
+
+  .dark .pricing-experience .text-emerald-700 {
+    color: #4ade80 !important;
+  }
+
+  .dark .pricing-experience .text-rose-600,
+  .dark .pricing-experience .text-rose-700 {
+    color: #fda4af !important;
+  }
+
+  .dark .pricing-experience .bg-rose-50 {
+    background-color: rgba(136, 19, 55, 0.24) !important;
+  }
+
   .urologics-shell {
     @apply min-h-screen relative;
     background: var(--background);
