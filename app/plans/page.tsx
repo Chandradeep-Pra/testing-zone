@@ -1,256 +1,71 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  ArrowRight,
-  Check,
-  Gift,
-  RefreshCw,
-} from "lucide-react";
-
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Clock3, Layers3, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
-import type {
-  PricingPlan,
-  PricingPlanVersion,
-  PricingCoupon,
-  PricingResponse,
-} from "@/components/pricing/types";
+import type { PricingCoupon, PricingPlan, PricingPlanVersion, PricingResponse } from "@/components/pricing/types";
 import { appPath } from "@/lib/app-path";
 
-function money(value: number) {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
-  }).format(value);
+const money = (value: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: value % 1 ? 2 : 0 }).format(value);
+
+function fallback(plan: PricingPlan): PricingPlanVersion {
+  return { id: plan.id, months: plan.expiryMonths, price: plan.price, originalPrice: plan.originalPrice, discountedPrice: plan.discountedPrice, couponId: plan.couponId, couponCode: plan.couponCode, embeddedLink: plan.embeddedLink, durationLabel: plan.durationLabel, billingLabel: plan.billingLabel };
 }
 
-function currentPrice(version: PricingPlanVersion) {
-  return version.discountedPrice || version.price;
-}
+function PlanCard({ plan }: { plan: PricingPlan; coupons: PricingCoupon[] }) {
+  const versions = useMemo(() => (plan.versions?.length ? [...plan.versions] : [fallback(plan)]).sort((a, b) => a.months - b.months), [plan]);
+  const [activeId, setActiveId] = useState(versions[0].id);
+  const active = versions.find((version) => version.id === activeId) || versions[0];
+  const basePrice = active.discountedPrice || active.price;
+  const originalPrice = active.originalPrice || active.price;
+  const checkoutUrl = active.embeddedLink || plan.embeddedLink;
 
-function couponIsCurrentlyActive(coupon: PricingCoupon) {
-  const now = Date.now();
-  const startsAt = coupon.startsAt ? new Date(coupon.startsAt).getTime() : null;
-  const endsAt = coupon.endsAt ? new Date(coupon.endsAt).getTime() : null;
-
-  return (
-    coupon.isActive &&
-    (!startsAt || Number.isNaN(startsAt) || startsAt <= now) &&
-    (!endsAt || Number.isNaN(endsAt) || endsAt >= now)
-  );
-}
-
-function priceAfterCoupon(price: number, coupon: PricingCoupon | null) {
-  if (!coupon) return price;
-  const discount =
-    coupon.discountType === "percent"
-      ? price * (coupon.discountValue / 100)
-      : coupon.discountValue;
-  return Math.max(0, price - discount);
-}
-
-function fallbackVersion(plan: PricingPlan): PricingPlanVersion {
-  return {
-    id: plan.id,
-    months: plan.expiryMonths,
-    price: plan.price,
-    originalPrice: plan.originalPrice,
-    discountedPrice: plan.discountedPrice,
-    couponId: plan.couponId,
-    couponCode: plan.couponCode,
-    embeddedLink: plan.embeddedLink,
-    durationLabel: plan.durationLabel,
-    billingLabel: plan.billingLabel,
-  };
-}
-
-function PlanCard({
-  plan,
-  featured,
-  coupons,
-}: {
-  plan: PricingPlan;
-  featured: boolean;
-  coupons: PricingCoupon[];
-}) {
-  const options = plan.versions?.length ? plan.versions : [fallbackVersion(plan)];
-  const [selectedId, setSelectedId] = useState(options[0].id);
-  const [couponInput, setCouponInput] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<PricingCoupon | null>(null);
-  const [couponError, setCouponError] = useState("");
-  const selected = options.find((version) => version.id === selectedId) || options[0];
-  const basePrice = currentPrice(selected);
-  const price = priceAfterCoupon(basePrice, appliedCoupon);
-  const original = selected.originalPrice || selected.price;
-  const saving = Math.max(0, original - price);
-  const checkoutUrl = selected.embeddedLink || plan.embeddedLink;
-
-  function beginCheckout() {
+  function checkout() {
     if (!checkoutUrl) return;
-    if (!appliedCoupon) {
-      window.location.assign(checkoutUrl);
-      return;
-    }
-
-    const paymentUrl = new URL(checkoutUrl, window.location.href);
-    paymentUrl.searchParams.set("coupon", appliedCoupon.code);
-    window.location.assign(paymentUrl.toString());
-  }
-
-  function applyCoupon() {
-    const normalizedCode = couponInput.trim().toLowerCase();
-    const coupon = coupons.find(
-      (item) => item.code.trim().toLowerCase() === normalizedCode,
-    );
-    const eligibleByCoupon =
-      !coupon?.allowedPlanIds?.length || coupon.allowedPlanIds.includes(plan.id);
-    const eligibleByPlan =
-      !plan.eligibleCouponIds.length ||
-      (coupon ? plan.eligibleCouponIds.includes(coupon.id) : false);
-
-    if (!coupon || !couponIsCurrentlyActive(coupon) || !eligibleByCoupon || !eligibleByPlan) {
-      setAppliedCoupon(null);
-      setCouponError("This coupon is invalid or not available for this plan.");
-      return;
-    }
-
-    setAppliedCoupon(coupon);
-    setCouponInput(coupon.code);
-    setCouponError("");
+    window.location.assign(appPath(`/checkout?planId=${encodeURIComponent(plan.id)}&versionId=${encodeURIComponent(active.id)}`));
   }
 
   return (
-    <article
-      className={`relative flex h-full flex-col overflow-hidden rounded-[30px] border p-5 transition duration-300 sm:p-7 ${
-        featured
-          ? "border-[var(--accent)] bg-[radial-gradient(circle_at_top_right,var(--accent-muted),transparent_38%),var(--surface-raised)] shadow-[0_24px_60px_var(--shadow-brand)]"
-          : "border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_16px_40px_var(--shadow-soft)] hover:-translate-y-1 hover:border-[color-mix(in_srgb,var(--accent)_35%,var(--border))]"
-      }`}
-    >
-      <div className="flex min-h-7 items-start justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {plan.tag && (
-            <span className="rounded-full bg-[var(--accent)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white">
-              {plan.tag}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <h2 className="mt-5 text-2xl font-semibold tracking-[-0.035em] text-[var(--text-primary)]">
-        {plan.name}
-      </h2>
-      <p className="mt-2 min-h-12 text-sm leading-6 text-[var(--text-secondary)]">
-        {plan.description}
-      </p>
-
-      {options.length > 1 && (
-        <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-[var(--surface-muted)] p-1.5" aria-label="Choose plan duration">
-          {options.map((version) => (
-            <button
-              key={version.id}
-              type="button"
-              onClick={() => setSelectedId(version.id)}
-              className={`rounded-xl px-3 py-2.5 text-xs font-semibold transition ${
-                version.id === selected.id
-                  ? "bg-[var(--surface-raised)] text-[var(--text-primary)] shadow-[0_5px_18px_var(--shadow-soft)]"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              {version.durationLabel || `${version.months} months`}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-6 flex items-end gap-2">
-        <span className="text-4xl font-semibold tracking-[-0.06em] text-[var(--text-primary)]">
-          {money(price)}
-        </span>
-        {original > price && (
-          <span className="pb-1 text-sm text-[var(--text-tertiary)] line-through">
-            {money(original)}
-          </span>
-        )}
-      </div>
-      <div className="mt-1 flex min-h-6 flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
-        <span>{selected.billingLabel || plan.billingLabel}</span>
-        {saving > 0 && (
-          <span className="rounded-full bg-emerald-500/10 px-2 py-1 font-semibold text-emerald-600 dark:text-emerald-400">
-            Save {money(saving)}
-          </span>
-        )}
-      </div>
-
-      <div className="my-6 h-px bg-[var(--border)]" />
-      <ul className="flex-1 space-y-3.5">
-        {plan.featureBullets.map((feature) => (
-          <li key={feature} className="flex gap-3 text-sm leading-5 text-[var(--text-secondary)]">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-              <Check className="h-3.5 w-3.5" strokeWidth={3} />
-            </span>
-            {feature}
-          </li>
-        ))}
-      </ul>
-
-      {plan.availabilityNote && (
-        <p className="mt-5 text-xs leading-5 text-[var(--text-tertiary)]">{plan.availabilityNote}</p>
-      )}
-
-      <div className="mt-5 rounded-[22px] border border-[var(--border)] bg-[var(--surface)] p-3.5">
-        <label htmlFor={`coupon-${plan.id}`} className="flex items-center gap-2 text-xs font-semibold text-[var(--text-primary)]">
-          <Gift className="h-4 w-4 text-[var(--accent)]" /> Have a coupon?
-        </label>
-        {appliedCoupon ? (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-emerald-500/10 px-3 py-2.5 text-xs text-emerald-700 dark:text-emerald-300">
-            <span><strong>{appliedCoupon.code}</strong> applied · You save {money(basePrice - price)}</span>
-            <button
-              type="button"
-              className="shrink-0 font-semibold underline underline-offset-2"
-              onClick={() => { setAppliedCoupon(null); setCouponInput(""); }}
-            >
-              Remove
-            </button>
+    <article className="relative overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white p-5 shadow-[0_16px_44px_rgba(15,120,150,0.08)] sm:p-7">
+      <div className="absolute inset-x-0 top-0 h-1 bg-[#0f7896]" />
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,1.12fr)_minmax(260px,.88fr)]">
+        <div className="flex min-w-0 flex-col">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f7896]/10 text-[#0f7896]"><Sparkles className="h-4 w-4" /></span>
+                {plan.tag ? <span className="rounded-full bg-[#0f7896]/10 px-3 py-1 text-xs font-semibold text-[#0f7896]">{plan.tag}</span> : null}
+                {!plan.isActive ? <span className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-600">Coming soon</span> : null}
+              </div>
+              <h3 className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-[#071014]">{plan.name}</h3>
+            </div>
+            {plan.availabilityNote ? <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">{plan.availabilityNote}</span> : null}
           </div>
-        ) : (
-          <div className="mt-3 flex gap-2">
-            <input
-              id={`coupon-${plan.id}`}
-              value={couponInput}
-              onChange={(event) => { setCouponInput(event.target.value.toUpperCase()); setCouponError(""); }}
-              onKeyDown={(event) => { if (event.key === "Enter") applyCoupon(); }}
-              placeholder="Enter code"
-              autoCapitalize="characters"
-              className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2.5 text-sm uppercase text-[var(--text-primary)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--focus)]"
-            />
-            <button
-              type="button"
-              onClick={applyCoupon}
-              disabled={!couponInput.trim()}
-              className="rounded-xl bg-[var(--accent-soft)] px-4 text-xs font-semibold text-[var(--accent-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Apply
-            </button>
+          <p className="mt-4 text-sm leading-7 text-[#071014]/60">{plan.description || "A focused Urologics learning plan built for your exam preparation."}</p>
+          <div className="mt-6 space-y-3">
+            {plan.featureBullets.map((feature) => <div key={feature} className="flex items-start gap-3 border-b border-[#0f7896]/8 pb-3 text-sm leading-6 text-[#071014]/72"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><span>{feature}</span></div>)}
+            {!plan.featureBullets.length ? <p className="rounded-2xl border border-dashed border-[#0f7896]/15 bg-cyan-50 p-4 text-sm text-[#071014]/55">Custom access bundle</p> : null}
           </div>
-        )}
-        {couponError && <p className="mt-2 text-xs leading-5 text-red-600 dark:text-red-400">{couponError}</p>}
-      </div>
+        </div>
 
-      <button
-        type="button"
-        onClick={beginCheckout}
-        disabled={!plan.isActive || !checkoutUrl}
-        className={`mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold transition ${
-          plan.isActive && checkoutUrl
-            ? "bg-[var(--accent)] text-white shadow-[0_14px_30px_var(--shadow-brand)] hover:-translate-y-0.5 hover:bg-[var(--accent-hover)]"
-            : "cursor-not-allowed bg-[var(--surface-muted)] text-[var(--text-tertiary)]"
-        }`}
-      >
-        {plan.isActive ? "Choose this plan" : "Currently unavailable"}
-        {plan.isActive && <ArrowRight className="h-4 w-4" />}
-      </button>
+        <aside className="border-t border-[#0f7896]/10 pt-6 lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">
+          <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f7896]">Choose duration</p><p className="text-xs text-[#071014]/50">{versions.length} option{versions.length === 1 ? "" : "s"}</p></div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {versions.map((version) => <button key={version.id} type="button" disabled={!plan.isActive} onClick={() => setActiveId(version.id)} className={`min-h-10 border px-3 py-2 text-sm font-medium transition ${version.id === active.id ? "border-[#0f7896] bg-[#0f7896] text-white" : "border-[#0f7896]/15 bg-[#f8fdff] text-[#0f7896] hover:border-[#0f7896]/40"}`}>{version.durationLabel || `${version.months} months`}</button>)}
+          </div>
+          <div className="mt-4 border-l-2 border-[#0f7896] bg-cyan-50 px-4 py-3 text-sm text-[#071014]/62">
+            <p className="flex items-center gap-2 font-medium text-[#0f7896]"><Clock3 className="h-4 w-4" />{active.durationLabel || `Valid for ${active.months} months`}</p>
+            {(active.billingLabel || plan.billingLabel) ? <p className="mt-2">{active.billingLabel || plan.billingLabel}</p> : null}
+            {plan.vivaMinutes ? <p className="mt-2">Includes {plan.vivaMinutes} AI viva minutes</p> : null}
+          </div>
+          <div className="mt-5 border-t border-[#0f7896]/10 pt-5">
+            {basePrice < originalPrice ? <p className="text-sm text-[#071014]/45 line-through decoration-2 decoration-orange-500">{money(originalPrice)}</p> : null}
+            <div className="mt-1 flex items-end justify-between gap-3"><p className="text-3xl font-semibold tracking-[-0.04em] text-[#071014]">{money(basePrice)}</p>{originalPrice > basePrice ? <span className="text-xs font-semibold text-emerald-700">Save {money(originalPrice - basePrice)}</span> : null}</div>
+            <button type="button" onClick={checkout} disabled={!plan.isActive || !checkoutUrl} className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#0f7896] px-5 text-sm font-semibold text-white hover:bg-[#0b647d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">{plan.isActive ? "Continue to payment" : "Coming soon"}{plan.isActive ? <ArrowRight className="h-4 w-4" /> : null}</button>
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11px] text-[#071014]/45"><ShieldCheck className="h-3.5 w-3.5" />Secure checkout · Access starts after payment</p>
+          </div>
+        </aside>
+      </div>
     </article>
   );
 }
@@ -259,100 +74,39 @@ export default function PlansPage() {
   const [data, setData] = useState<PricingResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
 
   async function loadPlans() {
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
       const response = await fetch(appPath("/api/pricing-plans"), { cache: "no-store" });
-      const payload = (await response.json()) as PricingResponse & { error?: string };
+      const payload = await response.json() as PricingResponse & { error?: string };
       if (!response.ok) throw new Error(payload.error || "Unable to load plans.");
       setData(payload);
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Unable to load plans.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (nextError) { setError(nextError instanceof Error ? nextError.message : "Unable to load plans."); }
+    finally { setLoading(false); }
   }
 
-  useEffect(() => {
-    void loadPlans();
-  }, []);
-
-  const plans = useMemo(
-    () => [...(data?.plans || [])].sort((a, b) => a.sortOrder - b.sortOrder),
-    [data],
-  );
-  const planGroups = useMemo(() => {
-    const groups = new Map<string, PricingPlan[]>();
-    for (const plan of plans) {
-      const category = plan.category?.trim() || "Other plans";
-      groups.set(category, [...(groups.get(category) || []), plan]);
+  useEffect(() => { void loadPlans(); }, []);
+  const groups = useMemo(() => {
+    const map = new Map<string, PricingPlan[]>();
+    for (const plan of [...(data?.plans || [])].sort((a, b) => a.sortOrder - b.sortOrder)) {
+      const category = plan.category?.trim() || "Programs";
+      map.set(category, [...(map.get(category) || []), plan]);
     }
-    return [...groups.entries()];
-  }, [plans]);
+    return [...map.entries()];
+  }, [data]);
+  useEffect(() => { if (!openCategory && groups.length) setOpenCategory(groups[0][0]); }, [groups, openCategory]);
 
   return (
-    <main className="urologics-shell min-h-screen overflow-x-hidden">
-      <div className="mx-auto min-h-screen w-full max-w-[1400px] px-3 pb-14 sm:px-6 lg:px-8">
+    <main className="min-h-screen overflow-x-hidden bg-cyan-50 text-[#071014]">
+      <div className="mx-auto w-full max-w-[1400px] px-3 pb-16 sm:px-6 lg:px-8">
         <UrologicsHeader current="Plans" product="Plans" tag="Membership & access" />
-        <section className="mt-7">
-          {loading ? (
-            <div className="grid gap-5 lg:grid-cols-3" aria-label="Loading pricing plans">
-              {[0, 1, 2].map((item) => (
-                <div key={item} className="h-[560px] animate-pulse rounded-[30px] border border-[var(--border)] bg-[var(--surface-raised)] p-7">
-                  <div className="h-5 w-20 rounded-full bg-[var(--surface-muted)]" />
-                  <div className="mt-7 h-8 w-2/3 rounded bg-[var(--surface-muted)]" />
-                  <div className="mt-4 h-4 w-full rounded bg-[var(--surface-muted)]" />
-                  <div className="mt-2 h-4 w-4/5 rounded bg-[var(--surface-muted)]" />
-                  <div className="mt-10 h-12 w-1/2 rounded bg-[var(--surface-muted)]" />
-                </div>
-              ))}
-            </div>
-          ) : error ? (
-            <div className="mx-auto max-w-xl rounded-[28px] border border-red-200 bg-red-50 p-8 text-center dark:border-red-900/50 dark:bg-red-950/30">
-              <p className="font-semibold text-red-700 dark:text-red-300">Plans could not be loaded</p>
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>
-              <button type="button" onClick={() => void loadPlans()} className="urologics-button-secondary mt-5 gap-2">
-                <RefreshCw className="h-4 w-4" /> Try again
-              </button>
-            </div>
-          ) : plans.length === 0 ? (
-            <div className="rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-10 text-center text-[var(--text-secondary)]">
-              No plans are available right now. Please check back soon.
-            </div>
-          ) : (
-            <div className="space-y-10 sm:space-y-12">
-              {planGroups.map(([category, categoryPlans]) => (
-                <section key={category} aria-labelledby={`category-${category.replace(/\s+/g, "-").toLowerCase()}`}>
-                  <div className="mb-4 flex items-center gap-3 sm:mb-5">
-                    <h2 id={`category-${category.replace(/\s+/g, "-").toLowerCase()}`} className="text-xl font-semibold tracking-[-0.035em] text-[var(--text-primary)] sm:text-2xl">
-                      {category}
-                    </h2>
-                    <span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent-strong)]">
-                      {categoryPlans.length} {categoryPlans.length === 1 ? "plan" : "plans"}
-                    </span>
-                    <div className="h-px flex-1 bg-[var(--border)]" />
-                  </div>
-                  <div className={`grid items-stretch gap-4 sm:gap-5 ${categoryPlans.length === 1 ? "max-w-md" : categoryPlans.length === 2 ? "max-w-4xl md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-3"}`}>
-                    {categoryPlans.map((plan) => (
-                      <PlanCard
-                        key={plan.id}
-                        plan={plan}
-                        coupons={data?.coupons || []}
-                        featured={Boolean(plan.tag)}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <footer className="mt-10 text-center text-xs leading-5 text-[var(--text-tertiary)]">
-          Payments are completed on our secure checkout. Access begins after successful payment.
-        </footer>
+        <header className="mb-10 mt-10 max-w-4xl sm:mb-14"><p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0f7896]">Plans & payment</p><h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[#071014] sm:text-6xl">Simple plans for serious FRCS preparation.</h1><p className="mt-5 max-w-2xl text-base leading-7 text-[#071014]/60">Choose the access that fits your preparation, apply an eligible offer, and continue to secure payment.</p></header>
+        {loading ? <div className="space-y-5" aria-label="Loading pricing plans">{[0, 1, 2].map((item) => <div key={item} className="h-32 animate-pulse rounded-[28px] border border-[#0f7896]/10 bg-white" />)}</div>
+        : error ? <div className="mx-auto max-w-xl rounded-[28px] border border-rose-200 bg-white p-8 text-center"><p className="font-semibold text-rose-700">Plans could not be loaded</p><p className="mt-2 text-sm text-rose-600">{error}</p><button type="button" onClick={() => void loadPlans()} className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#0f7896] px-5 py-3 text-sm font-semibold text-white"><RefreshCw className="h-4 w-4" />Try again</button></div>
+        : groups.length === 0 ? <div className="rounded-[28px] border border-[#0f7896]/12 bg-white p-10 text-center text-[#071014]/60">No plans are available right now. Please check back soon.</div>
+        : <div className="space-y-6">{groups.map(([category, plans]) => { const open = openCategory === category; return <section key={category} className="overflow-hidden rounded-[32px] border border-[#0f7896]/12 bg-white shadow-[0_18px_50px_rgba(15,120,150,0.08)]"><button type="button" onClick={() => setOpenCategory(open ? null : category)} className="flex w-full items-center justify-between gap-5 bg-gradient-to-r from-white via-cyan-50/70 to-white px-5 py-6 text-left hover:bg-cyan-50 sm:px-7"><div className="flex min-w-0 items-center gap-4"><span className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl bg-[#0f7896] text-white shadow-[0_10px_24px_rgba(15,120,150,.22)]"><Layers3 className="h-6 w-6" /></span><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#0f7896]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7896]">Category</span><span className="text-xs text-[#071014]/50">{plans.length} plan{plans.length === 1 ? "" : "s"}</span></div><h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] sm:text-2xl">{category}</h2></div></div><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#0f7896]/12 bg-white text-[#0f7896]">{open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}</span></button>{open ? <div className="space-y-5 border-t border-[#0f7896]/10 bg-[#fbfeff] p-4 sm:p-6">{plans.map((plan) => <PlanCard key={plan.id} plan={plan} coupons={data?.coupons || []} />)}</div> : null}</section>; })}</div>}
       </div>
     </main>
   );

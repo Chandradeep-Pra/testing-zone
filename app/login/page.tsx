@@ -45,9 +45,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  function redirectAfterLogin() {
+    const requested = new URLSearchParams(window.location.search).get("redirect");
+    return requested?.startsWith("/") && !requested.startsWith("//") ? requested : "/";
+  }
+
   useEffect(() => {
     if (!loading && user) {
-      router.replace("/");
+      router.replace(redirectAfterLogin());
     }
   }, [loading, router, user]);
 
@@ -63,7 +68,7 @@ export default function LoginPage() {
     try {
       const signedInUser = await signIn(email, password);
       toast.success(`Welcome ${signedInUser.name}`);
-      router.replace("/");
+      router.replace(redirectAfterLogin());
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to sign in.";
       toast.error(getReadableAuthError(message));
