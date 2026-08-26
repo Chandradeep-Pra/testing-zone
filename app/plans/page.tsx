@@ -33,7 +33,7 @@ function PlanCard({ plan }: { plan: PricingPlan; coupons: PricingCoupon[] }) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-[#0f7896]/10 text-[#0f7896]"><Sparkles className="h-4 w-4" /></span>
+                
                 {plan.tag ? <span className="rounded-full bg-[#0f7896]/10 px-3 py-1 text-xs font-semibold text-[#0f7896]">{plan.tag}</span> : null}
                 {!plan.isActive ? <span className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-600">Coming soon</span> : null}
               </div>
