@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Clock3, Layers3, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronUp, Clock3, Layers3, RefreshCw, ShieldCheck } from "lucide-react";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
-import type { PricingCoupon, PricingPlan, PricingPlanVersion, PricingResponse } from "@/components/pricing/types";
+import type { PricingPlan, PricingPlanVersion, PricingResponse } from "@/components/pricing/types";
 import { appPath } from "@/lib/app-path";
 
 const money = (value: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: value % 1 ? 2 : 0 }).format(value);
@@ -12,12 +12,12 @@ function fallback(plan: PricingPlan): PricingPlanVersion {
   return { id: plan.id, months: plan.expiryMonths, price: plan.price, originalPrice: plan.originalPrice, discountedPrice: plan.discountedPrice, couponId: plan.couponId, couponCode: plan.couponCode, embeddedLink: plan.embeddedLink, durationLabel: plan.durationLabel, billingLabel: plan.billingLabel };
 }
 
-function PlanCard({ plan }: { plan: PricingPlan; coupons: PricingCoupon[] }) {
+function PlanCard({ plan }: { plan: PricingPlan }) {
   const versions = useMemo(() => (plan.versions?.length ? [...plan.versions] : [fallback(plan)]).sort((a, b) => a.months - b.months), [plan]);
   const [activeId, setActiveId] = useState(versions[0].id);
   const active = versions.find((version) => version.id === activeId) || versions[0];
-  const basePrice = active.discountedPrice || active.price;
-  const originalPrice = active.originalPrice || active.price;
+  const basePrice = active.price;
+  const originalPrice = active.price;
   const checkoutUrl = active.embeddedLink || plan.embeddedLink;
 
   function checkout() {
@@ -28,7 +28,7 @@ function PlanCard({ plan }: { plan: PricingPlan; coupons: PricingCoupon[] }) {
   return (
     <article className="relative overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white p-5 shadow-[0_16px_44px_rgba(15,120,150,0.08)] sm:p-7">
       <div className="absolute inset-x-0 top-0 h-1 bg-[#0f7896]" />
-      <div className="grid gap-7 lg:grid-cols-[minmax(0,1.12fr)_minmax(260px,.88fr)]">
+      <div className="flex h-full flex-col gap-7">
         <div className="flex min-w-0 flex-col">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -48,7 +48,7 @@ function PlanCard({ plan }: { plan: PricingPlan; coupons: PricingCoupon[] }) {
           </div>
         </div>
 
-        <aside className="border-t border-[#0f7896]/10 pt-6 lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0">
+        <aside className="mt-auto border-t border-[#0f7896]/10 pt-6">
           <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f7896]">Choose duration</p><p className="text-xs text-[#071014]/50">{versions.length} option{versions.length === 1 ? "" : "s"}</p></div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {versions.map((version) => <button key={version.id} type="button" disabled={!plan.isActive} onClick={() => setActiveId(version.id)} className={`min-h-10 border px-3 py-2 text-sm font-medium transition ${version.id === active.id ? "border-[#0f7896] bg-[#0f7896] text-white" : "border-[#0f7896]/15 bg-[#f8fdff] text-[#0f7896] hover:border-[#0f7896]/40"}`}>{version.durationLabel || `${version.months} months`}</button>)}
@@ -106,7 +106,7 @@ export default function PlansPage() {
         {loading ? <div className="space-y-5" aria-label="Loading pricing plans">{[0, 1, 2].map((item) => <div key={item} className="h-32 animate-pulse rounded-[28px] border border-[#0f7896]/10 bg-white" />)}</div>
         : error ? <div className="mx-auto max-w-xl rounded-[28px] border border-rose-200 bg-white p-8 text-center"><p className="font-semibold text-rose-700">Plans could not be loaded</p><p className="mt-2 text-sm text-rose-600">{error}</p><button type="button" onClick={() => void loadPlans()} className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#0f7896] px-5 py-3 text-sm font-semibold text-white"><RefreshCw className="h-4 w-4" />Try again</button></div>
         : groups.length === 0 ? <div className="rounded-[28px] border border-[#0f7896]/12 bg-white p-10 text-center text-[#071014]/60">No plans are available right now. Please check back soon.</div>
-        : <div className="space-y-6">{groups.map(([category, plans]) => { const open = openCategory === category; return <section key={category} className="overflow-hidden rounded-[32px] border border-[#0f7896]/12 bg-white shadow-[0_18px_50px_rgba(15,120,150,0.08)]"><button type="button" onClick={() => setOpenCategory(open ? null : category)} className="flex w-full items-center justify-between gap-5 bg-gradient-to-r from-white via-cyan-50/70 to-white px-5 py-6 text-left hover:bg-cyan-50 sm:px-7"><div className="flex min-w-0 items-center gap-4"><span className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl bg-[#0f7896] text-white shadow-[0_10px_24px_rgba(15,120,150,.22)]"><Layers3 className="h-6 w-6" /></span><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#0f7896]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7896]">Category</span><span className="text-xs text-[#071014]/50">{plans.length} plan{plans.length === 1 ? "" : "s"}</span></div><h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] sm:text-2xl">{category}</h2></div></div><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#0f7896]/12 bg-white text-[#0f7896]">{open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}</span></button>{open ? <div className="space-y-5 border-t border-[#0f7896]/10 bg-[#fbfeff] p-4 sm:p-6">{plans.map((plan) => <PlanCard key={plan.id} plan={plan} coupons={data?.coupons || []} />)}</div> : null}</section>; })}</div>}
+        : <div className="space-y-6">{groups.map(([category, plans]) => { const open = openCategory === category; return <section key={category} className="overflow-hidden rounded-[32px] border border-[#0f7896]/12 bg-white shadow-[0_18px_50px_rgba(15,120,150,0.08)]"><button type="button" onClick={() => setOpenCategory(open ? null : category)} className="flex w-full items-center justify-between gap-5 bg-gradient-to-r from-white via-cyan-50/70 to-white px-5 py-6 text-left hover:bg-cyan-50 sm:px-7"><div className="flex min-w-0 items-center gap-4"><span className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl bg-[#0f7896] text-white shadow-[0_10px_24px_rgba(15,120,150,.22)]"><Layers3 className="h-6 w-6" /></span><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#0f7896]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7896]">Category</span><span className="text-xs text-[#071014]/50">{plans.length} plan{plans.length === 1 ? "" : "s"}</span></div><h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] sm:text-2xl">{category}</h2></div></div><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#0f7896]/12 bg-white text-[#0f7896]">{open ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}</span></button>{open ? <div className="grid items-stretch gap-5 border-t border-[#0f7896]/10 bg-[#fbfeff] p-4 md:grid-cols-2 sm:p-6 xl:grid-cols-3">{plans.map((plan) => <PlanCard key={plan.id} plan={plan} />)}</div> : null}</section>; })}</div>}
       </div>
     </main>
   );
