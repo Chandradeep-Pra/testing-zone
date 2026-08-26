@@ -201,6 +201,20 @@
 }
 
 @layer components {
+  .pricing-card-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--accent) 35%, transparent) transparent;
+  }
+
+  .pricing-card-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .pricing-card-scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
   .urologics-shell {
     @apply min-h-screen relative;
     background: var(--background);
