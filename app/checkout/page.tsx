@@ -38,7 +38,6 @@ function CheckoutContent() {
   const [verifying, setVerifying] = useState(false);
   const [paymentState, setPaymentState] = useState<"idle" | "creating" | "processing" | "success" | "cancelled" | "failed" | "pending">("idle");
   const [paymentMessage, setPaymentMessage] = useState("");
-  const [checkoutStarted, setCheckoutStarted] = useState(false);
   const [materialRequest, setMaterialRequest] = useState("");
   const [requestSaving, setRequestSaving] = useState(false);
   const [requestReference, setRequestReference] = useState("");
@@ -80,7 +79,7 @@ function CheckoutContent() {
   }, [authLoading, params, user]);
 
   useEffect(() => {
-    if (!details?.purchaseAvailable || !details.paypalClientId || paymentComplete || !checkoutStarted || !user) return;
+    if (!details?.purchaseAvailable || !details.paypalClientId || paymentComplete || !user) return;
     const checkout = details;
     const container = document.getElementById("paypal-button-container");
     if (!container) return;
@@ -90,7 +89,6 @@ function CheckoutContent() {
     const render = async () => {
       if (disposed || !window.paypal) return;
       buttons = window.paypal.Buttons({
-        fundingSource: window.paypal.FUNDING?.PAYPAL,
         style: { layout: "vertical", shape: "pill", label: "paypal", height: 48 },
         createOrder: async () => {
           setPaymentState("creating"); setPaymentMessage("");
@@ -116,7 +114,7 @@ function CheckoutContent() {
     if (existing) { if (window.paypal) void render(); else existing.addEventListener("load", render, { once: true }); }
     else { const script = document.createElement("script"); script.dataset.paypalSdk = "true"; script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(checkout.paypalClientId)}&currency=${encodeURIComponent(checkout.version.currency)}&intent=capture`; script.addEventListener("load", render, { once: true }); script.addEventListener("error", () => { setPaymentState("failed"); setPaymentMessage("Unable to load PayPal checkout."); }); document.head.appendChild(script); }
     return () => { disposed = true; void buttons?.close?.(); };
-  }, [applied?.couponCode, checkoutStarted, details, paymentComplete, user]);
+  }, [applied?.couponCode, details, paymentComplete, user]);
 
   async function applyCoupon(code = couponCode) {
     if (!details?.purchaseAvailable || !code.trim()) return;
@@ -126,7 +124,7 @@ function CheckoutContent() {
   }
 
   if (error) return <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-700">{error}</div>;
-  if (!details) return <div className="flex items-center justify-center gap-3 py-16 text-slate-600"><Loader2 className="h-5 w-5 animate-spin" />Checking your account and plan...</div>;
+  if (!details) return <div className="flex items-center justify-center gap-3 py-16 text-slate-600"><Loader2 className="h-5 w-5 animate-spin" />Continuing to checkout...</div>;
 
   if (!details.purchaseAvailable) {
     const unavailable = details;
@@ -154,7 +152,8 @@ function CheckoutContent() {
     catch (error) { setConcernError(error instanceof Error ? error.message : "Unable to raise concern"); } finally { setConcernSaving(false); }
   }
 
-  return <div className="space-y-6">
+  return <div className={`relative space-y-6 ${paymentState === "creating" ? "min-h-40 [&>*:not(.payment-loading)]:invisible" : ""}`}>
+    {paymentState === "creating" ? <div className="payment-loading absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 text-center"><div className="grid h-12 w-12 place-items-center rounded-full bg-cyan-50 text-cyan-700 ring-1 ring-cyan-100"><Loader2 className="h-6 w-6 animate-spin" /></div><p className="text-sm font-semibold text-slate-700">Proceeding to checkout...</p></div> : null}
     <a href={appPath("/plans")} className="inline-flex items-center gap-2 text-sm font-medium text-[#0f7896]"><ArrowLeft className="h-4 w-4" />Back to plans</a>
     <div className="flex items-center gap-3 text-emerald-700"><ShieldCheck className="h-6 w-6" /><span className="font-semibold">Signed in and ready for secure checkout</span></div>
     {params.get("queryId") ? <div className="flex items-start gap-3 rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-cyan-900"><CircleHelp className="mt-0.5 h-5 w-5" /><div><p className="font-semibold">Your payment query is linked</p><p className="mt-1 text-sm">Support reference: {params.get("queryId")}</p></div></div> : null}
@@ -169,7 +168,7 @@ function CheckoutContent() {
     {paymentMessage ? <p className={`rounded-2xl p-4 text-center text-sm ${paymentState === "pending" ? "bg-amber-50 text-amber-800" : "bg-rose-50 text-rose-600"}`}>{paymentMessage}</p> : null}
     {paymentState === "processing" ? <p className="flex items-center justify-center gap-2 rounded-2xl bg-cyan-50 p-4 text-sm text-cyan-800"><Loader2 className="h-4 w-4 animate-spin" />Processing and verifying payment...</p> : null}
     {canRaiseConcern ? <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">{!concernOpen ? <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold text-slate-950">Need help with this payment?</p><p className="mt-1 text-sm text-slate-600">Send the details to Urologics support.</p></div><button type="button" onClick={() => setConcernOpen(true)} className="rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-semibold">Raise concern</button></div> : concernReference ? <div className="text-emerald-800"><p className="font-semibold">Your payment concern has been raised</p><p className="mt-2 text-sm">Reference: {concernReference}. {concernEmailSent ? `A confirmation email was sent to ${details.user.email}.` : "Your concern was saved successfully."}</p></div> : <form onSubmit={submitConcern} className="space-y-4"><div><p className="font-semibold">Raise a payment concern</p><p className="mt-1 text-sm text-slate-600">Account and plan details are filled automatically.</p></div><div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Name<input readOnly value={details.user.name || user?.name || "Member"} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3" /></label><label className="text-sm font-medium">Email<input readOnly value={details.user.email || user?.email || ""} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3" /></label></div><div className="rounded-xl bg-white p-3 text-sm text-slate-600"><p><strong>Plan:</strong> {details.plan.name}</p><p><strong>Duration:</strong> {details.version.durationLabel || `${details.version.months} months`}</p><p><strong>Coupon:</strong> {applied?.couponCode || couponCode.trim() || "Not provided"}</p></div><label className="block text-sm font-medium">Describe the payment problem<textarea required maxLength={2000} value={paymentQuery} onChange={(event) => setPaymentQuery(event.target.value)} className="mt-1 min-h-28 w-full rounded-xl border border-slate-200 bg-white p-3" placeholder="Tell us what happened during payment..." /></label>{concernError ? <p className="text-sm text-rose-600">{concernError}</p> : null}<div className="flex gap-2"><button disabled={concernSaving || !paymentQuery.trim()} className="rounded-full bg-[#0f7896] px-5 py-2 font-semibold text-white disabled:opacity-50">{concernSaving ? "Sending..." : "Submit concern"}</button><button type="button" onClick={() => setConcernOpen(false)} className="px-4 text-sm font-semibold">Cancel</button></div></form>}</section> : null}
-    {!details.paypalClientId ? <p className="rounded-2xl bg-amber-50 p-4 text-amber-800">PayPal Sandbox is not configured.</p> : !checkoutStarted ? <button type="button" onClick={() => setCheckoutStarted(true)} className="min-h-12 w-full rounded-full bg-[#0f7896] px-6 text-base font-semibold text-white hover:bg-[#0b647d]">Continue to payment</button> : <div className="space-y-3"><p className="text-center text-sm text-slate-500">Continue securely with PayPal</p><div id="paypal-button-container" className={paymentState === "processing" ? "pointer-events-none opacity-50" : ""} /></div>}
+    {!details.paypalClientId ? <p className="rounded-2xl bg-amber-50 p-4 text-amber-800">PayPal Sandbox is not configured.</p> : <div id="paypal-button-container" className={paymentState === "processing" ? "pointer-events-none opacity-50" : ""} />}
   </div>;
 }
 
