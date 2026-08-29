@@ -9,6 +9,7 @@ import {
   KeyRound,
   LogOut,
   Pencil,
+  ReceiptText,
   ShieldCheck,
   TrendingUp,
   UserRound,
@@ -62,6 +63,8 @@ type ProgressPayload = {
   };
 };
 
+type Purchase = { id: string; courseNameSnapshot?: string; planNameSnapshot?: string; paidAmount?: number; currency?: string; status?: string; paypalOrderId?: string; purchasedAt?: string | null; accessEndsAt?: string | null; createdAt?: string | null };
+
 const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
 function numberValue(value: unknown) {
@@ -73,6 +76,7 @@ export default function UserPage() {
   const { user, loading, refreshUser, signOut } = useAuth();
   const [access, setAccess] = useState<AccessPayload | null>(null);
   const [progress, setProgress] = useState<ProgressPayload | null>(null);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -94,7 +98,7 @@ export default function UserPage() {
       setPageLoading(true);
 
       try {
-        const [accessResponse, progressResponse] = await Promise.all([
+        const [accessResponse, progressResponse, purchasesResponse] = await Promise.all([
           fetch(appPath("/api/urologics/access"), {
             headers: { Authorization: `Bearer ${idToken}` },
             cache: "no-store",
@@ -103,17 +107,24 @@ export default function UserPage() {
             headers: { Authorization: `Bearer ${idToken}` },
             cache: "no-store",
           }),
+          fetch(appPath("/api/urologics/purchases"), {
+            headers: { Authorization: `Bearer ${idToken}` },
+            cache: "no-store",
+          }),
         ]);
 
         const accessPayload = await accessResponse.json().catch(() => ({}));
         const progressPayload = await progressResponse.json().catch(() => ({}));
+        const purchasesPayload = await purchasesResponse.json().catch(() => ({}));
 
         if (!accessResponse.ok) throw new Error(accessPayload?.error || "Unable to load access.");
         if (!progressResponse.ok) throw new Error(progressPayload?.error || "Unable to load progress.");
+        if (!purchasesResponse.ok) throw new Error(purchasesPayload?.error || "Unable to load purchases.");
 
         if (!active) return;
         setAccess(accessPayload);
         setProgress(progressPayload);
+        setPurchases(Array.isArray(purchasesPayload?.purchases) ? purchasesPayload.purchases : []);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to load profile.");
       } finally {
@@ -397,6 +408,13 @@ export default function UserPage() {
                     <LogOut className="h-4 w-4" />
                     Logout
                   </button>
+                </div>
+              </div>
+
+              <div className="urologics-panel p-5 sm:p-6">
+                <div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-[var(--accent-strong)]" /><h2 className="text-xl font-semibold text-[var(--text-primary)]">Purchase history</h2></div>
+                <div className="mt-5 space-y-3">
+                  {purchases.length ? purchases.map((purchase) => <div key={purchase.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold text-[var(--text-primary)]">{purchase.courseNameSnapshot || "Course purchase"}</p><p className="mt-1 text-sm text-[var(--text-secondary)]">{purchase.planNameSnapshot || "Plan"}</p></div><span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">{purchase.status || "CREATED"}</span></div><div className="mt-3 grid gap-1 text-xs text-[var(--text-secondary)] sm:grid-cols-2"><p>{new Intl.NumberFormat("en-GB", { style: "currency", currency: purchase.currency || "GBP" }).format(Number(purchase.paidAmount || 0))}</p><p>Order: {purchase.paypalOrderId || "Pending"}</p><p>Purchased: {purchase.purchasedAt ? new Date(purchase.purchasedAt).toLocaleDateString("en-GB") : "Pending"}</p><p>Access expires: {purchase.accessEndsAt ? new Date(purchase.accessEndsAt).toLocaleDateString("en-GB") : "Pending"}</p></div></div>) : <p className="text-sm text-[var(--text-secondary)]">No purchases yet.</p>}
                 </div>
               </div>
 
