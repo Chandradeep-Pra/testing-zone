@@ -19,8 +19,13 @@ type AvailableCheckoutDetails = {
 type UnavailableCheckoutDetails = { purchaseAvailable: false; message: string; plan: { id: string; name: string; description: string }; user: { uid: string; email: string | null; name: string | null } };
 type CheckoutDetails = AvailableCheckoutDetails | UnavailableCheckoutDetails;
 type AppliedPricing = { couponCode: string; discountAmount: number; discountedPrice: number; expiresAt: string | null };
-type PayPalButtons = (options: { createOrder: () => Promise<string>; onApprove: (data: { orderID: string }) => Promise<void>; onCancel: () => void; onError: (error: unknown) => void }) => { render: (selector: HTMLElement) => Promise<void>; close?: () => Promise<void> };
-declare global { interface Window { paypal?: { Buttons: PayPalButtons } } }
+type PayPalButtons = (options: { fundingSource?: string; style?: { layout?: "vertical" | "horizontal"; shape?: "pill" | "rect"; label?: "paypal" | "checkout" | "pay" | "buynow"; height?: number }; createOrder: () => Promise<string>; onApprove: (data: { orderID: string }) => Promise<void>; onCancel: () => void; onError: (error: unknown) => void }) => { render: (selector: HTMLElement) => Promise<void>; close?: () => Promise<void> };
+declare global { interface Window { paypal?: { Buttons: PayPalButtons; FUNDING?: { PAYPAL?: string } } } }
+
+function PurchaseSuccess() {
+  const colors = ["#0f7896", "#1294ba", "#f59e0b", "#10b981", "#ec4899"];
+  return <div className="relative overflow-hidden py-8 text-center">{Array.from({ length: 36 }, (_, index) => <span key={index} className="pointer-events-none absolute top-[-20px] h-3 w-2 animate-[confetti-fall_3s_ease-in_infinite]" style={{ left: `${(index * 29) % 100}%`, backgroundColor: colors[index % colors.length], animationDelay: `${(index % 12) * 0.16}s`, animationDuration: `${2.4 + (index % 7) * 0.2}s` }} />)}<div className="relative mx-auto grid h-20 w-20 place-items-center rounded-full bg-emerald-100 text-emerald-700"><Check className="h-10 w-10" /></div><p className="relative mt-6 text-sm font-bold uppercase tracking-[0.18em] text-[#0f7896]">Payment confirmed</p><h1 className="relative mt-3 text-4xl font-black tracking-[-0.05em] text-slate-950">Thank you for your purchase!</h1><p className="relative mx-auto mt-4 max-w-md text-base leading-7 text-slate-600">Your payment was verified successfully and your course access is now active.</p><a href="https://urologics.co.uk" className="relative mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-[#0f7896] px-8 font-bold text-white shadow-lg transition hover:bg-[#0b647d]">Login to Urologics</a><p className="relative mt-4 text-xs text-slate-500">A purchase confirmation has been sent to your email.</p><style jsx>{`@keyframes confetti-fall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(620px) rotate(720deg); opacity: 0; } }`}</style></div>;
+}
 
 function CheckoutContent() {
   const params = useSearchParams();
@@ -33,6 +38,7 @@ function CheckoutContent() {
   const [verifying, setVerifying] = useState(false);
   const [paymentState, setPaymentState] = useState<"idle" | "creating" | "processing" | "success" | "cancelled" | "failed" | "pending">("idle");
   const [paymentMessage, setPaymentMessage] = useState("");
+  const [checkoutStarted, setCheckoutStarted] = useState(false);
   const [materialRequest, setMaterialRequest] = useState("");
   const [requestSaving, setRequestSaving] = useState(false);
   const [requestReference, setRequestReference] = useState("");
@@ -74,7 +80,7 @@ function CheckoutContent() {
   }, [authLoading, params, user]);
 
   useEffect(() => {
-    if (!details?.purchaseAvailable || !details.paypalClientId || paymentComplete || !user) return;
+    if (!details?.purchaseAvailable || !details.paypalClientId || paymentComplete || !checkoutStarted || !user) return;
     const checkout = details;
     const container = document.getElementById("paypal-button-container");
     if (!container) return;
@@ -84,6 +90,8 @@ function CheckoutContent() {
     const render = async () => {
       if (disposed || !window.paypal) return;
       buttons = window.paypal.Buttons({
+        fundingSource: window.paypal.FUNDING?.PAYPAL,
+        style: { layout: "vertical", shape: "pill", label: "paypal", height: 48 },
         createOrder: async () => {
           setPaymentState("creating"); setPaymentMessage("");
           const response = await fetch(appPath("/api/paypal/create-order"), { method: "POST", headers: { Authorization: `Bearer ${user.idToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ courseId: checkout.plan.courseId, planId: checkout.plan.id, versionId: checkout.version.id, couponCode: applied?.couponCode || undefined }) });
@@ -108,7 +116,7 @@ function CheckoutContent() {
     if (existing) { if (window.paypal) void render(); else existing.addEventListener("load", render, { once: true }); }
     else { const script = document.createElement("script"); script.dataset.paypalSdk = "true"; script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(checkout.paypalClientId)}&currency=${encodeURIComponent(checkout.version.currency)}&intent=capture`; script.addEventListener("load", render, { once: true }); script.addEventListener("error", () => { setPaymentState("failed"); setPaymentMessage("Unable to load PayPal checkout."); }); document.head.appendChild(script); }
     return () => { disposed = true; void buttons?.close?.(); };
-  }, [applied?.couponCode, details, paymentComplete, user]);
+  }, [applied?.couponCode, checkoutStarted, details, paymentComplete, user]);
 
   async function applyCoupon(code = couponCode) {
     if (!details?.purchaseAvailable || !code.trim()) return;
@@ -131,6 +139,7 @@ function CheckoutContent() {
   }
 
   const checkout = details;
+  if (paymentComplete) return <PurchaseSuccess />;
 
   const money = (value: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: details.version.currency }).format(value);
   const wholeMoney = (value: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: details.version.currency, maximumFractionDigits: 0 }).format(value);
@@ -157,10 +166,10 @@ function CheckoutContent() {
       {applied ? <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium text-emerald-700"><p className="flex items-center gap-2"><Check className="h-4 w-4" />Coupon {applied.couponCode} applied</p>{applied.expiresAt ? <p className="rounded-full bg-emerald-100 px-3 py-1 text-xs">Offer ends {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(applied.expiresAt))}</p> : null}</div> : couponError ? <p className="text-sm text-rose-600">{couponError}</p> : null}
     </section>
     <section className="rounded-2xl border border-slate-200 p-5"><div className="mb-4 flex items-center gap-2"><ReceiptText className="h-5 w-5 text-cyan-700" /><h2 className="font-semibold text-slate-950">Bill details</h2></div><div className="space-y-3 text-sm"><div className="flex justify-between gap-4 text-slate-600"><span>{details.plan.name} · {details.version.durationLabel || `${details.version.months} months`}</span><span>{money(details.version.originalPrice)}</span></div>{applied ? <div className="flex justify-between gap-4 text-emerald-700"><span>Coupon discount ({applied.couponCode})</span><span>−{money(applied.discountAmount)}</span></div> : null}<div className="flex justify-between gap-4 text-slate-500"><span>Taxes + platform fee</span><span>+{money(platformFee)}</span></div><div className="border-t border-slate-200 pt-3"><div className="flex items-end justify-between"><span className="font-semibold text-slate-950">Total</span><div className="text-right">{applied ? <p className="text-sm text-slate-400 line-through">{money(details.version.originalPrice)}</p> : null}<span className="block text-2xl font-bold text-slate-950">{wholeMoney(total)}</span></div></div><p className="mt-1 text-right text-xs text-slate-500">Currency: {details.version.currency}</p></div></div></section>
-    {paymentMessage ? <p className={`rounded-2xl p-4 text-center text-sm ${paymentState === "success" ? "bg-emerald-50 text-emerald-700" : paymentState === "pending" ? "bg-amber-50 text-amber-800" : "bg-rose-50 text-rose-600"}`}>{paymentMessage}</p> : null}
+    {paymentMessage ? <p className={`rounded-2xl p-4 text-center text-sm ${paymentState === "pending" ? "bg-amber-50 text-amber-800" : "bg-rose-50 text-rose-600"}`}>{paymentMessage}</p> : null}
     {paymentState === "processing" ? <p className="flex items-center justify-center gap-2 rounded-2xl bg-cyan-50 p-4 text-sm text-cyan-800"><Loader2 className="h-4 w-4 animate-spin" />Processing and verifying payment...</p> : null}
     {canRaiseConcern ? <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">{!concernOpen ? <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold text-slate-950">Need help with this payment?</p><p className="mt-1 text-sm text-slate-600">Send the details to Urologics support.</p></div><button type="button" onClick={() => setConcernOpen(true)} className="rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-semibold">Raise concern</button></div> : concernReference ? <div className="text-emerald-800"><p className="font-semibold">Your payment concern has been raised</p><p className="mt-2 text-sm">Reference: {concernReference}. {concernEmailSent ? `A confirmation email was sent to ${details.user.email}.` : "Your concern was saved successfully."}</p></div> : <form onSubmit={submitConcern} className="space-y-4"><div><p className="font-semibold">Raise a payment concern</p><p className="mt-1 text-sm text-slate-600">Account and plan details are filled automatically.</p></div><div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-medium">Name<input readOnly value={details.user.name || user?.name || "Member"} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3" /></label><label className="text-sm font-medium">Email<input readOnly value={details.user.email || user?.email || ""} className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3" /></label></div><div className="rounded-xl bg-white p-3 text-sm text-slate-600"><p><strong>Plan:</strong> {details.plan.name}</p><p><strong>Duration:</strong> {details.version.durationLabel || `${details.version.months} months`}</p><p><strong>Coupon:</strong> {applied?.couponCode || couponCode.trim() || "Not provided"}</p></div><label className="block text-sm font-medium">Describe the payment problem<textarea required maxLength={2000} value={paymentQuery} onChange={(event) => setPaymentQuery(event.target.value)} className="mt-1 min-h-28 w-full rounded-xl border border-slate-200 bg-white p-3" placeholder="Tell us what happened during payment..." /></label>{concernError ? <p className="text-sm text-rose-600">{concernError}</p> : null}<div className="flex gap-2"><button disabled={concernSaving || !paymentQuery.trim()} className="rounded-full bg-[#0f7896] px-5 py-2 font-semibold text-white disabled:opacity-50">{concernSaving ? "Sending..." : "Submit concern"}</button><button type="button" onClick={() => setConcernOpen(false)} className="px-4 text-sm font-semibold">Cancel</button></div></form>}</section> : null}
-    {!details.paypalClientId ? <p className="rounded-2xl bg-amber-50 p-4 text-amber-800">PayPal Sandbox is not configured.</p> : <div id="paypal-button-container" className={paymentState === "processing" || paymentState === "success" ? "pointer-events-none opacity-50" : ""} />}
+    {!details.paypalClientId ? <p className="rounded-2xl bg-amber-50 p-4 text-amber-800">PayPal Sandbox is not configured.</p> : !checkoutStarted ? <button type="button" onClick={() => setCheckoutStarted(true)} className="min-h-12 w-full rounded-full bg-[#0f7896] px-6 text-base font-semibold text-white hover:bg-[#0b647d]">Continue to payment</button> : <div className="space-y-3"><p className="text-center text-sm text-slate-500">Continue securely with PayPal</p><div id="paypal-button-container" className={paymentState === "processing" ? "pointer-events-none opacity-50" : ""} /></div>}
   </div>;
 }
 
