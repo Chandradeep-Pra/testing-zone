@@ -48,6 +48,7 @@ export type PricingPlan = {
   embeddedLink: string;
   isActive: boolean;
   sortOrder: number;
+  categorySortOrder?: number;
   vivaMinutes: number;
   couponId: string;
   couponCode: string;

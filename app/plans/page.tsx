@@ -89,12 +89,23 @@ export default function PlansPage() {
 
   useEffect(() => { void loadPlans(); }, []);
   const groups = useMemo(() => {
-    const map = new Map<string, PricingPlan[]>();
-    for (const plan of [...(data?.plans || [])].sort((a, b) => a.sortOrder - b.sortOrder)) {
+    const map = new Map<string, { plans: PricingPlan[]; sortOrder: number }>();
+    for (const plan of data?.plans || []) {
       const category = plan.category?.trim() || "Programs";
-      map.set(category, [...(map.get(category) || []), plan]);
+      const group = map.get(category);
+      if (group) {
+        group.plans.push(plan);
+        group.sortOrder = Math.min(group.sortOrder, plan.categorySortOrder ?? Number.MAX_SAFE_INTEGER);
+      } else {
+        map.set(category, {
+          plans: [plan],
+          sortOrder: plan.categorySortOrder ?? Number.MAX_SAFE_INTEGER,
+        });
+      }
     }
-    return [...map.entries()];
+    return [...map.entries()]
+      .sort(([, a], [, b]) => a.sortOrder - b.sortOrder)
+      .map(([category, group]) => [category, [...group.plans].sort((a, b) => a.sortOrder - b.sortOrder)] as const);
   }, [data]);
   return (
     <main className="pricing-experience min-h-screen overflow-x-hidden bg-cyan-50 text-[#071014]">
