@@ -18,10 +18,8 @@ function PlanCard({ plan }: { plan: PricingPlan }) {
   const active = versions.find((version) => version.id === activeId) || versions[0];
   const basePrice = active.price;
   const originalPrice = active.price;
-  const checkoutUrl = active.embeddedLink || plan.embeddedLink;
 
   function checkout() {
-    if (!checkoutUrl) return;
     window.location.assign(appPath(`/checkout?planId=${encodeURIComponent(plan.id)}&versionId=${encodeURIComponent(active.id)}`));
   }
 
@@ -61,7 +59,7 @@ function PlanCard({ plan }: { plan: PricingPlan }) {
           <div className="mt-3 border-t border-[#0f7896]/10 pt-3">
             {basePrice < originalPrice ? <p className="text-sm text-[#071014]/45 line-through decoration-2 decoration-orange-500">{money(originalPrice)}</p> : null}
             <div className="mt-1 flex items-end justify-between gap-3"><p className="text-3xl font-semibold tracking-[-0.04em] text-[#071014]">{money(basePrice)}</p>{originalPrice > basePrice ? <span className="text-xs font-semibold text-emerald-700">Save {money(originalPrice - basePrice)}</span> : null}</div>
-            <button type="button" onClick={checkout} disabled={!plan.isActive || !checkoutUrl} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-[#0f7896] px-5 text-sm font-semibold text-white hover:bg-[#0b647d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">{plan.isActive ? "Continue to payment" : "Coming soon"}{plan.isActive ? <ArrowRight className="h-4 w-4" /> : null}</button>
+            <button type="button" onClick={checkout} disabled={!plan.isActive} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-[#0f7896] px-5 text-sm font-semibold text-white hover:bg-[#0b647d] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">{plan.isActive ? "Continue to payment" : "Coming soon"}{plan.isActive ? <ArrowRight className="h-4 w-4" /> : null}</button>
             <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[10px] text-[#071014]/45"><ShieldCheck className="h-3 w-3" />Secure checkout · Access starts after payment</p>
           </div>
         </aside>
