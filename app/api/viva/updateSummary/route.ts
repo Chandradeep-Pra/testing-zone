@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { geminiModel } from "@/lib/gemni";
+import { VIVA_TRANSCRIPTION_POLICY } from "@/lib/viva-transcription-policy";
 import { getDefaultVivaCase, normalizeVivaCase, type VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_PHASES } from "@/lib/viva-flow";
 
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
 
     const prompt = `
 Maintain compact hidden state for a calm FRCS urology viva.
+${VIVA_TRANSCRIPTION_POLICY}
 
 Case:
 ${vivaCase.case.stem}

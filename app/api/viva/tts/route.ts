@@ -1,5 +1,6 @@
 import textToSpeech from "@google-cloud/text-to-speech";
 import { normalizeMedicalTerms, prepareTextForMedicalTts } from "@/lib/medical-terminology";
+import { resolveVivaTtsVoice } from "@/lib/viva-tts-voice";
 
 type GoogleCredentials = {
   client_email: string;
@@ -50,14 +51,20 @@ function getTtsClient() {
 
 export async function POST(req: Request) {
   const { text, voiceName, languageCode, terminology } = (await req.json()) as TtsRequestBody;
+  if (typeof text !== "string" || !text.trim()) {
+    return Response.json({ error: "Text is required" }, { status: 400 });
+  }
+  let voice: ReturnType<typeof resolveVivaTtsVoice>;
+  try {
+    voice = resolveVivaTtsVoice(voiceName, languageCode);
+  } catch (error) {
+    return Response.json({ error: (error as Error).message }, { status: 400 });
+  }
   const spokenText = prepareTextForMedicalTts(text, normalizeMedicalTerms(terminology));
 
   const [response] = await getTtsClient().synthesizeSpeech({
     input: { text: spokenText },
-    voice: {
-      languageCode: languageCode || "en-GB",
-      name: voiceName || "en-GB-Chirp3-HD-Leda",
-    },
+    voice,
     audioConfig: {
       audioEncoding: "MP3",
     },
@@ -72,6 +79,8 @@ export async function POST(req: Request) {
     headers: {
       "Content-Type": "audio/mpeg",
       "Cache-Control": "no-store",
+      "X-Viva-TTS-Voice": voice.name,
+      "Access-Control-Expose-Headers": "X-Viva-TTS-Voice",
     },
   });
 }

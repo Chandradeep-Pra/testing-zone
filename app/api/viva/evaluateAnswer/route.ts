@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { geminiModel } from "@/lib/gemni";
+import { VIVA_TRANSCRIPTION_POLICY } from "@/lib/viva-transcription-policy";
 import { normalizeClinicalEvaluation, type VivaClinicalState } from "@/lib/viva-clinical-state";
 import { getDefaultVivaCase, normalizeVivaCase, type VivaCaseRecord } from "@/lib/viva-case";
 import { getVivaStage } from "@/lib/viva-followup";
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
   const prompt = `
 You are the hidden clinical reasoning evaluator for an FRCS Urology viva.
 Evaluate only the candidate's latest answer against the supplied case. Do not generate the next question.
+${VIVA_TRANSCRIPTION_POLICY}
 
 Case stem: ${vivaCase.case.stem}
 Hidden case narrative: ${body.caseStory || "not supplied"}

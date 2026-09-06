@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { geminiModel } from "@/lib/gemni";
+import { VIVA_TRANSCRIPTION_POLICY } from "@/lib/viva-transcription-policy";
 import { getDefaultVivaCase, normalizeVivaCase, type VivaCaseRecord } from "@/lib/viva-case";
 
 type ScoreRequest = {
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
 You are an FRCS Urology examiner.
 
 Evaluate the candidate performance in this viva.
+${VIVA_TRANSCRIPTION_POLICY}
 
 Case Title: ${vivaCase.case.title}
 Case Stem: ${vivaCase.case.stem}

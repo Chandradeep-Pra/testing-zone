@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { geminiModel } from "@/lib/gemni";
+import { VIVA_TRANSCRIPTION_POLICY } from "@/lib/viva-transcription-policy";
 import {
   getDefaultVivaCase,
   normalizeVivaCase,
@@ -333,6 +334,7 @@ Return JSON only.
 
   const prompt = `
 You are an experienced FRCS (Urology) viva examiner.
+${VIVA_TRANSCRIPTION_POLICY}
 
 Your role is ONLY to assess clinical reasoning by asking ONE concise viva question at a time.
 
