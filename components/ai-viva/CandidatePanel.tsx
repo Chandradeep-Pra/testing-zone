@@ -23,6 +23,7 @@ export function CandidatePanel({
   -------------------------------- */
 
   useEffect(() => {
+    let cancelled = false;
 
     async function startCamera() {
       try {
@@ -31,6 +32,10 @@ export function CandidatePanel({
           video: true,
           audio: false,
         });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
 
         streamRef.current = stream;
 
@@ -59,7 +64,10 @@ export function CandidatePanel({
     if (cameraOn) startCamera();
     else stopCamera();
 
-    return () => stopCamera();
+    return () => {
+      cancelled = true;
+      stopCamera();
+    };
 
   }, [cameraOn]);
 

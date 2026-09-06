@@ -18,7 +18,6 @@ import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
-import { CALM_PHASE_GUIDANCE } from "@/lib/viva-flow";
 import { appPath } from "@/lib/app-path";
 import { prepareTextForMedicalTts } from "@/lib/medical-terminology";
 
@@ -777,7 +776,7 @@ export default function VivaVoiceAi({
   }
 
   async function handleBegin(
-    cameraPref = false,
+    cameraPref = true,
     examinerChoice: ExaminerVoice = getDefaultExaminer(selectedMode),
     micDeviceId?: string
   ) {
@@ -785,6 +784,7 @@ export default function VivaVoiceAi({
 
     hasStartedRef.current = true;
     setCameraEnabled(cameraPref);
+    setCameraOn(cameraPref);
     selectedMicDeviceIdRef.current = micDeviceId;
     setReadyVisible(false);
     setThinking(true);
@@ -984,8 +984,6 @@ export default function VivaVoiceAi({
             thinking={thinking}
             transcript={transcript}
             keywordDetected={keywordDetected}
-            stageLabel={!isFastMode && vivaStarted ? CALM_PHASE_GUIDANCE[calmPhaseTiming.phase].title : undefined}
-            stageRemainingSec={!isFastMode && vivaStarted ? calmPhaseTiming.remainingInPhaseSec : undefined}
             avatarVideo={
               liveAvatar.isReady ? (
                 <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.28),_rgba(2,6,23,0.96))]">

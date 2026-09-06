@@ -11,7 +11,6 @@ import {
   TimerReset,
   Volume2,
 } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import MicLevelMeter from "./MicLevelMeter";
 import {
@@ -33,10 +32,10 @@ export default function ReadyOverlay({
   selectedMode,
 }: ReadyOverlayProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
 
   const [micAllowed, setMicAllowed] = useState(false);
   const [cameraAllowed, setCameraAllowed] = useState(false);
-  const [cameraEnabled, setCameraEnabled] = useState(false);
   const [checking, setChecking] = useState(true);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
@@ -54,87 +53,64 @@ export default function ReadyOverlay({
     setSelectedExaminerId(getDefaultExaminer(selectedMode).id);
   }, [selectedMode]);
 
-  /* ----------------------------------------
-     Request Permissions
-  ----------------------------------------- */
   useEffect(() => {
+    let cancelled = false;
     async function requestPermissions() {
       try {
         const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStream.getTracks().forEach((track) => track.stop());
+        if (cancelled) return;
         setMicAllowed(true);
-        micStream.getTracks().forEach(track => track.stop());
-
         const devices = await navigator.mediaDevices.enumerateDevices();
+        if (cancelled) return;
         const audioInputs = devices.filter((device) => device.kind === "audioinput");
         setMicDevices(audioInputs);
         setSelectedMicDeviceId((current) => current || audioInputs[0]?.deviceId || "");
       } catch {
+        if (cancelled) return;
         setMicAllowed(false);
         setMicDevices([]);
         setSelectedMicDeviceId("");
       }
 
       try {
-        await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        cameraStreamRef.current = stream;
+        setCameraStream(stream);
         setCameraAllowed(true);
-        // Don't start the camera stream by default - only when user enables it
       } catch {
-        setCameraAllowed(false);
+        if (!cancelled) setCameraAllowed(false);
       }
-
-      setChecking(false);
+      if (!cancelled) setChecking(false);
     }
-
-    requestPermissions();
-
+    void requestPermissions();
     return () => {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-      }
+      cancelled = true;
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
     };
   }, []);
 
-  /* ----------------------------------------
-     Handle Camera Toggle
-  ----------------------------------------- */
   useEffect(() => {
-    async function toggleCamera() {
-      if (cameraEnabled && !cameraStream && cameraAllowed) {
-        try {
-          const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-          setCameraStream(videoStream);
-        } catch (err) {
-          console.error("Failed to access camera:", err);
-          setCameraEnabled(false);
-        }
-      } else if (!cameraEnabled && cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-        setCameraStream(null);
-      }
-    }
-
-    toggleCamera();
-
-    return () => {
-      if (!cameraEnabled && cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [cameraEnabled, cameraAllowed]);
-
-  /* ----------------------------------------
-     Attach stream AFTER video mounts
-  ----------------------------------------- */
-  useEffect(() => {
-    if (videoRef.current && cameraStream && cameraEnabled) {
+    if (videoRef.current && cameraStream) {
       videoRef.current.srcObject = cameraStream;
-      videoRef.current.play().catch(() => {});
-    } else if (videoRef.current) {
-      videoRef.current.srcObject = null;
+      void videoRef.current.play().catch(() => {});
     }
-  }, [cameraStream, cameraEnabled]);
+  }, [cameraStream]);
 
-  const canStart = micAllowed;
+  const canStart = !checking && micAllowed && cameraAllowed && Boolean(cameraStream);
+
+  function beginSession() {
+    if (!canStart) return;
+    // Release the setup preview before the session opens its camera stream.
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    onBegin(true, selectedExaminer, selectedMicDeviceId || undefined);
+  }
 
   return (
     <div className="absolute inset-0 z-50 overflow-y-auto bg-white/95 p-3 backdrop-blur-xl sm:p-4">
@@ -201,7 +177,7 @@ export default function ReadyOverlay({
                 </div>
                 <div className="text-sm font-medium text-[#071014]">Voice First</div>
                 <p className="mt-2 text-xs leading-5 text-[#071014]/65">
-                  Microphone access is required. Camera remains optional throughout the session.
+                  Microphone and camera access are required to begin. You can turn the camera off or on inside the session.
                 </p>
               </div>
             </div>
@@ -219,7 +195,7 @@ export default function ReadyOverlay({
                 </p>
               </div>
 
-              {cameraAllowed && cameraEnabled && (
+              {cameraAllowed && cameraStream && (
                 <div className="mb-5 overflow-hidden rounded-2xl">
                   <video
                     ref={videoRef}
@@ -290,35 +266,29 @@ export default function ReadyOverlay({
                   ) : !cameraAllowed ? (
                     <span className="text-[#071014]/65">Not available</span>
                   ) : (
-                    <Switch
-                      checked={cameraEnabled}
-                      onCheckedChange={setCameraEnabled}
-                      disabled={!cameraAllowed}
-                    />
+                    <span className="flex items-center gap-2 text-[#0f7896]">
+                      <CheckCircle2 size={18} /> On
+                    </span>
                   )}
                 </div>
               </div>
 
               <button
                 disabled={!canStart}
-                onClick={
-                  canStart
-                    ? () => onBegin(cameraEnabled, selectedExaminer, selectedMicDeviceId || undefined)
-                    : undefined
-                }
+                onClick={beginSession}
                 className={`mt-6 flex w-full items-center justify-center gap-3 rounded-2xl py-3 font-medium transition-all duration-200 ${
                   canStart
                     ? "bg-[#0f7896] text-white shadow-[0_16px_34px_rgba(15,120,150,0.2)] hover:bg-[#0b6078]"
                     : "cursor-not-allowed bg-[#071014]/10 text-[#071014]/45"
                 }`}
               >
-                {canStart ? "Enter Viva Room" : "Waiting For Microphone"}
+                {canStart ? "Enter Viva Room" : checking ? "Checking devices" : "Microphone and camera required"}
                 {canStart && <ArrowRight size={18} />}
               </button>
 
-              {!micAllowed && !checking && (
+              {(!micAllowed || !cameraAllowed) && !checking && (
                 <p className="mt-4 text-xs text-red-400">
-                  Microphone access is required to start the viva.
+                  Allow microphone and camera access in your browser, then reload to start the viva.
                 </p>
               )}
             </div>
