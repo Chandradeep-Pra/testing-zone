@@ -129,6 +129,7 @@ const VivaCasesPage: React.FC = () => {
       {
         key: string;
         name: string;
+        sortOrder: number;
         cases: VivaCaseWithAccess[];
       }
     >();
@@ -147,6 +148,7 @@ const VivaCasesPage: React.FC = () => {
       groups.set(key, {
         key,
         name,
+        sortOrder: viva.folderSortOrder ?? Number.MAX_SAFE_INTEGER,
         cases: [viva],
       });
     });
@@ -154,7 +156,7 @@ const VivaCasesPage: React.FC = () => {
     return Array.from(groups.values()).sort((left, right) => {
       if (left.key === UNFILED_FOLDER_KEY) return 1;
       if (right.key === UNFILED_FOLDER_KEY) return -1;
-      return left.name.localeCompare(right.name);
+      return left.sortOrder - right.sortOrder || left.name.localeCompare(right.name);
     });
   }, [cases]);
 

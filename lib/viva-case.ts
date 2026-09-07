@@ -83,6 +83,7 @@ export type VivaCaseRecord = {
   id: string;
   folderId?: string;
   folderName?: string;
+  folderSortOrder?: number;
   accessType?: "private" | "public" | string;
   case: {
     title: string;
@@ -386,6 +387,8 @@ export function normalizeVivaCase(payload: unknown): VivaCaseRecord {
     folderId: typeof source.folderId === "string" ? source.folderId : undefined,
     folderName:
       typeof source.folderName === "string" ? source.folderName : undefined,
+    folderSortOrder: typeof source.folderSortOrder === "number" && Number.isFinite(source.folderSortOrder)
+      ? source.folderSortOrder : undefined,
     accessType:
       typeof source.accessType === "string" ? source.accessType : undefined,
     case: {

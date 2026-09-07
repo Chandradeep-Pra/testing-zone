@@ -388,7 +388,7 @@ export default function VivaVoiceAi({
     setCandidateStatusDot("speaking");
     const generation = fastSilenceGenerationRef.current + 1;
     fastSilenceGenerationRef.current = generation;
-    const inactivityDelayMs = isFastMode ? 2500 : 4000;
+    const inactivityDelayMs = isFastMode ? 2000 : 4000;
     const remainingDelayMs = Math.max(
       0,
       inactivityDelayMs - (Date.now() - lastSpeechActivityAtRef.current),
