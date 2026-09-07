@@ -19,7 +19,6 @@ import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
 import { appPath } from "@/lib/app-path";
-import { prepareTextForMedicalTts } from "@/lib/medical-terminology";
 
 type VivaMode = "calm" | "fast";
 type QaHistoryItem = { question?: string; answer?: string };
@@ -89,12 +88,10 @@ export default function VivaVoiceAi({
   vivaCase: VivaCaseRecord;
   selectedMode?: VivaMode;
 }) {
-  const warmupDurationMs = 5000;
   const fastModeTotalDurationSec = 10 * 60;
   const isFastMode = selectedMode === "fast";
 
   const [candidate, setCandidate] = useState({ name: "", email: "" });
-  const warmupPrompt = `Hi ${candidate.name || "there"}, how are you feeling today?`;
   const [selectedExaminer, setSelectedExaminer] = useState<ExaminerVoice>(
     getDefaultExaminer(selectedMode)
   );
@@ -119,6 +116,7 @@ export default function VivaVoiceAi({
       });
       if (parsed.selectedExaminer) {
         setSelectedExaminer(parsed.selectedExaminer);
+        examinerVoiceRef.current = parsed.selectedExaminer;
       }
       if (Array.isArray(parsed.conversation)) {
         setMessages(parsed.conversation);
@@ -137,15 +135,15 @@ export default function VivaVoiceAi({
     clearExhibit,
   } = useVivaSession();
 
-  const { speak, amplitude } = useSpeechOutput();
+  const { speak, amplitude, error: audioError, stop: stopExaminerAudio } = useSpeechOutput();
   const liveAvatar = useLiveAvatar();
   const examinerSpeaking = speaking || liveAvatar.isSpeaking;
   const avatarSessionActiveRef = useRef(false);
 
   const hasStartedRef = useRef(false);
+  const firstQuestionRef = useRef<Awaited<ReturnType<typeof next>> | null>(null);
+  const examinerVoiceRef = useRef(selectedExaminer);
   const endingRef = useRef(false);
-  const warmupPendingRef = useRef(false);
-  const warmupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fillerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fastSilenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestCandidateTranscriptRef = useRef("");
@@ -172,22 +170,23 @@ export default function VivaVoiceAi({
   const [fastPauseState, setFastPauseState] = useState<FastPauseState>("idle");
   const [candidateStatusDot, setCandidateStatusDot] = useState<CandidateStatusDot>("idle");
   const [fastTimerStarted, setFastTimerStarted] = useState(false);
-  const [fastTimerResetKey, setFastTimerResetKey] = useState(0);
+  const fastTimerResetKey = 0;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [preparingCase, setPreparingCase] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   const fastKeywordProgress = isFastMode
     ? getCurrentFastQuestionKeywordProgress(candidateTranscript)
     : { matchedKeywords: [], totalKeywords: 0, allMatched: false };
 
   const vivaDurationSec = CALM_VIVA_TOTAL_DURATION_SEC;
-  const countdownRunning = (isFastMode ? fastTimerStarted : vivaStarted) && !ending;
+  const countdownRunning = (isFastMode ? fastTimerStarted : vivaStarted) && !ending && !preparingCase && !sessionError && !audioError;
   const countdownTotal = isFastMode ? fastModeTotalDurationSec : vivaDurationSec;
 
   function getExaminerSpeechOptions() {
     return {
-      voiceName: selectedExaminer.voiceName,
-      languageCode: selectedExaminer.languageCode,
+      voiceName: examinerVoiceRef.current.voiceName,
+      languageCode: examinerVoiceRef.current.languageCode,
       terminology: getMedicalTerminology(),
     };
   }
@@ -209,21 +208,8 @@ export default function VivaVoiceAi({
   }
 
   async function speakAsExaminer(text: string, onEnd?: () => void) {
-    if (avatarSessionActiveRef.current) {
-      try {
-        await liveAvatar.stopListening();
-        await liveAvatar.interrupt();
-        await liveAvatar.speakText(
-          prepareTextForMedicalTts(text, getMedicalTerminology()),
-          onEnd,
-        );
-        return;
-      } catch (err) {
-        console.error("LiveAvatar speak failed:", err);
-        // Fall back to local TTS on failure
-      }
-    }
-
+    // The avatar has its own voice configuration. Examiner speech must always
+    // use the voice selected in setup, including the first question.
     return speak(text, onEnd, getExaminerSpeechOptions());
   }
 
@@ -339,6 +325,7 @@ export default function VivaVoiceAi({
       await start();
     } catch (error) {
       console.error("Viva microphone capture failed:", error);
+      setSessionError("Unable to connect the microphone. Retry the question to reconnect.");
       setIsListening(false);
       setCandidateStatusDot("idle");
       void setAvatarListening(false);
@@ -377,7 +364,6 @@ export default function VivaVoiceAi({
       !vivaStarted ||
       endingRef.current ||
       advanceLockRef.current ||
-      warmupPendingRef.current ||
       !latestAnswer ||
       (isFastMode && doesAnswerMatchCurrentFastQuestion(latestAnswer))
     ) {
@@ -428,8 +414,7 @@ export default function VivaVoiceAi({
     if (
       ending ||
       endingRef.current ||
-      advanceLockRef.current ||
-      warmupPendingRef.current
+      advanceLockRef.current
     ) {
       return;
     }
@@ -461,6 +446,7 @@ export default function VivaVoiceAi({
     getTranscriptBuffer,
     resetTranscriptBuffer,
     micLevel,
+    prepare: prepareSpeechConnection,
   } = useSpeechInput(
     (interim) => {
       if (ending) return;
@@ -486,10 +472,6 @@ export default function VivaVoiceAi({
     // on silence; keyword-triggered advancement remains Fast-only above.
     async (finalText) => {
       if (ending || endingRef.current || advanceLockRef.current) return;
-
-      if (warmupPendingRef.current) {
-        return;
-      }
 
       const combinedFinalText = mergeWithAnswerPrefix(finalText);
       latestCandidateTranscriptRef.current = combinedFinalText;
@@ -543,10 +525,9 @@ export default function VivaVoiceAi({
   ]);
 
   useEffect(() => {
+    endingRef.current = false;
     return () => {
-      if (warmupTimeoutRef.current) {
-        clearTimeout(warmupTimeoutRef.current);
-      }
+      endingRef.current = true;
       if (fillerTimeoutRef.current) {
         clearTimeout(fillerTimeoutRef.current);
       }
@@ -614,7 +595,7 @@ export default function VivaVoiceAi({
 
     setThinking(false);
     applyApiResponse(data);
-    speakAsExaminer(question, () => {
+    await speakAsExaminer(question, () => {
       markSpeechEnded();
       beginListeningForAnswer();
     });
@@ -648,9 +629,9 @@ export default function VivaVoiceAi({
       console.error("Error concluding viva on timer:", error);
     }
 
-    speakAsExaminer("Time is up. We are concluding the viva now.", async () => {
+    void speakAsExaminer("Time is up. We are concluding the viva now.", async () => {
       await endViva();
-    });
+    }).catch(() => { void endViva(); });
   }
 
   async function submitCurrentAnswer(answerText: string) {
@@ -681,7 +662,7 @@ export default function VivaVoiceAi({
         if (endingRef.current) return;
         const filler = fillers[fillerIndexRef.current % fillers.length];
         fillerIndexRef.current += 1;
-        speakAsExaminer(filler);
+        void speakAsExaminer(filler).catch(() => {});
       }, 1200);
     } else {
       setThinking(true);
@@ -689,6 +670,9 @@ export default function VivaVoiceAi({
 
     try {
       await askNextQuestion(finalAnswer);
+    } catch (error) {
+      markSpeechEnded();
+      setSessionError(error instanceof Error ? error.message : "Unable to continue your viva.");
     } finally {
       setThinking(false);
       advanceLockRef.current = false;
@@ -696,83 +680,44 @@ export default function VivaVoiceAi({
   }
 
   async function startViva() {
+    setPreparingCase(true);
+    setSessionError(null);
+    setThinking(true);
     try {
-      if (isFastMode) {
-        setFastTimerStarted(false);
-        setFastTimerResetKey((value) => value + 1);
-      }
-
-      const data = await next("");
-
-      if (!data?.question) {
-        return;
-      }
+      // next() reads the backend-authored case questions directly. Retain the
+      // first result so an audio retry cannot consume the next question.
+      const data = firstQuestionRef.current ?? await next("");
+      if (!data?.question || data.exit) throw new Error("No questions are available for this viva. Please choose another case.");
+      firstQuestionRef.current = data;
+      if (endingRef.current) return;
       const question = data.question;
-
       setMessages([
-        {
-          id: crypto.randomUUID(),
-          role: "ai",
-          text: question,
-        },
-        ...(data.imageUsed && data.imageLink
-          ? [
-              {
-                id: crypto.randomUUID(),
-                role: "image" as const,
-                src: resolveExhibitSrc(data.imageLink),
-                description: data.imageDescription || undefined,
-              },
-            ]
-          : []),
+        { id: crypto.randomUUID(), role: "ai", text: question },
+        ...(data.imageUsed && data.imageLink ? [{
+          id: crypto.randomUUID(), role: "image" as const,
+          src: resolveExhibitSrc(data.imageLink), description: data.imageDescription || undefined,
+        }] : []),
       ]);
-
-      setThinking(false);
       applyApiResponse(data);
-      setVivaStarted(true);
-      if (isFastMode) {
-        setFastTimerStarted(true);
-      }
-      speakAsExaminer(question, () => {
+      await speakAsExaminer(question, () => {
+        if (endingRef.current) return;
         markSpeechEnded();
         beginListeningForAnswer();
       });
+      if (endingRef.current) return;
+      // Start the exam clock only once the first question is actually playing.
+      setVivaStarted(true);
+      if (isFastMode) setFastTimerStarted(true);
     } catch (error) {
-      console.error("Error starting viva:", error);
-      setThinking(false);
-    }
-  }
-
-  function startWarmup() {
-    warmupPendingRef.current = true;
-    setThinking(false);
-
-    if (warmupTimeoutRef.current) {
-      clearTimeout(warmupTimeoutRef.current);
-      warmupTimeoutRef.current = null;
-    }
-
-    speakAsExaminer(warmupPrompt, () => {
+      if (endingRef.current) return;
       markSpeechEnded();
-      setIsListening(true);
-      void setAvatarListening(true);
-      void startSpeechCapture();
-
-      warmupTimeoutRef.current = setTimeout(() => {
-        warmupPendingRef.current = false;
-        warmupTimeoutRef.current = null;
-        stop();
-        resetTranscriptBuffer();
-        setIsListening(false);
-        void setAvatarListening(false);
-        setThinking(true);
-
-        speakAsExaminer("Thank you. Let us begin.", async () => {
-          await new Promise((res) => setTimeout(res, 400));
-          await startViva();
-        });
-      }, warmupDurationMs);
-    });
+      setSessionError(error instanceof Error ? error.message : "Unable to start your viva. Please retry.");
+    } finally {
+      if (!endingRef.current) {
+        setPreparingCase(false);
+        setThinking(false);
+      }
+    }
   }
 
   async function handleBegin(
@@ -781,46 +726,60 @@ export default function VivaVoiceAi({
     micDeviceId?: string
   ) {
     if (hasStartedRef.current) return;
-
     hasStartedRef.current = true;
+    examinerVoiceRef.current = examinerChoice;
+    setSelectedExaminer(examinerChoice);
     setCameraEnabled(cameraPref);
     setCameraOn(cameraPref);
     selectedMicDeviceIdRef.current = micDeviceId;
     setReadyVisible(false);
-    setThinking(true);
-    setPreparingCase(!isFastMode);
-
+    setPreparingCase(true);
+    // Persistence must not prevent the exam from starting.
     try {
-      await prepareCalmCase().catch((error) => {
-        console.warn("Using the original case stem because preparation failed:", error);
-      });
-      setPreparingCase(false);
-      const greeting = `Hello ${candidate.name}, welcome to the Urologics AI Examiner viva. Please wait while we prepare your session.`;
-      setSelectedExaminer(examinerChoice);
-      const stored = localStorage.getItem("candidateInfo");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        parsed.selectedExaminer = examinerChoice;
-        parsed.selectedExaminerId = examinerChoice.id;
-        parsed.selectedMicDeviceId = micDeviceId || "";
-        localStorage.setItem("candidateInfo", JSON.stringify(parsed));
-      }
-      const avatarStarted = await liveAvatar.startSession();
-      avatarSessionActiveRef.current = avatarStarted;
-      if (!avatarStarted) {
-        console.warn("LiveAvatar session did not become ready. Falling back to TTS.", liveAvatar.error);
-      } else {
-        await liveAvatar.interrupt();
-        await liveAvatar.startListening();
-      }
-      await speakAsExaminer(greeting, async () => {
-        await new Promise((res) => setTimeout(res, 2000));
-        startWarmup();
+      const parsed = JSON.parse(localStorage.getItem("candidateInfo") || "{}");
+      parsed.selectedExaminer = examinerChoice;
+      parsed.selectedExaminerId = examinerChoice.id;
+      parsed.selectedMicDeviceId = micDeviceId || "";
+      localStorage.setItem("candidateInfo", JSON.stringify(parsed));
+    } catch (error) {
+      console.warn("Unable to save examiner preference:", error);
+    }
+    // Connect speech recognition while question audio is being prepared.
+    void prepareSpeechConnection().catch(() => {
+      // startSpeechCapture retries and presents an error if still unavailable.
+    });
+    // Legacy adaptive cases may prepare their clinical context in the
+    // background. Authored backend questions require no extra generation.
+    void prepareCalmCase().catch((error) => {
+      console.warn("Case context preparation skipped:", error);
+    });
+    // Do not gate backend questions on avatar provisioning or greeting/warmup
+    // audio. Use the selected examiner's TTS from the first question onward.
+    await startViva();
+  }
+
+  async function retryCurrentQuestion() {
+    if (preparingCase || endingRef.current) return;
+    if (!vivaStarted) {
+      await startViva();
+      return;
+    }
+    setSessionError(null);
+    setPreparingCase(true);
+    stop();
+    setIsListening(false);
+    try {
+      applyApiResponse({ question: transcript });
+      await speakAsExaminer(transcript, () => {
+        if (endingRef.current) return;
+        markSpeechEnded();
+        beginListeningForAnswer();
       });
     } catch (error) {
-      console.error("Error in greeting:", error);
+      markSpeechEnded();
+      setSessionError(error instanceof Error ? error.message : "Unable to play the question.");
+    } finally {
       setPreparingCase(false);
-      setThinking(false);
     }
   }
 
@@ -830,17 +789,13 @@ export default function VivaVoiceAi({
     endingRef.current = true;
     advanceLockRef.current = true;
     setEnding(true);
+    stopExaminerAudio();
     setIsListening(false);
     stop();
     closeSocket();
     void setAvatarListening(false);
     await liveAvatar.stopSession();
     avatarSessionActiveRef.current = false;
-
-    if (warmupTimeoutRef.current) {
-      clearTimeout(warmupTimeoutRef.current);
-      warmupTimeoutRef.current = null;
-    }
 
     if (fillerTimeoutRef.current) {
       clearTimeout(fillerTimeoutRef.current);
@@ -897,11 +852,21 @@ export default function VivaVoiceAi({
       )}
 
       {preparingCase && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/95 backdrop-blur-sm">
+        <div role="status" aria-live="polite" className="absolute inset-0 z-40 flex items-center justify-center bg-white/95 backdrop-blur-sm">
           <div className="rounded-[28px] border border-[#0f7896]/12 bg-white px-8 py-7 text-center shadow-[0_24px_60px_rgba(15,120,150,0.18)]">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-cyan-100 border-t-[#0f7896]" />
-            <p className="mt-4 text-lg font-semibold text-[#071014]">Getting case ready…</p>
-            <p className="mt-1 text-sm text-[#071014]/55">Preparing a consistent patient scenario</p>
+            <p className="mt-4 text-lg font-semibold text-[#071014]">Preparing your viva</p>
+            <p className="mt-1 text-sm text-[#071014]/55">Preparing examiner audio. Your viva starts automatically when ready.</p>
+          </div>
+        </div>
+      )}
+
+      {!preparingCase && !readyVisible && !ending && (sessionError || audioError) && (
+        <div role="alert" className="absolute inset-0 z-40 flex items-center justify-center bg-white/95 p-6 backdrop-blur-sm">
+          <div className="max-w-md rounded-[28px] border border-[#0f7896]/12 bg-white px-8 py-7 text-center shadow-xl">
+            <p className="text-lg font-semibold">{vivaStarted ? "Unable to continue audio" : "Unable to start your viva"}</p>
+            <p className="mt-3 text-sm text-[#071014]/65">{sessionError || audioError}</p>
+            <button type="button" onClick={() => { void retryCurrentQuestion(); }} className="mt-5 rounded-xl bg-[#0f7896] px-5 py-3 font-medium text-white">Retry question</button>
           </div>
         </div>
       )}

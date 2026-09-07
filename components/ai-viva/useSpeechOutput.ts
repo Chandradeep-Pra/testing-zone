@@ -1,73 +1,6 @@
-// "use client";
-
-// import { useRef, useState } from "react";
-
-// export function useSpeechOutput() {
-
-//   const [amplitude, setAmplitude] = useState(0);
-
-//   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-//   async function speak(text: string, onEnd?: () => void) {
-
-//     const res = await fetch("/api/viva/tts", {
-//       method: "POST",
-//       headers: {
-//         "Content-Type": "application/json",
-//       },
-//       body: JSON.stringify({ text }),
-//     });
-
-//     const blob = await res.blob();
-//     const url = URL.createObjectURL(blob);
-
-//     const audio = new Audio(url);
-//     audioRef.current = audio;
-
-//     const audioContext = new AudioContext();
-//     const source = audioContext.createMediaElementSource(audio);
-
-//     const analyser = audioContext.createAnalyser();
-//     analyser.fftSize = 256;
-
-//     source.connect(analyser);
-//     analyser.connect(audioContext.destination);
-
-//     const data = new Uint8Array(analyser.frequencyBinCount);
-
-//     function tick() {
-//       analyser.getByteFrequencyData(data);
-
-//       const avg =
-//         data.reduce((a, b) => a + b, 0) / data.length;
-
-//       setAmplitude(avg / 255);
-
-//       if (!audio.paused) {
-//         requestAnimationFrame(tick);
-//       }
-//     }
-
-//     audio.onplay = () => {
-//       tick();
-//     };
-
-//     audio.onended = () => {
-//       setAmplitude(0);
-//       onEnd?.();
-//       URL.revokeObjectURL(url);
-//     };
-
-//     await audio.play();
-//   }
-
-//   return { speak, amplitude };
-// }
-
 "use client";
 
-import { useRef, useState } from "react";
-
+import { useEffect, useRef, useState } from "react";
 import { appPath } from "@/lib/app-path";
 import type { MedicalTerm } from "@/lib/medical-terminology";
 
@@ -78,95 +11,135 @@ type SpeechOptions = {
 };
 
 export function useSpeechOutput() {
-const [amplitude, setAmplitude] = useState(0);
+  const [amplitude, setAmplitude] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const contextRef = useRef<AudioContext | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const generationRef = useRef(0);
 
-const audioRef = useRef<HTMLAudioElement | null>(null);
-const audioContextRef = useRef<AudioContext | null>(null);
-const analyserRef = useRef<AnalyserNode | null>(null);
-
-async function speak(text: string, onEnd?: () => void, options?: SpeechOptions) {
-
-
-try {
-
-  /* stop previous audio immediately */
-  if (audioRef.current) {
-    audioRef.current.pause();
-    audioRef.current.src = "";
+  function stop() {
+    generationRef.current += 1;
+    requestRef.current?.abort();
+    requestRef.current = null;
+    cleanupRef.current?.();
+    cleanupRef.current = null;
     audioRef.current = null;
-  }
-
-  const res = await fetch(appPath("/api/viva/tts"), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      text,
-      voiceName: options?.voiceName,
-      languageCode: options?.languageCode,
-      terminology: options?.terminology,
-    }),
-  });
-
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-
-  const audio = new Audio(url);
-  audioRef.current = audio;
-
-  /* create AudioContext once */
-  if (!audioContextRef.current) {
-    audioContextRef.current = new AudioContext();
-  }
-
-  const audioContext = audioContextRef.current;
-
-  const source = audioContext.createMediaElementSource(audio);
-
-  const analyser = audioContext.createAnalyser();
-  analyser.fftSize = 256;
-  analyserRef.current = analyser;
-
-  source.connect(analyser);
-  analyser.connect(audioContext.destination);
-
-  const data = new Uint8Array(analyser.frequencyBinCount);
-
-  function tick() {
-
-    if (!analyserRef.current) return;
-
-    analyserRef.current.getByteFrequencyData(data);
-
-    const avg =
-      data.reduce((a, b) => a + b, 0) / data.length;
-
-    setAmplitude(avg / 255);
-
-    if (!audio.paused) {
-      requestAnimationFrame(tick);
-    }
-
-  }
-
-  audio.onplay = () => {
-    tick();
-  };
-
-  audio.onended = () => {
     setAmplitude(0);
-    URL.revokeObjectURL(url);
-    onEnd?.();
-  };
+  }
 
-  await audio.play();
+  useEffect(() => () => {
+    stop();
+    void contextRef.current?.close();
+    contextRef.current = null;
+  }, []);
 
-} catch (err) {
-  console.error("TTS error:", err);
-}
+  // Resolves when playback STARTS. Completion still uses onEnd, so callers can
+  // dismiss preparation UI without waiting for the entire question to finish.
+  async function speak(text: string, onEnd?: () => void, options?: SpeechOptions) {
+    stop();
+    setError(null);
+    const generation = generationRef.current;
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const requestTimeout = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const res = await fetch(appPath("/api/viva/tts"), {
+        method: "POST",
+        signal: controller.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, ...options }),
+      });
+      if (!res.ok) throw new Error("Unable to prepare examiner audio. Please retry.");
+      const blob = await res.blob();
+      clearTimeout(requestTimeout);
+      if (!blob.size) throw new Error("The examiner audio was empty. Please retry.");
+      if (generation !== generationRef.current) throw new Error("Playback cancelled");
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      let frame = 0;
+      let source: MediaElementAudioSourceNode | null = null;
+      let playbackTimeout: ReturnType<typeof setTimeout> | undefined;
+      let rejectStart: ((error: Error) => void) | undefined;
+      const cleanup = () => {
+        if (playbackTimeout) clearTimeout(playbackTimeout);
+        cancelAnimationFrame(frame);
+        audio.onplay = null;
+        audio.onended = null;
+        audio.onerror = null;
+        audio.pause();
+        audio.removeAttribute("src");
+        source?.disconnect();
+        URL.revokeObjectURL(url);
+        rejectStart?.(new Error("Playback cancelled"));
+        rejectStart = undefined;
+      };
+      cleanupRef.current = cleanup;
+      // The waveform is optional. An unavailable/suspended analyser must not
+      // prevent the browser audio element from playing the question.
+      try {
+        contextRef.current ||= new AudioContext();
+        const context = contextRef.current;
+        if (context.state === "suspended") void context.resume().catch(() => {});
+        source = context.createMediaElementSource(audio);
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        analyser.connect(context.destination);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        const tick = () => {
+          if (generation !== generationRef.current || audio.paused) return;
+          analyser.getByteFrequencyData(data);
+          setAmplitude(data.reduce((sum, value) => sum + value, 0) / data.length / 255);
+          frame = requestAnimationFrame(tick);
+        };
+        audio.onplay = tick;
+      } catch {
+        // Native element playback is still available without a waveform.
+      }
+      audio.onended = () => {
+        if (generation !== generationRef.current) return;
+        cleanup();
+        cleanupRef.current = null;
+        audioRef.current = null;
+        setAmplitude(0);
+        onEnd?.();
+      };
+      audio.onerror = () => {
+        if (generation !== generationRef.current) return;
+        const message = "Examiner audio could not play. Please retry.";
+        setError(message);
+        rejectStart?.(new Error(message));
+        rejectStart = undefined;
+        cleanup();
+        cleanupRef.current = null;
+        setAmplitude(0);
+      };
+      await new Promise<void>((resolve, reject) => {
+        rejectStart = reject;
+        playbackTimeout = setTimeout(() => reject(new Error("Audio playback timed out. Please retry.")), 15_000);
+        audio.play().then(() => {
+          clearTimeout(playbackTimeout);
+          rejectStart = undefined;
+          resolve();
+        }, reject);
+      });
+    } catch (cause) {
+      if (generation === generationRef.current) {
+        cleanupRef.current?.();
+        cleanupRef.current = null;
+        setError(controller.signal.aborted
+          ? "Preparing examiner audio timed out. Please retry."
+          : cause instanceof Error ? cause.message : "Unable to play examiner audio.");
+      }
+      throw cause;
+    } finally {
+      clearTimeout(requestTimeout);
+      if (requestRef.current === controller) requestRef.current = null;
+    }
+  }
 
-}
-
-return { speak, amplitude };
+  return { speak, amplitude, error, stop };
 }

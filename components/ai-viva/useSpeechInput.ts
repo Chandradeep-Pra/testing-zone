@@ -18,6 +18,28 @@ function getPublicAssetPath(path: string) {
   return `${basePath}${path}`;
 }
 
+function waitForSpeechSocket(ws: WebSocket): Promise<WebSocket> {
+  if (ws.readyState === WebSocket.OPEN) return Promise.resolve(ws);
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timeout);
+      ws.removeEventListener("open", onOpen);
+      ws.removeEventListener("error", onError);
+      ws.removeEventListener("close", onError);
+    };
+    const onOpen = () => { cleanup(); resolve(ws); };
+    const onError = () => { cleanup(); reject(new Error("Speech connection failed. Please retry.")); };
+    const timeout = setTimeout(() => {
+      cleanup();
+      ws.close();
+      reject(new Error("Speech connection timed out. Please retry."));
+    }, 20_000);
+    ws.addEventListener("open", onOpen);
+    ws.addEventListener("error", onError);
+    ws.addEventListener("close", onError);
+  });
+}
+
 export function useSpeechInput(
   onInterim: (text: string) => void,
   onFinal: (text: string) => void | Promise<void>,
@@ -53,20 +75,7 @@ export function useSpeechInput(
     }
 
     if (wsRef.current?.readyState === WebSocket.CONNECTING) {
-      await new Promise<WebSocket>((resolve, reject) => {
-        const ws = wsRef.current;
-        if (!ws) {
-          reject(new Error("Socket unavailable"));
-          return;
-        }
-
-        ws.addEventListener("open", () => resolve(ws), { once: true });
-        ws.addEventListener("error", () => reject(new Error("Socket connection failed")), {
-          once: true,
-        });
-      });
-
-      return wsRef.current;
+      return waitForSpeechSocket(wsRef.current);
     }
 
     const ws = new WebSocket("wss://testing-zone-hx7q.onrender.com");
@@ -148,12 +157,7 @@ export function useSpeechInput(
       });
     };
 
-    await new Promise<WebSocket>((resolve, reject) => {
-      ws.addEventListener("open", () => resolve(ws), { once: true });
-      ws.addEventListener("error", () => reject(new Error("Socket connection failed")), {
-        once: true,
-      });
-    });
+    await waitForSpeechSocket(ws);
 
     return ws;
   }
@@ -314,6 +318,7 @@ export function useSpeechInput(
   }
 
   return {
+    prepare: ensureSocketReady,
     start,
     stop,
     closeSocket,

@@ -437,6 +437,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   ): Promise<VivaApiResponse> {
     const res = await fetch(appPath("/api/viva/generateFollowup"), {
       method: "POST",
+      signal: AbortSignal.timeout(30_000),
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         previousQA,
@@ -498,6 +499,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     if (getCalmModeQuestions(vivaCase).length > 0) return;
     const res = await fetch(appPath("/api/viva/prepareCase"), {
       method: "POST",
+      signal: AbortSignal.timeout(30_000),
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ vivaCase }),
     });
@@ -604,9 +606,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     } catch (err) {
       console.error("Viva engine error:", err);
 
-      return {
-        question: "Sorry, something went wrong generating the next question.",
-      };
+      throw err instanceof Error ? err : new Error("Unable to load the next viva question. Please retry.");
     }
   }
 
