@@ -1,3 +1,16 @@
+## Current environment source: .env.prod.stud
+
+The /web app now defaults to this repository's `.env.prod.stud`:
+
+```powershell
+node scripts/build-cloud-run.mjs urologics-web-app:local
+node scripts/run-cloud-run.mjs urologics-web-app:local
+```
+
+The build forwards only `NEXT_PUBLIC_FIREBASE_API_KEY`. The local run helper parses all variables (including quoted JSON/multiline values) and passes them through the Docker client's environment at runtime. Neither command copies or mounts the environment file. `.dockerignore` continues to exclude it. On Cloud Run, inject runtime settings and secrets from this file using environment variables / Secret Manager; the image does not load the file automatically. The previously documented deploy command preserves existing runtime settings and does not import this file.
+
+**Firebase parity must be rechecked:** the key in `.env.prod.stud` differs from the main app's `.env.prod` key. A different key does not prove a different project, but no project ID/auth domain is supplied in the student file. Earlier image/parity results below refer to the previous main-env build, not this new environment source. No image rebuild, deployment or external configuration change was performed for this environment-source update.
+
 # Deploying Urologics Web
 
 The existing Next.js configuration is preserved: `basePath: "/web"`, `output: "standalone"`, and `turbopack.root: process.cwd()`.
@@ -7,7 +20,7 @@ The existing Next.js configuration is preserved: `basePath: "/web"`, `output: "s
 Build for Linux amd64 (Cloud Run) from this directory. Set `NEXT_PUBLIC_FIREBASE_API_KEY` in the build process to the **same public web API key as the main application**:
 
 ```sh
-node scripts/build-cloud-run.mjs ../urocms/.env.prod IMAGE
+node scripts/build-cloud-run.mjs IMAGE
 # Or, after setting the same public key in the build environment:
 docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_FIREBASE_API_KEY -t IMAGE .
 docker run --rm -p 8080:8080 IMAGE
