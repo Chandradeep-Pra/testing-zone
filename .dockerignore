@@ -1,0 +1,26 @@
+# Deny by default: only build inputs can enter any image layer.
+**
+!package.json
+!package-lock.json
+!next.config.ts
+!next-env.d.ts
+!tsconfig.json
+!postcss.config.mjs
+!app/
+!app/**
+!components/
+!components/**
+!lib/
+!lib/**
+!ai-viva-data/
+!ai-viva-data/**
+!public/
+!public/**
+# Apply after allow rules, including nested files.
+**/.env*
+**/*.env
+**/*.env.*
+**/*.pem
+**/*.key
+**/*service-account*.json
+**/*credentials*.json

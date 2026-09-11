@@ -77,7 +77,6 @@ function buildConversationFromQaHistory(history: QaHistoryItem[]) {
 }
 
 function resolveExhibitSrc(src: string) {
-  if (/^https?:\/\//i.test(src) || src.startsWith("/web/")) return src;
   return src.startsWith("/") ? appPath(src) : src;
 }
 

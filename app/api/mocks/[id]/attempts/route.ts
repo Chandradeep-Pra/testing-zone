@@ -12,7 +12,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const idToken = req.cookies.get("urologics_id_token")?.value;
+  const idToken = req.cookies.get("__session")?.value;
 
   if (!idToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

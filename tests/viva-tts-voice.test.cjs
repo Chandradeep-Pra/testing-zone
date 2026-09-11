@@ -5,14 +5,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 function load(file, mocks = {}, globals = {}) {
-  const module = { exports: {} };
+  const testModule = { exports: {} };
   const source = fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText;
-  vm.runInNewContext(code, {module, exports: module.exports, require: name => {
+  vm.runInNewContext(code, {module: testModule, exports: testModule.exports, require: name => {
     if (!(name in mocks)) throw new Error(`Unexpected import: ${name}`);
     return mocks[name];
   }, Response, Buffer, ...globals});
-  return module.exports;
+  return testModule.exports;
 }
 function routeHarness() {
   const calls = [];

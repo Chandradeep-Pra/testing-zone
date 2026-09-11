@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { appPath } from "@/lib/app-path";
 import { normalizeMedicalTranscript, type MedicalTerm } from "@/lib/medical-terminology";
 
 type SttMessage = {
@@ -10,12 +11,7 @@ type SttMessage = {
 };
 
 function getPublicAssetPath(path: string) {
-  const basePath =
-    typeof window !== "undefined" && window.location.pathname.startsWith("/web")
-      ? "/web"
-      : "";
-
-  return `${basePath}${path}`;
+  return appPath(path);
 }
 
 function waitForSpeechSocket(ws: WebSocket): Promise<WebSocket> {

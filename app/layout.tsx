@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { appPath } from "@/lib/app-path";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import ToasterProvider from "@/components/ToastProvider";
@@ -11,9 +12,9 @@ export const metadata: Metadata = {
   description:
     "Premium AI viva, mock exam, and grand mock preparation for urology training with Urologics.",
   icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/logo.png",
+    icon: appPath("/logo.png"),
+    shortcut: appPath("/logo.png"),
+    apple: appPath("/logo.png"),
   },
 };
 

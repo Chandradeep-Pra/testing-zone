@@ -18,17 +18,26 @@ import { formatTime, getThumbnail, getYoutubeEmbedUrl } from "@/components/cours
 import { appPath } from "@/lib/app-path";
 
 export default function ModernVideoPlayer({ playback }: { playback: PlaybackResponse | null }) {
+  return <VideoPlayer key={playback?.video.id || "empty"} playback={playback} />;
+}
+
+function VideoPlayer({ playback }: { playback: PlaybackResponse | null }) {
   const playerShellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsTimerRef = useRef<number | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(() => {
+    const video = playback?.video;
+    return typeof video?.durationSeconds === "number" && Number.isFinite(video.durationSeconds)
+      ? video.durationSeconds
+      : typeof video?.durationMinutes === "number" && Number.isFinite(video.durationMinutes)
+        ? video.durationMinutes * 60 : 0;
+  });
   const [currentTime, setCurrentTime] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
 
-  const selectedVideoId = playback?.video.id || "";
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -47,20 +56,6 @@ export default function ModernVideoPlayer({ playback }: { playback: PlaybackResp
     };
   }, []);
 
-  useEffect(() => {
-    const video = playback?.video;
-    const storedDurationSeconds =
-      typeof video?.durationSeconds === "number" && Number.isFinite(video.durationSeconds)
-        ? video.durationSeconds
-        : typeof video?.durationMinutes === "number" && Number.isFinite(video.durationMinutes)
-          ? video.durationMinutes * 60
-          : 0;
-
-    setDuration(storedDurationSeconds);
-    setCurrentTime(0);
-    setPlaying(false);
-    setShowControls(true);
-  }, [selectedVideoId, playback?.video]);
 
   if (!playback) {
     return (

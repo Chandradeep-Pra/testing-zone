@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test:viva:browser": "node tests/browser/viva-startup.mjs"
   },
   "dependencies": {

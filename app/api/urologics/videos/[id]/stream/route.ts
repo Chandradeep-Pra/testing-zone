@@ -7,8 +7,8 @@ export async function GET(
 ) {
   const authHeader =
     getAuthHeader(req) ||
-    (req.cookies.get("urologics_id_token")?.value
-      ? `Bearer ${req.cookies.get("urologics_id_token")?.value}`
+    (req.cookies.get("__session")?.value
+      ? `Bearer ${req.cookies.get("__session")?.value}`
       : null);
 
   try {

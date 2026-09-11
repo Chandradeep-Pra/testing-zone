@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const COOKIE_NAME = "urologics_id_token";
+// Firebase Hosting forwards only __session to Cloud Run.
+const COOKIE_NAME = "__session";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as { idToken?: unknown };
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing token" }, { status: 400 });
   }
 
-  const response = NextResponse.json({ success: true });
+  const response = NextResponse.json({ success: true }, { headers: { "Cache-Control": "private, no-store" } });
   response.cookies.set(COOKIE_NAME, idToken, {
     httpOnly: true,
     sameSite: "lax",
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE() {
-  const response = NextResponse.json({ success: true });
+  const response = NextResponse.json({ success: true }, { headers: { "Cache-Control": "private, no-store" } });
   response.cookies.set(COOKIE_NAME, "", {
     httpOnly: true,
     sameSite: "lax",

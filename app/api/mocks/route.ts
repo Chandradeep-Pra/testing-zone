@@ -27,7 +27,7 @@ function onlyVisibleMocks(payload: MockPayload) {
 }
 
 export async function GET(req: NextRequest) {
-  const idToken = req.cookies.get("urologics_id_token")?.value;
+  const idToken = req.cookies.get("__session")?.value;
 
   if (!idToken) {
     try {

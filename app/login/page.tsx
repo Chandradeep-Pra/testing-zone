@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
+import { loginReturnPath } from "@/lib/app-path";
 
 function getReadableAuthError(message: string) {
   const source = message.toLowerCase();
@@ -47,7 +48,7 @@ export default function LoginPage() {
 
   function redirectAfterLogin() {
     const requested = new URLSearchParams(window.location.search).get("redirect");
-    return requested?.startsWith("/") && !requested.startsWith("//") ? requested : "/";
+    return loginReturnPath(requested);
   }
 
   useEffect(() => {
