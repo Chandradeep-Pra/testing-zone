@@ -5,6 +5,9 @@ import { appPath } from "@/lib/app-path";
 const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const STORAGE_KEY = "urologics-testing-zone-auth";
 const LOGOUT_FLAG_KEY = "urologics-auth-logged-out";
+const REFRESH_MARGIN_MS = 60_000;
+const pendingRestores = new Map<string, Promise<UrologicsUser>>();
+let authVersion = 0;
 
 export type UrologicsUser = {
   uid: string;
@@ -88,6 +91,8 @@ function saveAuth(user: UrologicsUser) {
 }
 
 export function clearStoredAuth() {
+  authVersion += 1;
+  pendingRestores.clear();
   window.localStorage.removeItem(STORAGE_KEY);
   window.localStorage.setItem(LOGOUT_FLAG_KEY, "1");
 }
@@ -109,19 +114,17 @@ export function getStoredAuth(): UrologicsUser | null {
 }
 
 async function fetchUrologicsAccess(idToken: string): Promise<UrologicsAccessResponse | null> {
-  try {
     const response = await fetch(appPath("/api/urologics/access"), {
       headers: {
         Authorization: `Bearer ${idToken}`,
       },
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      throw Object.assign(new Error("Unable to load account access. Please try again."), { status: response.status });
+    }
 
     return (await response.json()) as UrologicsAccessResponse;
-  } catch {
-    return null;
-  }
 }
 
 async function buildUserFromAuth(params: {
@@ -131,7 +134,11 @@ async function buildUserFromAuth(params: {
   idToken: string;
   refreshToken: string;
   expiresIn: string;
+  version?: number;
+  expiresAt?: number;
 }): Promise<UrologicsUser> {
+  const version = params.version ?? authVersion;
+  const expiresAt = params.expiresAt ?? toExpiresAt(params.expiresIn);
   const access = await fetchUrologicsAccess(params.idToken);
   const profile = access?.profile;
   const email = (profile?.email || params.email).trim().toLowerCase();
@@ -144,7 +151,7 @@ async function buildUserFromAuth(params: {
     tier: normalizeTier(access?.tier),
     idToken: params.idToken,
     refreshToken: params.refreshToken,
-    expiresAt: toExpiresAt(params.expiresIn),
+    expiresAt,
     profileImageUrl:
       typeof profile?.profileImageUrl === "string" && profile.profileImageUrl.trim()
         ? profile.profileImageUrl.trim()
@@ -158,11 +165,13 @@ async function buildUserFromAuth(params: {
         : null,
   };
 
+  if (version !== authVersion) throw new Error("Account changed while restoring the session.");
   saveAuth(user);
   return user;
 }
 
 export async function signInWithEmailPassword(email: string, password: string) {
+  const version = ++authVersion;
   const apiKey = requireFirebaseApiKey();
   const response = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
@@ -186,6 +195,7 @@ export async function signInWithEmailPassword(email: string, password: string) {
   }
 
   return buildUserFromAuth({
+    version,
     uid: payload.localId,
     email: payload.email || email,
     displayName: payload.displayName,
@@ -195,7 +205,34 @@ export async function signInWithEmailPassword(email: string, password: string) {
   });
 }
 
-export async function refreshStoredAuth(user: UrologicsUser) {
+export function refreshStoredAuth(user: UrologicsUser): Promise<UrologicsUser> {
+  const key = `${user.refreshToken}:${user.idToken}`;
+  const pending = pendingRestores.get(key);
+  if (pending) return pending;
+  const request = restoreStoredAuth(user, authVersion).finally(() => {
+    if (pendingRestores.get(key) === request) pendingRestores.delete(key);
+  });
+  pendingRestores.set(key, request);
+  return request;
+}
+
+async function restoreStoredAuth(user: UrologicsUser, version: number) {
+  if (user.expiresAt > Date.now() + REFRESH_MARGIN_MS) {
+    try {
+      return await buildUserFromAuth({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.name,
+        idToken: user.idToken,
+        refreshToken: user.refreshToken,
+        expiresIn: String(Math.max(0, (user.expiresAt - Date.now()) / 1000)),
+        expiresAt: user.expiresAt,
+        version,
+      });
+    } catch (error) {
+      if ((error as { status?: number }).status !== 401) throw error;
+    }
+  }
   const apiKey = requireFirebaseApiKey();
   const response = await fetch(`https://securetoken.googleapis.com/v1/token?key=${apiKey}`, {
     method: "POST",
@@ -211,11 +248,12 @@ export async function refreshStoredAuth(user: UrologicsUser) {
   };
 
   if (!response.ok) {
-    clearStoredAuth();
+    if (version === authVersion && (response.status === 400 || response.status === 401)) clearStoredAuth();
     throw new Error(payload.error?.message || "Session expired. Please sign in again.");
   }
 
   return buildUserFromAuth({
+    version,
     uid: payload.user_id,
     email: user.email,
     displayName: user.name,

@@ -16,12 +16,15 @@ import {
 import type { PlaybackResponse } from "@/components/courses/types";
 import { formatTime, getThumbnail, getYoutubeEmbedUrl } from "@/components/courses/videoUtils";
 import { appPath } from "@/lib/app-path";
+import { attachSignedPlayback } from "@/lib/client/signedPlayback";
 
-export default function ModernVideoPlayer({ playback }: { playback: PlaybackResponse | null }) {
-  return <VideoPlayer key={playback?.video.id || "empty"} playback={playback} />;
+type PlayerProps = { playback: PlaybackResponse | null; renewPlayback?: () => Promise<PlaybackResponse> };
+
+export default function ModernVideoPlayer({ playback, renewPlayback }: PlayerProps) {
+  return <VideoPlayer key={playback?.video.id || "empty"} playback={playback} renewPlayback={renewPlayback} />;
 }
 
-function VideoPlayer({ playback }: { playback: PlaybackResponse | null }) {
+function VideoPlayer({ playback, renewPlayback }: PlayerProps) {
   const playerShellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsTimerRef = useRef<number | null>(null);
@@ -37,6 +40,22 @@ function VideoPlayer({ playback }: { playback: PlaybackResponse | null }) {
   const [speed, setSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [buffering, setBuffering] = useState(true);
+  const [playbackError, setPlaybackError] = useState("");
+
+  useEffect(() => {
+    if (playback?.playback.provider !== "storage" || !videoRef.current || !renewPlayback) return;
+    return attachSignedPlayback(videoRef.current, playback.playback, async () => {
+      const result = await renewPlayback();
+      if (result.playback.provider !== "storage") throw new Error("Playback source changed");
+      return result.playback;
+    }, message => {
+      setPlaying(false);
+      setBuffering(false);
+      setShowControls(true);
+      setPlaybackError(message);
+    });
+  }, [playback, renewPlayback]);
 
 
   useEffect(() => {
@@ -83,13 +102,19 @@ function VideoPlayer({ playback }: { playback: PlaybackResponse | null }) {
     player.currentTime = Math.min(Math.max(player.currentTime + seconds, 0), player.duration || 0);
   }
 
-  function togglePlay() {
+  async function togglePlay() {
     const player = videoRef.current;
     if (!player) return;
 
     if (player.paused) {
-      void player.play();
-      setPlaying(true);
+      setPlaybackError("");
+      try {
+        await player.play();
+      } catch {
+        setPlaying(false);
+        setBuffering(false);
+        setPlaybackError("Playback could not start. Press Play to try again.");
+      }
     } else {
       player.pause();
       setPlaying(false);
@@ -159,14 +184,33 @@ function VideoPlayer({ playback }: { playback: PlaybackResponse | null }) {
           ) : (
             <video
               ref={videoRef}
-              src={appPath(`/api/urologics/videos/${video.id}/stream`)}
+              src={source.provider === "storage" ? source.url : appPath(`/api/urologics/videos/${video.id}/stream`)}
               poster={thumbnail || undefined}
+              preload="metadata"
               controls={false}
               controlsList="nodownload noplaybackrate"
               disablePictureInPicture
               onContextMenu={(event) => event.preventDefault()}
               onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
               onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime || 0)}
+              onWaiting={() => setBuffering(true)}
+              onCanPlay={() => setBuffering(false)}
+              onPlaying={() => {
+                setBuffering(false);
+                setPlaybackError("");
+              }}
+              onEnded={() => {
+                setPlaying(false);
+                setBuffering(false);
+                setShowControls(true);
+              }}
+              onError={() => {
+                if (source.provider === "storage" && renewPlayback) return;
+                setPlaying(false);
+                setBuffering(false);
+                setShowControls(true);
+                setPlaybackError("Unable to load this video. Select the lesson again to retry.");
+              }}
               onPlay={() => {
                 setPlaying(true);
                 setShowControls(true);
@@ -184,6 +228,12 @@ function VideoPlayer({ playback }: { playback: PlaybackResponse | null }) {
             />
           )}
         </div>
+
+        {source.provider !== "youtube" && (buffering || playbackError) ? (
+          <div role={playbackError ? "alert" : "status"} className="pointer-events-none absolute inset-x-4 top-4 bg-black/75 px-3 py-2 text-sm text-white">
+            {playbackError || "Loading video..."}
+          </div>
+        ) : null}
 
         {source.provider !== "youtube" ? (
           <div

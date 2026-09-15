@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   FolderOpen,
@@ -21,16 +21,18 @@ import type {
 } from "@/components/courses/types";
 import { isUnlocked } from "@/components/courses/videoUtils";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
-import GlobalLoading from "@/components/ui/GlobalLoading";
+import { CourseTilesSkeleton } from "@/components/courses/CourseSkeleton";
 import { appPath } from "@/lib/app-path";
+import { getStoredAuth, refreshStoredAuth } from "@/lib/urologics-auth";
+import { useQuery } from "@tanstack/react-query";
+import { accountQueryKey, readUrologicsJson } from "@/lib/client/urologicsQuery";
 
 const PRICING_URL = "https://urologics.co.uk/pricing";
 const COURSE_INQUIRY_MAIL =
   "mailto:ankitgoel042@gmail.com?subject=I%20want%20to%20inquire%20about%20your%20courses";
 
 export default function CoursesPage() {
-  const { user } = useAuth();
-  const [sections, setSections] = useState<VideoSection[]>([]);
+  const { user, loading: authLoading } = useAuth();
   const [showPlayerView, setShowPlayerView] = useState(false);
   const [query, setQuery] = useState("");
   const [expandedSectionIds, setExpandedSectionIds] = useState<string[]>([]);
@@ -38,54 +40,26 @@ export default function CoursesPage() {
     useState<PlaybackResponse | null>(null);
   const [selectedLockedVideo, setSelectedLockedVideo] =
     useState<VideoItem | null>(null);
-  const [libraryLoading, setLibraryLoading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const libraryPath = "/api/urologics/videos/library";
+  const library = useQuery({
+    queryKey: accountQueryKey(user?.uid, libraryPath),
+    queryFn: ({ signal }) => readUrologicsJson<VideoLibraryResponse>(libraryPath, user, signal),
+    enabled: !authLoading,
+  });
+  const sections = useMemo(() => library.data?.sections || [], [library.data]);
+  const libraryLoading = library.isPending;
+  const error = library.error?.message || "";
+  const playbackRequest = useRef<AbortController | null>(null);
+
+  useEffect(() => () => playbackRequest.current?.abort(), []);
 
   useEffect(() => {
-    const idToken = user?.idToken;
-
-    let active = true;
-
-    async function loadLibrary() {
-      setLibraryLoading(true);
-      setError("");
-
-      try {
-        const response = await fetch(appPath("/api/urologics/videos/library"), {
-          headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
-          cache: "no-store",
-        });
-        const payload = (await response.json()) as VideoLibraryResponse & {
-          error?: string;
-        };
-
-        if (!response.ok) {
-          throw new Error(payload.error || "Unable to load video library.");
-        }
-
-        if (!active) return;
-        const nextSections = payload.sections || [];
-        setSections(nextSections);
-        setExpandedSectionIds([]);
-      } catch (nextError) {
-        if (!active) return;
-        setError(
-          nextError instanceof Error
-            ? nextError.message
-            : "Unable to load video library.",
-        );
-      } finally {
-        if (active) setLibraryLoading(false);
-      }
-    }
-
-    void loadLibrary();
-
-    return () => {
-      active = false;
-    };
-  }, [user?.idToken]);
+    playbackRequest.current?.abort();
+    setSelectedPlayback(null);
+    setSelectedLockedVideo(null);
+    setPlayingId(null);
+  }, [user?.uid]);
 
   const filteredSections = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -144,7 +118,11 @@ export default function CoursesPage() {
   }
 
   async function handleVideoClick(video: VideoItem) {
+    playbackRequest.current?.abort();
+    const controller = new AbortController();
+    playbackRequest.current = controller;
     if (!isUnlocked(video)) {
+      setPlayingId(null);
       setSelectedPlayback(null);
       setSelectedLockedVideo(video);
       return;
@@ -156,6 +134,7 @@ export default function CoursesPage() {
       const response = await fetch(
         appPath(`/api/urologics/videos/${video.id}/play`),
         {
+          signal: controller.signal,
           headers: user?.idToken ? { Authorization: `Bearer ${user.idToken}` } : undefined,
         },
       );
@@ -167,15 +146,16 @@ export default function CoursesPage() {
         throw new Error(payload.error || "Unable to prepare video.");
       }
 
-      setSelectedPlayback(payload);
+      if (!controller.signal.aborted) setSelectedPlayback(payload);
     } catch (nextError) {
+      if (controller.signal.aborted) return;
       toast.error(
         nextError instanceof Error
           ? nextError.message
           : "Unable to prepare video.",
       );
     } finally {
-      setPlayingId(null);
+      if (!controller.signal.aborted) setPlayingId(null);
     }
   }
 
@@ -207,11 +187,9 @@ export default function CoursesPage() {
               </div>
 
               <div className="mt-5 grid gap-4 sm:mt-7 md:grid-cols-2 xl:grid-cols-3">
-                {libraryLoading ? (
-                  <div className="rounded-[26px] border border-[var(--border)] bg-[var(--surface)] p-6">
-                    <GlobalLoading />
-                  </div>
-                ) : error ? (
+                {authLoading || libraryLoading ? (
+                  <CourseTilesSkeleton />
+                ) : error && sections.length === 0 ? (
                   <div className="rounded-[26px] border border-red-100 bg-red-50 p-6 text-sm text-red-700">
                     {error}
                   </div>
@@ -297,6 +275,8 @@ export default function CoursesPage() {
               onSectionSelect={selectSection}
               onVideoClick={(video) => void handleVideoClick(video)}
               onBackToFolders={() => {
+                playbackRequest.current?.abort();
+                setPlayingId(null);
                 setShowPlayerView(false);
                 setSelectedPlayback(null);
                 setSelectedLockedVideo(null);
@@ -317,6 +297,16 @@ export default function CoursesPage() {
                 <ModernVideoPlayer
                   key={selectedPlayback?.video.id || "empty-player"}
                   playback={selectedPlayback}
+                  renewPlayback={async () => {
+                    if (!selectedPlayback) throw new Error("No lesson selected");
+                    const currentUser = user ? await refreshStoredAuth(getStoredAuth() || user) : null;
+                    const response = await fetch(appPath(`/api/urologics/videos/${selectedPlayback.video.id}/play`), {
+                      headers: currentUser ? { Authorization: `Bearer ${currentUser.idToken}` } : undefined,
+                      cache: "no-store",
+                    });
+                    if (!response.ok) throw new Error("Playback renewal failed");
+                    return response.json();
+                  }}
                 />
               )}
             </div>

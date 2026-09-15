@@ -3,6 +3,7 @@ import { appPath } from "@/lib/app-path";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import ToasterProvider from "@/components/ToastProvider";
+import QueryProvider from "@/components/data/QueryProvider";
 
 export const metadata: Metadata = {
   title: {
@@ -26,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider><QueryProvider>{children}</QueryProvider></AuthProvider>
         <ToasterProvider />
       </body>
     </html>

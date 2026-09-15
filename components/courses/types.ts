@@ -35,7 +35,7 @@ export type VideoLibraryResponse = {
 export type PlaybackResponse = {
   video: VideoItem;
   playback:
-    | { provider: "storage"; url: string; mimeType?: string }
+    | { provider: "storage"; url: string; mimeType?: string; expiresAt?: number }
     | { provider: "drive"; previewUrl: string; webViewUrl?: string }
     | { provider: "youtube"; url: string };
 };

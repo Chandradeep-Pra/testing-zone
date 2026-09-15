@@ -3,7 +3,7 @@
 import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, LockKeyhole, Search, Video } from "lucide-react";
 import type { VideoItem, VideoSection } from "@/components/courses/types";
 import { getThumbnail, isUnlocked, prettifyTitle } from "@/components/courses/videoUtils";
-import GlobalLoading from "@/components/ui/GlobalLoading";
+import { LessonRowsSkeleton } from "@/components/courses/CourseSkeleton";
 
 type CourseSidebarProps = {
   error: string;
@@ -72,9 +72,9 @@ export default function CourseSidebar({
       <div className="urologics-thin-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {libraryLoading ? (
           <div className="rounded-[22px] bg-[var(--accent-soft)] p-4">
-            <GlobalLoading label="Loading videos..." compact />
+            <LessonRowsSkeleton />
           </div>
-        ) : error ? (
+        ) : error && filteredSections.length === 0 ? (
           <div className="rounded-[22px] border border-red-100 bg-red-50 p-4 text-sm text-red-700">
             {error}
           </div>

@@ -35,11 +35,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const syncPlaybackSession = useCallback(async (idToken: string) => {
-    await fetch(appPath("/api/urologics/session"), {
+    const response = await fetch(appPath("/api/urologics/session"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ idToken }),
-    }).catch(() => undefined);
+    });
+    if (!response.ok) throw new Error("Playback session synchronization failed.");
   }, []);
 
   useEffect(() => {
@@ -55,8 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const nextUser = await refreshStoredAuth(stored);
-        await syncPlaybackSession(nextUser.idToken);
-        if (active) setUser(nextUser);
+        if (active) {
+          setUser(nextUser);
+          void syncPlaybackSession(nextUser.idToken).catch(() => console.warn("Playback session synchronization failed."));
+        }
       } catch {
         if (active) setUser(null);
       } finally {
@@ -89,10 +92,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const nextUser = await refreshStoredAuth(stored);
     await syncPlaybackSession(nextUser.idToken);
     setUser(nextUser);
+    window.dispatchEvent(new Event("urologics:access-changed"));
     return nextUser;
   }, [syncPlaybackSession]);
 
   const signOut = useCallback(() => {
+    window.dispatchEvent(new Event("urologics:logout"));
     void fetch(appPath("/api/urologics/session"), { method: "DELETE" });
     clearStoredAuth();
     setUser(null);
