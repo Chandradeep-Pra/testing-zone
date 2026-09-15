@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Gauge,
+  Loader2,
   Maximize2,
   Minimize2,
   Pause,
@@ -18,9 +19,14 @@ import { formatTime, getThumbnail, getYoutubeEmbedUrl } from "@/components/cours
 import { appPath } from "@/lib/app-path";
 import { attachSignedPlayback } from "@/lib/client/signedPlayback";
 
-type PlayerProps = { playback: PlaybackResponse | null; renewPlayback?: () => Promise<PlaybackResponse> };
+type PlayerProps = { playback: PlaybackResponse | null; loading?: boolean; renewPlayback?: () => Promise<PlaybackResponse> };
 
-export default function ModernVideoPlayer({ playback, renewPlayback }: PlayerProps) {
+export default function ModernVideoPlayer({ playback, loading, renewPlayback }: PlayerProps) {
+  if (loading) return (
+    <div className="grid aspect-video place-items-center rounded-[30px] bg-[#071014] text-white" role="status">
+      <div className="flex flex-col items-center gap-3"><Loader2 aria-hidden="true" className="h-9 w-9 animate-spin" /><span>Loading video...</span></div>
+    </div>
+  );
   return <VideoPlayer key={playback?.video.id || "empty"} playback={playback} renewPlayback={renewPlayback} />;
 }
 
@@ -42,6 +48,30 @@ function VideoPlayer({ playback, renewPlayback }: PlayerProps) {
   const [showControls, setShowControls] = useState(true);
   const [buffering, setBuffering] = useState(true);
   const [playbackError, setPlaybackError] = useState("");
+
+  useEffect(() => {
+    const player = videoRef.current;
+    if (!player) return;
+    let active = true;
+    void player.play().catch(() => {
+      if (!active || player.error) return;
+      setBuffering(false);
+      setShowControls(true);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!buffering || playback?.playback.provider === "youtube" || !playback) return;
+    const timer = window.setTimeout(() => {
+      videoRef.current?.pause();
+      setPlaying(false);
+      setBuffering(false);
+      setShowControls(true);
+      setPlaybackError("Video is taking too long to load. Press Play to retry.");
+    }, 20000);
+    return () => window.clearTimeout(timer);
+  }, [buffering, playback]);
 
   useEffect(() => {
     if (playback?.playback.provider !== "storage" || !videoRef.current || !renewPlayback) return;
@@ -108,6 +138,8 @@ function VideoPlayer({ playback, renewPlayback }: PlayerProps) {
 
     if (player.paused) {
       setPlaybackError("");
+      setBuffering(true);
+      if (player.error || playbackError) player.load();
       try {
         await player.play();
       } catch {
@@ -186,7 +218,8 @@ function VideoPlayer({ playback, renewPlayback }: PlayerProps) {
               ref={videoRef}
               src={source.provider === "storage" ? source.url : appPath(`/api/urologics/videos/${video.id}/stream`)}
               poster={thumbnail || undefined}
-              preload="metadata"
+              preload="auto"
+              autoPlay
               controls={false}
               controlsList="nodownload noplaybackrate"
               disablePictureInPicture
@@ -194,6 +227,9 @@ function VideoPlayer({ playback, renewPlayback }: PlayerProps) {
               onLoadedMetadata={(event) => setDuration(event.currentTarget.duration || 0)}
               onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime || 0)}
               onWaiting={() => setBuffering(true)}
+              onLoadStart={() => { setBuffering(true); setPlaybackError(""); }}
+              onSeeking={() => setBuffering(true)}
+              onSeeked={() => { if (videoRef.current && videoRef.current.readyState >= 3) setBuffering(false); }}
               onCanPlay={() => setBuffering(false)}
               onPlaying={() => {
                 setBuffering(false);
@@ -230,8 +266,11 @@ function VideoPlayer({ playback, renewPlayback }: PlayerProps) {
         </div>
 
         {source.provider !== "youtube" && (buffering || playbackError) ? (
-          <div role={playbackError ? "alert" : "status"} className="pointer-events-none absolute inset-x-4 top-4 bg-black/75 px-3 py-2 text-sm text-white">
-            {playbackError || "Loading video..."}
+          <div role={playbackError ? "alert" : "status"} className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-sm text-white">
+            <div className="flex max-w-sm flex-col items-center gap-3 rounded-2xl bg-black/75 px-5 py-4 text-center">
+              {!playbackError && <Loader2 aria-hidden="true" className="h-9 w-9 animate-spin" />}
+              <span>{playbackError || "Loading video..."}</span>
+            </div>
           </div>
         ) : null}
 

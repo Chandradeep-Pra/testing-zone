@@ -41,11 +41,12 @@ function renderPlayer(provider, player = {}) {
   return { nodes, states };
 }
 
-test('Storage plays directly with a poster and metadata-only preload', () => {
+test('Storage plays directly with a poster and eager preload', () => {
   const { nodes } = renderPlayer('storage');
   const video = nodes.find(node => node.type === 'video');
   assert.equal(video.props.src, 'https://storage.test/signed');
-  assert.equal(video.props.preload, 'metadata');
+  assert.equal(video.props.preload, 'auto');
+  assert.equal(video.props.autoPlay, true);
   assert.equal(video.props.poster, 'poster.jpg');
 });
 

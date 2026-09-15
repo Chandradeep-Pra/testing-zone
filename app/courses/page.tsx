@@ -297,6 +297,7 @@ export default function CoursesPage() {
                 <ModernVideoPlayer
                   key={selectedPlayback?.video.id || "empty-player"}
                   playback={selectedPlayback}
+                  loading={playingId !== null}
                   renewPlayback={async () => {
                     if (!selectedPlayback) throw new Error("No lesson selected");
                     const currentUser = user ? await refreshStoredAuth(getStoredAuth() || user) : null;
