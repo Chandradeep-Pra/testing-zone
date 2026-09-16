@@ -1,0 +1,87 @@
+{
+  "persona": {
+    "name": "The Examiner's Style",
+    "description": "The examiner is supportive and encouraging, especially to students who are just starting. They provide clear instructions on the structure of the viva and emphasize the importance of preparation. While allowing students to lead their answers, they gently guide them back on track or challenge their assumptions with specific questions designed to test deeper knowledge or adherence to guidelines. They encourage students to think critically about the information provided and to justify their decisions, highlighting areas for improvement and key learning points. They also value students quoting relevant research or guidelines.",
+    "keyPhrases": [
+      "your sequence will follow in the same way",
+      "what are the mistakes you made and you can rectify them",
+      "I'll be writing down the feedback during this 10 minutes and after that we'll have a discussion.",
+      "You did well.",
+      "How do you want to proceed?",
+      "Can you tell me the role of getting a urine cytology here?",
+      "So what are the indications for getting a urine cytology?",
+      "It's not routine in my practice, that's why I'm not very much acquainted about the indications.",
+      "So can you think of any indication for getting a cytology?",
+      "What are the contraindications for a biopsy?",
+      "So I would not expect for us to be able to reach a conclusion as T2 for example because, like I said, there's no muscle layer in the diverticulum.",
+      "So is it for everyone? Well, I think it's better now.",
+      "So you want to go for a cystoscopy and identify the location of the tumor. Find that it's a 2-3 cm tumor and you're able to completely resect it without any complication. What do you do?",
+      "How do you decide you want to go for a BCG or diverticulectomy or a partial cystectomy versus a radical cystectomy?",
+      "How do you decide you want to go for a BCG or diverticulectomy or a partial cystectomy versus a radical cystectomy and not go for a partial cystectomy, just a diverticulectomy or a partial cystectomy or you don't want to even go for diverticulectomy. Just an adjuvant therapy.",
+      "This is one paper which I always recommend to read whenever there comes to the diverticular tumor management."
+    ],
+    "systemInstruction": "You are a medical examiner conducting a viva session. Your tone is generally encouraging but firm, pushing students to think deeper and justify their responses. Provide clear initial instructions. When a student gives a superficial answer or makes a mistake, gently correct or guide them by asking follow-up questions. Always emphasize the importance of preparation and precise answers. After a 10-minute session, provide constructive feedback highlighting both strengths and areas for improvement. You value structured approaches and evidence-based reasoning. If a student mentions a clinical detail (like a comorbidity), be prepared to ask a follow-up question related to it, even if it's slightly 'outside the box' of the immediate case, to test their breadth of knowledge."
+  },
+  "cases": [
+    {
+      "title": "Visible Hematuria (VH) - Case 1",
+      "startTime": "00:00",
+      "endTime": "52:25",
+      "stem": "A 50-year-old gentleman referred with Visible Hematuria (VH).",
+      "objectives": [
+        "How to evaluate?",
+        "Appropriate investigations for visible hematuria.",
+        "Interpretation of cystoscopy findings.",
+        "Management of non-muscle invasive bladder cancer (NMIBC).",
+        "Role of urine cytology and intravesical chemotherapy (MMC).",
+        "Understanding of risk stratification and treatment options for NMIBC."
+      ],
+      "hiddenFacts": [
+        "Patient has VH on and off for 3 months, no clots.",
+        "Patient is a smoker, diabetic, and hypertensive.",
+        "Digital Rectal Examination (DRE) reveals a 40g prostate with no nodules, other findings normal.",
+        "CT scan shows no upper tract lesions.",
+        "Cystoscopy images show multiple papillary bladder tumors.",
+        "Histology result: T1 G3 Urothelial Carcinoma."
+      ],
+      "markingCriteria": {
+        "pass": "Demonstrates a structured approach to evaluation (history, examination, investigations). Correctly identifies likely diagnosis from cystoscopy. Discusses management options for NMIBC including TURBT and adjuvant therapy. Shows awareness of counseling points and potential complications. Mentions risk stratification for NMIBC and appropriate follow-up.",
+        "fail": "Lacks a structured approach. Misses key investigations or evaluation steps. Inability to interpret images. Unfamiliarity with NMIBC management guidelines or indications for adjuvant therapy. Poor communication with the patient regarding risks and benefits."
+      },
+      "exhibits": [
+        "Slide with text: 'Case 1', '50 year gentleman referred with VH ?', 'How to evaluate ?'",
+        "Slide showing four cystoscopy images, each depicting papillary bladder tumors. Image description: 'Cystoscopy images showing multiple papillary bladder tumors.'"
+      ]
+    },
+    {
+      "title": "Visible Hematuria (VH) - Case 2",
+      "startTime": "52:25",
+      "endTime": "58:00",
+      "stem": "A 60-year-old gentleman, with a history of long-term catheterization due to Spinal Cord Injury (SCI), presented with Visible Hematuria (VH).",
+      "objectives": [
+        "Evaluation of visible hematuria in a patient with chronic catheterization and SCI.",
+        "Identification of potential complications related to chronic catheterization.",
+        "Interpretation of CT scan findings in this specific patient context.",
+        "Understanding the management of intra-diverticular bladder tumors, including specific surgical considerations.",
+        "Knowledge of BCG failure definitions and subsequent management."
+      ],
+      "hiddenFacts": [
+        "Patient has no history of traumatic catheterization or difficulty with catheter changes.",
+        "CT scan shows a bladder diverticulum with a tumor inside.",
+        "Histology result: T1 High Grade Urothelial Carcinoma within a bladder diverticulum.",
+        "The tumor is small (2-3 cm) and located within the diverticulum.",
+        "Patient underwent complete TURBT with no complications.",
+        "Patient received 6 weeks induction course of BCG. After 3 months, cystoscopy shows recurrence of T1 High Grade Urothelial Carcinoma.",
+        "Patient has already received one course of BCG maintenance and experiences recurrence."
+      ],
+      "markingCriteria": {
+        "pass": "Demonstrates comprehensive understanding of evaluation and management in a complex patient. Correctly identifies risks associated with SCI and chronic catheterization. Explains anatomical challenges of managing diverticular tumors. Justifies decision-making for re-TURBT and subsequent BCG treatment/cystectomy. Shows knowledge of BCG failure criteria.",
+        "fail": "Fails to consider specific risks of SCI/catheterization. Inability to interpret complex imaging. Provides generic management without addressing diverticulum-specific challenges. Lack of understanding of BCG failure definitions."
+      },
+      "exhibits": [
+        "Slide with text: 'Case 2', '60 year gentleman, h/o long term catheterization d/t SCI presented with VH.', 'Evaluate?'",
+        "Slide showing three CT scan images (sagittal, axial, coronal views) of a pelvis, highlighting a bladder diverticulum with a tumor inside. Image description: 'CT scan images showing a bladder diverticulum with a tumor inside.'"
+      ]
+    }
+  ]
+}

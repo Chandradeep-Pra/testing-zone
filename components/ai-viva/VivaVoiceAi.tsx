@@ -12,9 +12,9 @@ import { useVivaEngine } from "./useVivaEngine";
 import ReadyOverlay from "./ReadyOverlay";
 import { useCountdown } from "./useCountdown";
 import ChatTimeline from "./ChatTimeline";
-import { useLiveAvatar } from "./useLiveAvatar";
+import { useGeminiLive } from "./useGeminiLive";
+// ... existing imports ...
 
-import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
@@ -719,13 +719,31 @@ export default function VivaVoiceAi({
     }
   }
 
+    const {
+    active: liveActive,
+    connecting: liveConnecting,
+    startSession: startLiveSession,
+    stopSession: stopLiveSession,
+    transcript: liveTranscript,
+  } = useGeminiLive(vivaCase, (vivaCase as any).persona);
+
   async function handleBegin(
     cameraPref = true,
     examinerChoice: ExaminerVoice = getDefaultExaminer(selectedMode),
     micDeviceId?: string
   ) {
     if (hasStartedRef.current) return;
+    
+    if (vivaCase.isUroAiPowered && selectedMode === "calm") {
+      hasStartedRef.current = true;
+      setReadyVisible(false);
+      setVivaStarted(true);
+      await startLiveSession();
+      return;
+    }
+
     hasStartedRef.current = true;
+
     examinerVoiceRef.current = examinerChoice;
     setSelectedExaminer(examinerChoice);
     setCameraEnabled(cameraPref);
@@ -927,8 +945,18 @@ export default function VivaVoiceAi({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+            {vivaCase.isUroAiPowered && (
+              <span className="flex items-center gap-1.5 rounded-full bg-cyan-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[#0f7896] shadow-[0_0_12px_rgba(15,120,150,0.2)]">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500"></span>
+                </span>
+                UroAI Powered
+              </span>
+            )}
             <span className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-1 text-xs uppercase tracking-[0.18em] text-[#071014]/65">
+
             {isFastMode ? "Fast and Furious" : "Live Viva"}
             </span>
             <div className="flex items-center gap-2 rounded-full bg-[#0f7896] px-3 py-1.5 text-sm font-semibold text-white">
@@ -1033,9 +1061,10 @@ export default function VivaVoiceAi({
                   <span>Transcript</span>
                 </button>
 
-                <button
-                  onClick={endViva}
-                  disabled={!vivaStarted || ending}
+                                <button
+                  onClick={liveActive ? stopLiveSession : endViva}
+                  disabled={(!vivaStarted && !liveActive) || ending}
+
                   className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                   title="End viva examination"
                 >

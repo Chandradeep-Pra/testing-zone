@@ -115,9 +115,14 @@ export type VivaCaseRecord = {
   attempts?: VivaCaseAttempt[];
   allowedUser?: string[];
   modes?: VivaCaseModes;
-  isActive?: boolean;
+    isActive?: boolean;
   publicParticipants?: PublicVivaParticipant[];
+  isUroAiPowered?: boolean;
+  persona?: {
+    systemInstruction: string;
+  };
 };
+
 
 export type PublicVivaParticipant = {
   name: string;
@@ -449,9 +454,15 @@ export function normalizeVivaCase(payload: unknown): VivaCaseRecord {
       : undefined,
     allowedUser: asStringArray(source.allowedUser),
     modes: normalizeModes(source.modes) ?? fallback.modes,
-    isActive:
+        isActive:
       typeof source.isActive === "boolean" ? source.isActive : undefined,
+    isUroAiPowered:
+      typeof source.isUroAiPowered === "boolean" ? source.isUroAiPowered : undefined,
+    persona: asRecord(source.persona) ? {
+      systemInstruction: String((source.persona as any).systemInstruction || "")
+    } : undefined,
     publicParticipants: Array.isArray(source.publicParticipants)
+
       ? source.publicParticipants
           .map((participant) => normalizePublicParticipant(participant))
           .filter((participant): participant is PublicVivaParticipant =>

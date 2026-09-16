@@ -1,0 +1,150 @@
+import { useState, useRef, useCallback, useEffect } from "react";
+import { GoogleGenAI, Modality } from "@google/genai";
+
+export function useGeminiLive(vivaCase: any, persona: any) {
+  const [active, setActive] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [amplitude, setAmplitude] = useState(0);
+  
+  const sessionRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const nextPlayTimeRef = useRef(0);
+
+  const stopSession = useCallback(() => {
+    sessionRef.current?.close();
+    micStreamRef.current?.getTracks().forEach(track => track.stop());
+    if (audioContextRef.current?.state !== 'closed') {
+      audioContextRef.current?.close();
+    }
+    setActive(false);
+  }, []);
+
+  const playAudioChunk = useCallback((base64Data: string) => {
+    if (!audioContextRef.current) return;
+    
+    // Decode base64 to ArrayBuffer
+    const binaryString = window.atob(base64Data);
+    const len = binaryString.length;
+    const bytes = new Int16Array(len / 2);
+    for (let i = 0; i < len; i += 2) {
+      bytes[i / 2] = (binaryString.charCodeAt(i + 1) << 8) | binaryString.charCodeAt(i);
+    }
+    
+    // Convert to Float32 for Web Audio API
+    const float32Data = new Float32Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) {
+      float32Data[i] = bytes[i] / 32768.0;
+    }
+
+    const buffer = audioContextRef.current.createBuffer(1, float32Data.length, 24000);
+    buffer.getChannelData(0).set(float32Data);
+    
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContextRef.current.destination);
+    
+    // Schedule playback for gapless audio
+    const startTime = Math.max(audioContextRef.current.currentTime, nextPlayTimeRef.current);
+    source.start(startTime);
+    nextPlayTimeRef.current = startTime + buffer.duration;
+  }, []);
+
+  const startSession = useCallback(async () => {
+    setConnecting(true);
+    setTranscript("");
+    try {
+      const res = await fetch("/api/viva/live/session", {
+        method: "POST",
+        body: JSON.stringify({ vivaCase, persona }),
+      });
+      const { token, model } = await res.json();
+
+      const live = new GoogleGenAI({ 
+        apiKey: token,
+        httpOptions: { apiVersion: "v1alpha" }
+      });
+
+      // 1. Setup Audio Context
+      audioContextRef.current = new AudioContext({ sampleRate: 16000 });
+      await audioContextRef.current.audioWorklet.addModule("/audio-processor.js");
+
+      // 2. Connect to Gemini Live
+      sessionRef.current = await live.live.connect({
+        model,
+        config: { responseModalities: [Modality.AUDIO] },
+        callbacks: {
+          onmessage: (msg: any) => {
+            // Handle Audio from AI
+            if (msg.serverContent?.modelTurn?.parts) {
+              msg.serverContent.modelTurn.parts.forEach((part: any) => {
+                if (part.inlineData?.mimeType?.includes("audio/pcm")) {
+                  playAudioChunk(part.inlineData.data);
+                }
+                if (part.text) {
+                  setTranscript(prev => prev + " " + part.text);
+                }
+              });
+            }
+            
+            // Handle Interruption (Server tells us if user interrupted)
+            if (msg.serverContent?.interrupted) {
+              nextPlayTimeRef.current = 0; // Reset playback queue
+            }
+          },
+          onerror: (err: any) => {
+            console.error("Live Error:", err);
+            stopSession();
+          },
+          onclose: () => setActive(false),
+        }
+      });
+
+      // 3. Setup Microphone and Stream to Gemini
+      micStreamRef.current = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      const micSource = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
+      const processor = new AudioWorkletNode(audioContextRef.current, "audio-processor");
+      
+      processor.port.onmessage = (e) => {
+        const pcmData = e.data; // Int16Array from processor
+        // Convert to base64 for Gemini
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
+        sessionRef.current?.sendRealtimeInput([{
+          mimeType: "audio/pcm;rate=16000",
+          data: base64
+        }]);
+      };
+
+      micSource.connect(processor);
+      setActive(true);
+    } catch (err) {
+      console.error("Failed to start live session:", err);
+      stopSession();
+    } finally {
+      setConnecting(false);
+    }
+  }, [vivaCase, persona, playAudioChunk, stopSession]);
+
+  useEffect(() => {
+    return () => {
+      stopSession();
+    };
+  }, [stopSession]);
+
+  return {
+    active,
+    connecting,
+    startSession,
+    stopSession,
+    transcript,
+    amplitude,
+  };
+}
