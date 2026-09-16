@@ -13,9 +13,11 @@ import ReadyOverlay from "./ReadyOverlay";
 import { useCountdown } from "./useCountdown";
 import ChatTimeline from "./ChatTimeline";
 import { useGeminiLive } from "./useGeminiLive";
-// ... existing imports ...
 
+import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
+
+
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
 import { appPath } from "@/lib/app-path";
@@ -134,10 +136,10 @@ export default function VivaVoiceAi({
     clearExhibit,
   } = useVivaSession();
 
-  const { speak, amplitude, error: audioError, stop: stopExaminerAudio } = useSpeechOutput();
-  const liveAvatar = useLiveAvatar();
-  const examinerSpeaking = speaking || liveAvatar.isSpeaking;
+    const { speak, amplitude, error: audioError, stop: stopExaminerAudio } = useSpeechOutput();
+  const examinerSpeaking = speaking;
   const avatarSessionActiveRef = useRef(false);
+
 
   const hasStartedRef = useRef(false);
   const firstQuestionRef = useRef<Awaited<ReturnType<typeof next>> | null>(null);
@@ -190,21 +192,12 @@ export default function VivaVoiceAi({
     };
   }
 
-  async function setAvatarListening(listening: boolean) {
+    async function setAvatarListening(listening: boolean) {
     if (!avatarSessionActiveRef.current) {
       return;
     }
-
-    try {
-      if (listening) {
-        await liveAvatar.startListening();
-      } else {
-        await liveAvatar.stopListening();
-      }
-    } catch (err) {
-      console.error("LiveAvatar listening state update failed:", err);
-    }
   }
+
 
   async function speakAsExaminer(text: string, onEnd?: () => void) {
     // The avatar has its own voice configuration. Examiner speech must always
@@ -810,9 +803,10 @@ export default function VivaVoiceAi({
     setIsListening(false);
     stop();
     closeSocket();
-    void setAvatarListening(false);
-    await liveAvatar.stopSession();
+        void setAvatarListening(false);
+    // await liveAvatar.stopSession();
     avatarSessionActiveRef.current = false;
+
 
     if (fillerTimeoutRef.current) {
       clearTimeout(fillerTimeoutRef.current);
@@ -976,25 +970,8 @@ export default function VivaVoiceAi({
             thinking={thinking}
             transcript={transcript}
             keywordDetected={keywordDetected}
-            avatarVideo={
-              liveAvatar.isReady ? (
-                <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.28),_rgba(2,6,23,0.96))]">
-                  <video
-                    ref={liveAvatar.videoElementRef}
-                    autoPlay
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
-                  <div
-                    ref={liveAvatar.audioContainerRef}
-                    className="pointer-events-none absolute left-0 top-0 h-0 w-0 overflow-hidden"
-                  />
-                  {!examinerSpeaking && (
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(15,23,42,0.08),_rgba(2,6,23,0.42))]" />
-                  )}
-                </div>
-              ) : null
-            }
+                avatarVideo={null}
+
             exhibit={
                 exhibit?.type === "image" ? (
                   <div className="relative mx-auto flex h-full max-w-full items-center justify-center md:max-w-3xl">
