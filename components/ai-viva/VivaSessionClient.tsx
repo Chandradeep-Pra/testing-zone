@@ -58,13 +58,15 @@ function getStoredCandidate(vivaCase: VivaCaseRecord, mode: VivaMode, initialCan
     }
 
     const parsed = JSON.parse(raw) as StoredCandidateInfo;
+    const resolvedCandidate = initialCandidate || {
+      name: parsed.name || "",
+      email: parsed.email || "",
+    };
     return {
-      candidate: {
-        name: parsed.name || "",
-        email: parsed.email || "",
-      },
+      candidate: resolvedCandidate,
       submitted:
-        Boolean(parsed.name && parsed.email) && parsed.selectedCaseId === vivaCase.id,
+        Boolean(resolvedCandidate.name && resolvedCandidate.email) &&
+        (Boolean(initialCandidate) || parsed.selectedCaseId === vivaCase.id),
       selectedMode: parsed.selectedMode || "calm",
       selectedExaminerId: parsed.selectedExaminerId || getDefaultExaminer(parsed.selectedMode || "calm").id,
     };
@@ -114,7 +116,7 @@ export default function VivaSessionClient({
   const initialState = getStoredCandidate(vivaCase, selectedModeFromUrl, initialCandidate);
   const [candidate, setCandidate] = useState<CandidateInfo>(initialState.candidate);
   const [submitted, setSubmitted] = useState(
-    (autoStart || initialState.submitted) && initialState.selectedMode === selectedModeFromUrl
+    autoStart || (initialState.submitted && initialState.selectedMode === selectedModeFromUrl)
   );
 
   useEffect(() => {
@@ -142,7 +144,11 @@ export default function VivaSessionClient({
   if (submitted) {
     return (
       <main className="min-h-screen bg-white text-[#071014]">
-        <VivaVoiceAi vivaCase={vivaCase} selectedMode={selectedModeFromUrl} />
+        <VivaVoiceAi
+          vivaCase={vivaCase}
+          selectedMode={selectedModeFromUrl}
+          initialCandidate={candidate}
+        />
       </main>
     );
   }

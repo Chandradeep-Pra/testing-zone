@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { GoogleGenAI, Modality } from "@google/genai";
 
-export function useGeminiLive(vivaCase: any, persona: any) {
+export function useGeminiLive(vivaCase: any, persona: any, candidateName: string) {
   const [active, setActive] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -110,6 +110,16 @@ export function useGeminiLive(vivaCase: any, persona: any) {
         }
       });
 
+      sessionRef.current.sendClientContent({
+        turns: [{
+          role: "user",
+          parts: [{
+            text: `Start the viva by saying exactly: "Hi ${candidateName}, how are you doing today ?" Then wait for the candidate's answer. Do not add any other words.`,
+          }],
+        }],
+        turnComplete: true,
+      });
+
       // 3. Setup Microphone and Stream to Gemini
       micStreamRef.current = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -141,7 +151,7 @@ export function useGeminiLive(vivaCase: any, persona: any) {
     } finally {
       setConnecting(false);
     }
-  }, [vivaCase, persona, playAudioChunk, stopSession]);
+  }, [candidateName, vivaCase, persona, playAudioChunk, stopSession]);
 
   useEffect(() => {
     return () => {

@@ -23,6 +23,7 @@ import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flo
 import { appPath } from "@/lib/app-path";
 
 type VivaMode = "calm" | "fast";
+type CandidateInfo = { name: string; email: string };
 type QaHistoryItem = { question?: string; answer?: string };
 type CandidateConversationMessage =
   | {
@@ -85,14 +86,18 @@ function resolveExhibitSrc(src: string) {
 export default function VivaVoiceAi({
   vivaCase,
   selectedMode = "calm",
+  initialCandidate,
 }: {
   vivaCase: VivaCaseRecord;
   selectedMode?: VivaMode;
+  initialCandidate?: CandidateInfo;
 }) {
   const fastModeTotalDurationSec = 10 * 60;
   const isFastMode = selectedMode === "fast";
 
-  const [candidate, setCandidate] = useState({ name: "", email: "" });
+  const [candidate, setCandidate] = useState<CandidateInfo>(
+    initialCandidate || { name: "", email: "" },
+  );
   const [selectedExaminer, setSelectedExaminer] = useState<ExaminerVoice>(
     getDefaultExaminer(selectedMode)
   );
@@ -108,13 +113,18 @@ export default function VivaVoiceAi({
   } = useVivaEngine(vivaCase, selectedMode);
 
   useEffect(() => {
+    if (initialCandidate?.name && initialCandidate.email) {
+      setCandidate(initialCandidate);
+    }
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {
       const parsed = JSON.parse(stored) as StoredCandidateInfo;
-      setCandidate({
-        name: parsed.name || "",
-        email: parsed.email || "",
-      });
+      if (!initialCandidate) {
+        setCandidate({
+          name: parsed.name || "",
+          email: parsed.email || "",
+        });
+      }
       if (parsed.selectedExaminer) {
         setSelectedExaminer(parsed.selectedExaminer);
         examinerVoiceRef.current = parsed.selectedExaminer;
@@ -123,7 +133,7 @@ export default function VivaVoiceAi({
         setMessages(parsed.conversation);
       }
     }
-  }, []);
+  }, [initialCandidate]);
 
   const {
     transcript,
@@ -142,7 +152,6 @@ export default function VivaVoiceAi({
 
 
   const hasStartedRef = useRef(false);
-  const firstQuestionRef = useRef<Awaited<ReturnType<typeof next>> | null>(null);
   const examinerVoiceRef = useRef(selectedExaminer);
   const endingRef = useRef(false);
   const fillerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -676,22 +685,10 @@ export default function VivaVoiceAi({
     setSessionError(null);
     setThinking(true);
     try {
-      // next() reads the backend-authored case questions directly. Retain the
-      // first result so an audio retry cannot consume the next question.
-      const data = firstQuestionRef.current ?? await next("");
-      if (!data?.question || data.exit) throw new Error("No questions are available for this viva. Please choose another case.");
-      firstQuestionRef.current = data;
+      const greeting = `Hi ${candidate.name || "there"}, how are you doing today ?`;
       if (endingRef.current) return false;
-      const question = data.question;
-      setMessages([
-        { id: crypto.randomUUID(), role: "ai", text: question },
-        ...(data.imageUsed && data.imageLink ? [{
-          id: crypto.randomUUID(), role: "image" as const,
-          src: resolveExhibitSrc(data.imageLink), description: data.imageDescription || undefined,
-        }] : []),
-      ]);
-      applyApiResponse(data);
-      await speakAsExaminer(question, () => {
+      setMessages([{ id: crypto.randomUUID(), role: "ai", text: greeting }]);
+      await speakAsExaminer(greeting, () => {
         if (endingRef.current) return;
         markSpeechEnded();
         beginListeningForAnswer();
@@ -720,7 +717,7 @@ export default function VivaVoiceAi({
     startSession: startLiveSession,
     stopSession: stopLiveSession,
     transcript: liveTranscript,
-  } = useGeminiLive(vivaCase, (vivaCase as any).persona);
+  } = useGeminiLive(vivaCase, (vivaCase as any).persona, candidate.name);
 
   async function handleBegin(
     cameraPref = true,
