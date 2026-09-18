@@ -7,9 +7,9 @@ export async function POST(req: NextRequest) {
     const { vivaCase: rawCase, persona } = await req.json();
     const vivaCase = rawCase ? normalizeVivaCase(rawCase) : getDefaultVivaCase();
     
-    const apiKey = process.env.GEMINI_LIVE_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "Missing GEMINI_LIVE_API_KEY" }, { status: 500 });
+      return NextResponse.json({ error: "Missing GEMINI_API_KEY" }, { status: 500 });
     }
 
     const model = process.env.GEMINI_LIVE_MODEL || "gemini-2.5-flash-native-audio-latest";

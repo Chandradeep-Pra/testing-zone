@@ -10,7 +10,7 @@ let session;
 let timer;
 let stage = 'ephemeral token';
 try {
-  const client = new GoogleGenAI({apiKey: env.GEMINI_LIVE_API_KEY, httpOptions: {apiVersion: 'v1alpha', timeout: 20000}});
+  const client = new GoogleGenAI({apiKey: env.GEMINI_API_KEY, httpOptions: {apiVersion: 'v1alpha', timeout: 20000}});
   const token = await client.authTokens.create({config: {
     uses: 1,
     newSessionExpireTime: new Date(Date.now() + 60000).toISOString(),

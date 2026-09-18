@@ -58,7 +58,7 @@ try {
   stage = 'save ignored local configuration';
   const file = '.env.local';
   let content = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-  const settings = {GEMINI_LIVE_API_KEY: keyString, GEMINI_LIVE_PROJECT_ID: project};
+  const settings = {GEMINI_API_KEY: keyString, GEMINI_LIVE_PROJECT_ID: project};
   for (const [name, value] of Object.entries(settings)) {
     const line = `${name}=${JSON.stringify(value)}`;
     const pattern = new RegExp(`^${name}=.*$`, 'm');
