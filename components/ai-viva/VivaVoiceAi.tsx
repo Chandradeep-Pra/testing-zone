@@ -88,10 +88,12 @@ export default function VivaVoiceAi({
   vivaCase,
   selectedMode = "calm",
   initialCandidate,
+  aiMode = false,
 }: {
   vivaCase: VivaCaseRecord;
   selectedMode?: VivaMode;
   initialCandidate?: CandidateInfo;
+  aiMode?: boolean;
 }) {
   const fastModeTotalDurationSec = 10 * 60;
   const isFastMode = selectedMode === "fast";
@@ -693,7 +695,25 @@ export default function VivaVoiceAi({
       const greeting = `Hi ${candidate.name || "there"}, how are you doing today ?`;
       if (endingRef.current) return false;
       setMessages([{ id: crypto.randomUUID(), role: "ai", text: greeting }]);
-      await speakAsExaminer(greeting, () => {
+      await speakAsExaminer(greeting);
+      if (endingRef.current) return false;
+
+      const firstQuestion = await next("");
+      if (!firstQuestion?.question || firstQuestion.exit) {
+        throw new Error("No questions are available for this viva. Please choose another case.");
+      }
+      setMessages((items) => [
+        ...items,
+        { id: crypto.randomUUID(), role: "ai", text: firstQuestion.question! },
+        ...(firstQuestion.imageUsed && firstQuestion.imageLink ? [{
+          id: crypto.randomUUID(),
+          role: "image" as const,
+          src: resolveExhibitSrc(firstQuestion.imageLink),
+          description: firstQuestion.imageDescription || undefined,
+        }] : []),
+      ]);
+      applyApiResponse(firstQuestion);
+      await speakAsExaminer(firstQuestion.question, () => {
         if (endingRef.current) return;
         markSpeechEnded();
         beginListeningForAnswer();
@@ -793,12 +813,11 @@ export default function VivaVoiceAi({
     }
   }
 
-  async function startLiveViva() {
+  async function startLiveViva(firstQuestion: Awaited<ReturnType<typeof next>>) {
     const greeting = `Hi ${candidate.name || "there"}, how are you doing today ?`;
     setMessages([{ id: crypto.randomUUID(), role: "ai", text: greeting }]);
     setLiveQuestion(greeting);
     await speakLiveText(greeting);
-    const firstQuestion = await next("");
     await presentLiveQuestion(firstQuestion);
   }
 
@@ -812,19 +831,20 @@ export default function VivaVoiceAi({
     setPreparingCase(true);
     setSessionError(null);
 
-    if (selectedMode === "calm") {
+    if (aiMode) {
       try {
         hasStartedRef.current = true;
+        const firstQuestion = await next("");
         await startLiveSession();
         setReadyVisible(false);
         setVivaStarted(true);
-        setPreparingCase(true);
-        await startLiveViva();
+        setPreparingCase(false);
+        await startLiveViva(firstQuestion);
       } catch (error) {
         hasStartedRef.current = false;
-        setSessionError(error instanceof Error ? error.message : "Unable to connect the live viva.");
+        setSessionError(error instanceof Error ? error.message : "Unable to start the AI simulated viva.");
       } finally {
-        setPreparingCase(false);
+        if (!endingRef.current) setPreparingCase(false);
       }
       return;
     }
@@ -1079,6 +1099,7 @@ export default function VivaVoiceAi({
             liveMode={liveActive}
             liveQuestion={liveQuestion}
             liveUserTranscript={liveUserTranscript}
+            liveMessages={messages}
                 avatarVideo={null}
 
             exhibit={

@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test:auth:setup": "node tests/browser/setup-auth.mjs",
     "test:viva:browser": "node tests/browser/viva-startup.mjs"
   },
   "dependencies": {

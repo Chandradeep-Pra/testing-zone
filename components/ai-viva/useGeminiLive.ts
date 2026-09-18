@@ -26,6 +26,8 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
   const callbacksRef = useRef(callbacks);
   const pendingSpeechRef = useRef<(() => void) | null>(null);
   const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  const answerSilenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const answerReportedRef = useRef(false);
 
   useEffect(() => {
     callbacksRef.current = callbacks;
@@ -50,6 +52,9 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
     setAmplitude(0);
     pendingSpeechRef.current?.();
     pendingSpeechRef.current = null;
+    if (answerSilenceTimerRef.current) clearTimeout(answerSilenceTimerRef.current);
+    answerSilenceTimerRef.current = null;
+    answerReportedRef.current = false;
   }, []);
 
   const playAudioChunk = useCallback((base64Data: string) => {
@@ -89,6 +94,7 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
     setTranscript("");
     setHistory([]);
     currentAnswerRef.current = "";
+    answerReportedRef.current = false;
     try {
       const res = await fetch(appPath("/api/viva/live/session"), {
         method: "POST",
@@ -151,9 +157,10 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
               if (pendingSpeechRef.current) {
                 pendingSpeechRef.current();
                 pendingSpeechRef.current = null;
-              } else if (currentAnswerRef.current.trim()) {
+              } else if (currentAnswerRef.current.trim() && !answerReportedRef.current) {
                 const answer = currentAnswerRef.current.trim();
                 currentAnswerRef.current = "";
+                answerReportedRef.current = true;
                 callbacksRef.current.onInputTurnComplete?.(answer);
               }
             }
@@ -188,14 +195,29 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
           sum += sample * sample;
         }
         setAmplitude(pcmData.length ? Math.min(1, Math.sqrt(sum / pcmData.length) * 4.5) : 0);
+        const level = pcmData.length ? Math.sqrt(sum / pcmData.length) : 0;
+        if (level > 0.012) {
+          answerReportedRef.current = false;
+          if (answerSilenceTimerRef.current) clearTimeout(answerSilenceTimerRef.current);
+          answerSilenceTimerRef.current = setTimeout(() => {
+            const answer = currentAnswerRef.current.trim();
+            if (answer && !answerReportedRef.current) {
+              currentAnswerRef.current = "";
+              answerReportedRef.current = true;
+              callbacksRef.current.onInputTurnComplete?.(answer);
+            }
+          }, 1400);
+        }
         // Convert to base64 for Gemini
         const base64 = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
         if (sessionRef.current) {
           try {
-            sessionRef.current.sendRealtimeInput([{
-              mimeType: "audio/pcm;rate=16000",
-              data: base64
-            }]);
+            sessionRef.current.sendRealtimeInput({
+              audio: {
+                mimeType: "audio/pcm;rate=16000",
+                data: base64,
+              },
+            });
           } catch {
             // The socket may close between an audio callback and cleanup.
           }

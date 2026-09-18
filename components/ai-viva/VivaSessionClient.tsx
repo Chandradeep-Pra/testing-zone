@@ -113,6 +113,7 @@ export default function VivaSessionClient({
 }) {
   const searchParams = useSearchParams();
   const selectedModeFromUrl: VivaMode = searchParams.get("mode") === "fast" ? "fast" : "calm";
+  const aiMode = searchParams.get("ai") === "1";
   const initialState = getStoredCandidate(vivaCase, selectedModeFromUrl, initialCandidate);
   const [candidate, setCandidate] = useState<CandidateInfo>(initialState.candidate);
   const [submitted, setSubmitted] = useState(
@@ -148,6 +149,7 @@ export default function VivaSessionClient({
           vivaCase={vivaCase}
           selectedMode={selectedModeFromUrl}
           initialCandidate={candidate}
+          aiMode={aiMode}
         />
       </main>
     );

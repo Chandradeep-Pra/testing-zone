@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  basePath: "/web",
+  basePath: process.env.NEXT_PUBLIC_APP_BASE_PATH ?? "/web",
   turbopack: {
     root: process.cwd(),
   },
