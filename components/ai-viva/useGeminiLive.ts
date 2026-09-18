@@ -7,12 +7,15 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
   const [connecting, setConnecting] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [amplitude, setAmplitude] = useState(0);
+  const [history, setHistory] = useState<Array<{ question: string; answer: string }>>([]);
   
   const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const micGainRef = useRef<GainNode | null>(null);
   const nextPlayTimeRef = useRef(0);
+  const currentQuestionRef = useRef("");
+  const currentAnswerRef = useRef("");
 
   const stopSession = useCallback(() => {
     sessionRef.current?.close();
@@ -59,6 +62,9 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
   const startSession = useCallback(async () => {
     setConnecting(true);
     setTranscript("");
+    setHistory([]);
+    currentQuestionRef.current = "";
+    currentAnswerRef.current = "";
     try {
       const res = await fetch(appPath("/api/viva/live/session"), {
         method: "POST",
@@ -87,19 +93,39 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
       // 2. Connect to Gemini Live
       sessionRef.current = await live.live.connect({
         model,
-        config: { responseModalities: [Modality.AUDIO] },
+        config: {
+          responseModalities: [Modality.AUDIO],
+          inputAudioTranscription: {},
+        },
         callbacks: {
           onmessage: (msg: any) => {
+            const inputText = msg.serverContent?.inputTranscription?.text;
+            if (typeof inputText === "string" && inputText.trim()) {
+              currentAnswerRef.current += ` ${inputText.trim()}`;
+            }
+
             // Handle Audio from AI
             if (msg.serverContent?.modelTurn?.parts) {
+              let modelText = "";
               msg.serverContent.modelTurn.parts.forEach((part: any) => {
                 if (part.inlineData?.mimeType?.includes("audio/pcm")) {
                   playAudioChunk(part.inlineData.data);
                 }
                 if (part.text) {
+                  modelText += ` ${part.text}`;
                   setTranscript(prev => prev + " " + part.text);
                 }
               });
+              if (modelText.trim()) {
+                if (currentAnswerRef.current.trim() && currentQuestionRef.current.trim()) {
+                  setHistory((items) => [
+                    ...items,
+                    { question: currentQuestionRef.current.trim(), answer: currentAnswerRef.current.trim() },
+                  ]);
+                  currentAnswerRef.current = "";
+                }
+                currentQuestionRef.current = modelText.trim();
+              }
             }
             
             // Handle Interruption (Server tells us if user interrupted)
@@ -182,5 +208,6 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
     stopSession,
     transcript,
     amplitude,
+    history,
   };
 }

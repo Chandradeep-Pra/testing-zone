@@ -610,9 +610,9 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     }
   }
 
-  async function generateScore() {
+  async function generateScore(historyOverride?: Array<{ question: string; answer: string }>) {
     try {
-      const history = previousQARef.current;
+      const history = historyOverride || previousQARef.current;
 
       const res = await fetch(appPath("/api/viva/generateScore"), {
         method: "POST",

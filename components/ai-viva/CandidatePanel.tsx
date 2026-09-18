@@ -96,7 +96,7 @@ export function CandidatePanel({
           autoPlay
           muted
           playsInline
-          className="w-full h-full object-cover"
+          className="h-full w-full rounded-[24px] object-cover"
         />
 
       ) : (

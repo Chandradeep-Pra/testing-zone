@@ -21,6 +21,7 @@ import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
 import { appPath } from "@/lib/app-path";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 type VivaMode = "calm" | "fast";
 type CandidateInfo = { name: string; email: string };
@@ -718,6 +719,7 @@ export default function VivaVoiceAi({
     stopSession: stopLiveSession,
     transcript: liveTranscript,
     amplitude: liveAmplitude,
+    history: liveHistory,
   } = useGeminiLive(vivaCase, (vivaCase as any).persona, candidate.name);
 
   async function handleBegin(
@@ -811,10 +813,12 @@ export default function VivaVoiceAi({
   async function endViva() {
     if (ending) return;
 
+    const wasLiveSession = liveActive;
     endingRef.current = true;
     advanceLockRef.current = true;
     setEnding(true);
     stopExaminerAudio();
+    stopLiveSession();
     setIsListening(false);
     stop();
     closeSocket();
@@ -837,10 +841,14 @@ export default function VivaVoiceAi({
     setFastTimerStarted(false);
 
     const stored = localStorage.getItem("candidateInfo");
-    if (stored) {
-      const parsed = JSON.parse(stored);
+    const parsed = stored ? JSON.parse(stored) : {};
+    if (candidate.name && candidate.email) {
+      parsed.name = candidate.name;
+      parsed.email = candidate.email;
+    }
+    if (candidate.name || candidate.email || stored) {
       const qaHistory = getHistory();
-      parsed.qaHistory = qaHistory;
+      parsed.qaHistory = wasLiveSession && liveHistory.length ? liveHistory : qaHistory;
       parsed.conversation =
         messagesRef.current.length > 0
           ? messagesRef.current
@@ -854,7 +862,7 @@ export default function VivaVoiceAi({
       localStorage.setItem("candidateInfo", JSON.stringify(parsed));
     }
 
-    await generateScore();
+    await generateScore(wasLiveSession ? liveHistory : undefined);
   }
 
   return (
@@ -954,7 +962,8 @@ export default function VivaVoiceAi({
             </div>
           </div>
 
-                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
+                      <ThemeToggle />
             {vivaCase.isUroAiPowered && (
               <span className="flex items-center gap-1.5 rounded-full bg-cyan-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[#0f7896] shadow-[0_0_12px_rgba(15,120,150,0.2)]">
                 <span className="relative flex h-2 w-2">
@@ -1014,7 +1023,7 @@ export default function VivaVoiceAi({
               <p className="mt-0.5 truncate text-sm font-semibold text-[#071014]">{candidate.name || "You"}</p>
             </div>
 
-            <div className="aspect-video min-h-[112px] w-full overflow-hidden bg-slate-950 md:min-h-0 md:flex-1 md:aspect-auto">
+            <div className="aspect-video min-h-[112px] w-full overflow-hidden rounded-[24px] bg-slate-950 md:min-h-0 md:flex-1 md:aspect-auto">
               <CandidatePanel
                 cameraOn={cameraOn}
                 listening={isListening || (liveActive && !liveConnecting)}
@@ -1055,7 +1064,7 @@ export default function VivaVoiceAi({
                 </button>
 
                                 <button
-                  onClick={liveActive ? stopLiveSession : endViva}
+                  onClick={endViva}
                   disabled={(!vivaStarted && !liveActive) || ending}
 
                   className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
