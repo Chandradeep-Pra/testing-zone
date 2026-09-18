@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { GoogleGenAI, Modality } from "@google/genai";
+import { appPath } from "@/lib/app-path";
 
 export function useGeminiLive(vivaCase: any, persona: any, candidateName: string) {
   const [active, setActive] = useState(false);
@@ -55,7 +56,7 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
     setConnecting(true);
     setTranscript("");
     try {
-      const res = await fetch("/api/viva/live/session", {
+      const res = await fetch(appPath("/api/viva/live/session"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ vivaCase, persona }),
@@ -77,7 +78,7 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
 
       // 1. Setup Audio Context
       audioContextRef.current = new AudioContext({ sampleRate: 16000 });
-      await audioContextRef.current.audioWorklet.addModule("/audio-processor.js");
+      await audioContextRef.current.audioWorklet.addModule(appPath("/audio-processor.js"));
 
       // 2. Connect to Gemini Live
       sessionRef.current = await live.live.connect({
