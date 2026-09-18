@@ -57,9 +57,18 @@ export function useGeminiLive(vivaCase: any, persona: any) {
     try {
       const res = await fetch("/api/viva/live/session", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ vivaCase, persona }),
       });
-      const { token, model } = await res.json();
+      const payload = (await res.json()) as {
+        token?: string;
+        model?: string;
+        error?: string;
+      };
+      if (!res.ok || !payload.token || !payload.model) {
+        throw new Error(payload.error || "Unable to prepare the Gemini Live session.");
+      }
+      const { token, model } = payload;
 
       const live = new GoogleGenAI({ 
         apiKey: token,
@@ -128,6 +137,7 @@ export function useGeminiLive(vivaCase: any, persona: any) {
     } catch (err) {
       console.error("Failed to start live session:", err);
       stopSession();
+      throw err;
     } finally {
       setConnecting(false);
     }

@@ -7,10 +7,12 @@ export async function POST(req: NextRequest) {
     const { vivaCase: rawCase, persona } = await req.json();
     const vivaCase = rawCase ? normalizeVivaCase(rawCase) : getDefaultVivaCase();
     
-    const apiKey = process.env.GEMINI_LIVE_API_KEY || process.env.GOOGLE_API_KEY;
+    const apiKey = process.env.GEMINI_LIVE_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "Missing GEMINI_LIVE_API_KEY" }, { status: 500 });
     }
+
+    const model = process.env.GEMINI_LIVE_MODEL || "gemini-2.5-flash-native-audio-latest";
 
     const client = new GoogleGenAI({ 
       apiKey,
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest) {
       config: {
         uses: 1,
         liveConnectConstraints: {
-          model: "gemini-3.6-flash",
+          model,
           config: {
             responseModalities: [Modality.AUDIO],
             systemInstruction: {
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ 
       token: tokenResponse.name,
-      model: "gemini-2.5-flash"
+      model,
     });
     
   } catch (error) {

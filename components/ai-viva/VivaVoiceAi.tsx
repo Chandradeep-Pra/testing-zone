@@ -671,7 +671,7 @@ export default function VivaVoiceAi({
     }
   }
 
-  async function startViva() {
+  async function startViva(): Promise<boolean> {
     setPreparingCase(true);
     setSessionError(null);
     setThinking(true);
@@ -681,7 +681,7 @@ export default function VivaVoiceAi({
       const data = firstQuestionRef.current ?? await next("");
       if (!data?.question || data.exit) throw new Error("No questions are available for this viva. Please choose another case.");
       firstQuestionRef.current = data;
-      if (endingRef.current) return;
+      if (endingRef.current) return false;
       const question = data.question;
       setMessages([
         { id: crypto.randomUUID(), role: "ai", text: question },
@@ -696,14 +696,16 @@ export default function VivaVoiceAi({
         markSpeechEnded();
         beginListeningForAnswer();
       });
-      if (endingRef.current) return;
+      if (endingRef.current) return false;
       // Start the exam clock only once the first question is actually playing.
       setVivaStarted(true);
       if (isFastMode) setFastTimerStarted(true);
+      return true;
     } catch (error) {
-      if (endingRef.current) return;
+      if (endingRef.current) return false;
       markSpeechEnded();
       setSessionError(error instanceof Error ? error.message : "Unable to start your viva. Please retry.");
+      return false;
     } finally {
       if (!endingRef.current) {
         setPreparingCase(false);
@@ -726,12 +728,22 @@ export default function VivaVoiceAi({
     micDeviceId?: string
   ) {
     if (hasStartedRef.current) return;
-    
-    if (vivaCase.isUroAiPowered && selectedMode === "calm") {
-      hasStartedRef.current = true;
-      setReadyVisible(false);
-      setVivaStarted(true);
-      await startLiveSession();
+
+    setPreparingCase(true);
+    setSessionError(null);
+
+    if (selectedMode === "calm") {
+      try {
+        hasStartedRef.current = true;
+        await startLiveSession();
+        setReadyVisible(false);
+        setVivaStarted(true);
+      } catch (error) {
+        hasStartedRef.current = false;
+        setSessionError(error instanceof Error ? error.message : "Unable to connect the live viva.");
+      } finally {
+        setPreparingCase(false);
+      }
       return;
     }
 
@@ -742,7 +754,6 @@ export default function VivaVoiceAi({
     setCameraEnabled(cameraPref);
     setCameraOn(cameraPref);
     selectedMicDeviceIdRef.current = micDeviceId;
-    setReadyVisible(false);
     setPreparingCase(true);
     // Persistence must not prevent the exam from starting.
     try {
@@ -754,18 +765,24 @@ export default function VivaVoiceAi({
     } catch (error) {
       console.warn("Unable to save examiner preference:", error);
     }
-    // Connect speech recognition while question audio is being prepared.
-    void prepareSpeechConnection().catch(() => {
-      // startSpeechCapture retries and presents an error if still unavailable.
-    });
-    // Legacy adaptive cases may prepare their clinical context in the
-    // background. Authored backend questions require no extra generation.
-    void prepareCalmCase().catch((error) => {
-      console.warn("Case context preparation skipped:", error);
-    });
-    // Do not gate backend questions on avatar provisioning or greeting/warmup
-    // audio. Use the selected examiner's TTS from the first question onward.
-    await startViva();
+    try {
+      // Complete the dependencies before the first question is requested.
+      await prepareSpeechConnection();
+      await prepareCalmCase();
+      const started = await startViva();
+      if (!started) {
+        hasStartedRef.current = false;
+        setReadyVisible(true);
+        return;
+      }
+      setReadyVisible(false);
+    } catch (error) {
+      hasStartedRef.current = false;
+      setSessionError(error instanceof Error ? error.message : "Unable to start your viva.");
+      setReadyVisible(true);
+    } finally {
+      if (!endingRef.current) setPreparingCase(false);
+    }
   }
 
   async function retryCurrentQuestion() {
