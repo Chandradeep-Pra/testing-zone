@@ -2,7 +2,13 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { GoogleGenAI, Modality } from "@google/genai";
 import { appPath } from "@/lib/app-path";
 
-export function useGeminiLive(vivaCase: any, persona: any, candidateName: string) {
+type LiveCallbacks = {
+  onInputTranscript?: (text: string) => void;
+  onInputTurnComplete?: (text: string) => void;
+  onInterruption?: () => void;
+};
+
+export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallbacks = {}) {
   const [active, setActive] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -13,12 +19,27 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
   const audioContextRef = useRef<AudioContext | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const micGainRef = useRef<GainNode | null>(null);
+  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorRef = useRef<AudioWorkletNode | null>(null);
   const nextPlayTimeRef = useRef(0);
-  const currentQuestionRef = useRef("");
   const currentAnswerRef = useRef("");
+  const callbacksRef = useRef(callbacks);
+  const pendingSpeechRef = useRef<(() => void) | null>(null);
+  const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+
+  useEffect(() => {
+    callbacksRef.current = callbacks;
+  }, [callbacks]);
 
   const stopSession = useCallback(() => {
+    processorRef.current?.disconnect();
+    processorRef.current = null;
+    micSourceRef.current?.disconnect();
+    micSourceRef.current = null;
     sessionRef.current?.close();
+    sessionRef.current = null;
+    audioSourcesRef.current.forEach((source) => source.stop());
+    audioSourcesRef.current.clear();
     micStreamRef.current?.getTracks().forEach(track => track.stop());
     micGainRef.current?.disconnect();
     micGainRef.current = null;
@@ -27,6 +48,8 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
     }
     setActive(false);
     setAmplitude(0);
+    pendingSpeechRef.current?.();
+    pendingSpeechRef.current = null;
   }, []);
 
   const playAudioChunk = useCallback((base64Data: string) => {
@@ -52,6 +75,8 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
     const source = audioContextRef.current.createBufferSource();
     source.buffer = buffer;
     source.connect(audioContextRef.current.destination);
+    audioSourcesRef.current.add(source);
+    source.onended = () => audioSourcesRef.current.delete(source);
     
     // Schedule playback for gapless audio
     const startTime = Math.max(audioContextRef.current.currentTime, nextPlayTimeRef.current);
@@ -63,7 +88,6 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
     setConnecting(true);
     setTranscript("");
     setHistory([]);
-    currentQuestionRef.current = "";
     currentAnswerRef.current = "";
     try {
       const res = await fetch(appPath("/api/viva/live/session"), {
@@ -102,35 +126,36 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
             const inputText = msg.serverContent?.inputTranscription?.text;
             if (typeof inputText === "string" && inputText.trim()) {
               currentAnswerRef.current += ` ${inputText.trim()}`;
+              callbacksRef.current.onInputTranscript?.(currentAnswerRef.current.trim());
             }
 
-            // Handle Audio from AI
             if (msg.serverContent?.modelTurn?.parts) {
-              let modelText = "";
               msg.serverContent.modelTurn.parts.forEach((part: any) => {
                 if (part.inlineData?.mimeType?.includes("audio/pcm")) {
                   playAudioChunk(part.inlineData.data);
                 }
-                if (part.text) {
-                  modelText += ` ${part.text}`;
-                  setTranscript(prev => prev + " " + part.text);
-                }
+                if (part.text) setTranscript(prev => prev + " " + part.text);
               });
-              if (modelText.trim()) {
-                if (currentAnswerRef.current.trim() && currentQuestionRef.current.trim()) {
-                  setHistory((items) => [
-                    ...items,
-                    { question: currentQuestionRef.current.trim(), answer: currentAnswerRef.current.trim() },
-                  ]);
-                  currentAnswerRef.current = "";
-                }
-                currentQuestionRef.current = modelText.trim();
-              }
             }
             
-            // Handle Interruption (Server tells us if user interrupted)
             if (msg.serverContent?.interrupted) {
-              nextPlayTimeRef.current = 0; // Reset playback queue
+              audioSourcesRef.current.forEach((source) => source.stop());
+              audioSourcesRef.current.clear();
+              nextPlayTimeRef.current = 0;
+              pendingSpeechRef.current?.();
+              pendingSpeechRef.current = null;
+              callbacksRef.current.onInterruption?.();
+            }
+
+            if (msg.serverContent?.turnComplete) {
+              if (pendingSpeechRef.current) {
+                pendingSpeechRef.current();
+                pendingSpeechRef.current = null;
+              } else if (currentAnswerRef.current.trim()) {
+                const answer = currentAnswerRef.current.trim();
+                currentAnswerRef.current = "";
+                callbacksRef.current.onInputTurnComplete?.(answer);
+              }
             }
           },
           onerror: (err: any) => {
@@ -139,16 +164,6 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
           },
           onclose: () => setActive(false),
         }
-      });
-
-      sessionRef.current.sendClientContent({
-        turns: [{
-          role: "user",
-          parts: [{
-            text: `Start the viva by saying exactly: "Hi ${candidateName}, how are you doing today ?" Then wait for the candidate's answer. Do not add any other words.`,
-          }],
-        }],
-        turnComplete: true,
       });
 
       // 3. Setup Microphone and Stream to Gemini
@@ -162,6 +177,8 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
       
       const micSource = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
       const processor = new AudioWorkletNode(audioContextRef.current, "audio-processor");
+      micSourceRef.current = micSource;
+      processorRef.current = processor;
       
       processor.port.onmessage = (e) => {
         const pcmData = e.data; // Int16Array from processor
@@ -173,10 +190,16 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
         setAmplitude(pcmData.length ? Math.min(1, Math.sqrt(sum / pcmData.length) * 4.5) : 0);
         // Convert to base64 for Gemini
         const base64 = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
-        sessionRef.current?.sendRealtimeInput([{
-          mimeType: "audio/pcm;rate=16000",
-          data: base64
-        }]);
+        if (sessionRef.current) {
+          try {
+            sessionRef.current.sendRealtimeInput([{
+              mimeType: "audio/pcm;rate=16000",
+              data: base64
+            }]);
+          } catch {
+            // The socket may close between an audio callback and cleanup.
+          }
+        }
       };
 
       micSource.connect(processor);
@@ -193,7 +216,23 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
     } finally {
       setConnecting(false);
     }
-  }, [candidateName, vivaCase, persona, playAudioChunk, stopSession]);
+  }, [vivaCase, persona, playAudioChunk, stopSession]);
+
+  const speakText = useCallback((text: string) => {
+    if (!sessionRef.current) return Promise.reject(new Error("Live session is not connected."));
+    return new Promise<void>((resolve) => {
+      pendingSpeechRef.current = resolve;
+      sessionRef.current.sendClientContent({
+        turns: [{
+          role: "user",
+          parts: [{
+            text: `Speak exactly the following examiner text and do not add anything else: ${text}`,
+          }],
+        }],
+        turnComplete: true,
+      });
+    });
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -206,6 +245,7 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
     connecting,
     startSession,
     stopSession,
+    speakText,
     transcript,
     amplitude,
     history,

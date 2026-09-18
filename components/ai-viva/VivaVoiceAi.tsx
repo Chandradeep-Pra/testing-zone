@@ -168,6 +168,8 @@ export default function VivaVoiceAi({
   const messagesRef = useRef<CandidateConversationMessage[]>([]);
   const selectedMicDeviceIdRef = useRef<string | undefined>(undefined);
   const prefetchedPhaseRef = useRef("assessment");
+  const liveHistoryRef = useRef<Array<{ question: string; answer: string }>>([]);
+  const liveAnswerLockRef = useRef(false);
 
   const [readyVisible, setReadyVisible] = useState(true);
   const [ending, setEnding] = useState(false);
@@ -178,6 +180,8 @@ export default function VivaVoiceAi({
   const [isListening, setIsListening] = useState(false);
   const [keywordDetected, setKeywordDetected] = useState(false);
   const [candidateTranscript, setCandidateTranscript] = useState("");
+  const [liveQuestion, setLiveQuestion] = useState("");
+  const [liveUserTranscript, setLiveUserTranscript] = useState("");
   const [fastPauseState, setFastPauseState] = useState<FastPauseState>("idle");
   const [candidateStatusDot, setCandidateStatusDot] = useState<CandidateStatusDot>("idle");
   const [fastTimerStarted, setFastTimerStarted] = useState(false);
@@ -717,10 +721,86 @@ export default function VivaVoiceAi({
     connecting: liveConnecting,
     startSession: startLiveSession,
     stopSession: stopLiveSession,
-    transcript: liveTranscript,
     amplitude: liveAmplitude,
-    history: liveHistory,
-  } = useGeminiLive(vivaCase, (vivaCase as any).persona, candidate.name);
+    speakText: speakLiveText,
+  } = useGeminiLive(vivaCase, (vivaCase as any).persona, {
+    onInputTranscript: (text) => {
+      setLiveUserTranscript(text);
+      if (!liveCandidateMsgId.current) {
+        const messageId = crypto.randomUUID();
+        liveCandidateMsgId.current = messageId;
+        setMessages((items) => [...items, {
+          id: messageId,
+          role: "candidate",
+          text,
+          live: true,
+        }]);
+      } else {
+        setMessages((items) => items.map((item) =>
+          item.id === liveCandidateMsgId.current ? { ...item, text, live: true } : item
+        ));
+      }
+    },
+    onInputTurnComplete: (text) => {
+      void submitLiveAnswer(text);
+    },
+  });
+
+  async function presentLiveQuestion(data: Awaited<ReturnType<typeof next>>) {
+    if (!data?.question || data.exit) {
+      await endViva();
+      return;
+    }
+
+    const question = data.question;
+    setLiveQuestion(question);
+    setMessages((items) => [
+      ...items,
+      { id: crypto.randomUUID(), role: "ai", text: question },
+      ...(data.imageUsed && data.imageLink ? [{
+        id: crypto.randomUUID(),
+        role: "image" as const,
+        src: resolveExhibitSrc(data.imageLink),
+        description: data.imageDescription || undefined,
+      }] : []),
+    ]);
+    applyApiResponse(data);
+    setLiveUserTranscript("");
+    liveCandidateMsgId.current = null;
+    await speakLiveText(question);
+  }
+
+  async function submitLiveAnswer(answer: string) {
+    if (!answer.trim() || endingRef.current || liveAnswerLockRef.current) return;
+    liveAnswerLockRef.current = true;
+    const finalAnswer = answer.trim();
+    setLiveUserTranscript(finalAnswer);
+    if (liveCandidateMsgId.current) {
+      setMessages((items) => items.map((item) =>
+        item.id === liveCandidateMsgId.current ? { ...item, text: finalAnswer, live: false } : item
+      ));
+    }
+    liveHistoryRef.current.push({ question: liveQuestion || "Candidate opening response", answer: finalAnswer });
+    setThinking(true);
+    try {
+      const data = await next(finalAnswer, false, elapsedSec);
+      await presentLiveQuestion(data);
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : "Unable to continue your viva.");
+    } finally {
+      setThinking(false);
+      liveAnswerLockRef.current = false;
+    }
+  }
+
+  async function startLiveViva() {
+    const greeting = `Hi ${candidate.name || "there"}, how are you doing today ?`;
+    setMessages([{ id: crypto.randomUUID(), role: "ai", text: greeting }]);
+    setLiveQuestion(greeting);
+    await speakLiveText(greeting);
+    const firstQuestion = await next("");
+    await presentLiveQuestion(firstQuestion);
+  }
 
   async function handleBegin(
     cameraPref = true,
@@ -738,6 +818,8 @@ export default function VivaVoiceAi({
         await startLiveSession();
         setReadyVisible(false);
         setVivaStarted(true);
+        setPreparingCase(true);
+        await startLiveViva();
       } catch (error) {
         hasStartedRef.current = false;
         setSessionError(error instanceof Error ? error.message : "Unable to connect the live viva.");
@@ -848,7 +930,7 @@ export default function VivaVoiceAi({
     }
     if (candidate.name || candidate.email || stored) {
       const qaHistory = getHistory();
-      parsed.qaHistory = wasLiveSession && liveHistory.length ? liveHistory : qaHistory;
+      parsed.qaHistory = wasLiveSession && liveHistoryRef.current.length ? liveHistoryRef.current : qaHistory;
       parsed.conversation =
         messagesRef.current.length > 0
           ? messagesRef.current
@@ -862,7 +944,7 @@ export default function VivaVoiceAi({
       localStorage.setItem("candidateInfo", JSON.stringify(parsed));
     }
 
-    await generateScore(wasLiveSession ? liveHistory : undefined);
+    await generateScore(wasLiveSession ? liveHistoryRef.current : undefined);
   }
 
   return (
@@ -994,6 +1076,9 @@ export default function VivaVoiceAi({
             thinking={thinking}
             transcript={transcript}
             keywordDetected={keywordDetected}
+            liveMode={liveActive}
+            liveQuestion={liveQuestion}
+            liveUserTranscript={liveUserTranscript}
                 avatarVideo={null}
 
             exhibit={

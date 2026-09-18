@@ -11,6 +11,9 @@ type Props = {
   amplitude?: number;
   keywordDetected?: boolean;
   avatarVideo?: React.ReactNode;
+  liveMode?: boolean;
+  liveQuestion?: string;
+  liveUserTranscript?: string;
 };
 
 // const fillers = [
@@ -50,6 +53,9 @@ export function AiPanel({
   amplitude = 0,
   keywordDetected = false,
   avatarVideo,
+  liveMode = false,
+  liveQuestion = "",
+  liveUserTranscript = "",
 }: Props) {
   const [filler, setFiller] = useState("");
   // Keep an investigation visible while the examiner asks the candidate to
@@ -107,7 +113,20 @@ export function AiPanel({
       </div>
 
       <div className="absolute inset-0 flex items-center justify-center bg-transparent">
-        {avatarVideo ? (
+        {liveMode ? (
+          <div className="flex h-full w-full flex-col justify-end gap-3 overflow-y-auto px-5 pb-24 pt-20 sm:px-10">
+            {liveQuestion ? (
+              <div className="max-w-[85%] self-start rounded-2xl rounded-bl-md border border-cyan-300/20 bg-cyan-50 px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm">
+                {liveQuestion}
+              </div>
+            ) : null}
+            {liveUserTranscript ? (
+              <div className="max-w-[85%] self-end rounded-2xl rounded-br-md border border-teal-300/20 bg-teal-600 px-4 py-3 text-sm leading-6 text-white shadow-sm">
+                {liveUserTranscript}
+              </div>
+            ) : null}
+          </div>
+        ) : avatarVideo ? (
           <div className="h-full w-full">{avatarVideo}</div>
         ) : (
           <div className="flex items-center justify-center scale-110">
@@ -124,7 +143,7 @@ export function AiPanel({
         </div>
       )}
 
-      {(visibleTranscript || thinking) && (
+      {!liveMode && (visibleTranscript || thinking) && (
         <div
           className="absolute bottom-8 left-1/2 -translate-x-1/2
           max-w-2xl w-[80%]
