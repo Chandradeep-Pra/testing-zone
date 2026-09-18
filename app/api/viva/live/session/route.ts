@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
           model,
           config: {
             responseModalities: [Modality.AUDIO],
+            inputAudioTranscription: {},
             systemInstruction: {
               parts: [{
                 text: `

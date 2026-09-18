@@ -1096,7 +1096,7 @@ export default function VivaVoiceAi({
             thinking={thinking}
             transcript={transcript}
             keywordDetected={keywordDetected}
-            liveMode={liveActive}
+            liveMode={aiMode || liveActive}
             liveQuestion={liveQuestion}
             liveUserTranscript={liveUserTranscript}
             liveMessages={messages}
