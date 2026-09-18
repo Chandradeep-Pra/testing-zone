@@ -7,12 +7,14 @@ type Props = {
   cameraOn: boolean;
   listening: boolean;
   statusDot?: "idle" | "speaking" | "keyword" | "silence";
+  micLevel?: number;
 };
 
 export function CandidatePanel({
   cameraOn,
   listening,
   statusDot = "idle",
+  micLevel = 0,
 }: Props) {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -130,6 +132,15 @@ export function CandidatePanel({
         <div className="absolute right-1 top-1 flex items-center gap-1 rounded-full bg-sky-400/10 px-2 py-1 text-[10px] text-sky-300 md:right-3 md:top-3 md:text-xs">
           <Mic size={10} className="md:h-[14px] md:w-[14px]" />
           <span className="hidden sm:inline">Listening</span>
+        </div>
+      )}
+
+      {listening && (
+        <div className="absolute bottom-2 left-2 right-2 h-1.5 overflow-hidden rounded-full bg-white/15 md:bottom-3 md:left-3 md:right-3">
+          <div
+            className="h-full rounded-full bg-sky-400 transition-[width] duration-75"
+            style={{ width: `${Math.round(Math.max(0, Math.min(1, micLevel)) * 100)}%` }}
+          />
         </div>
       )}
 

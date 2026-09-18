@@ -11,15 +11,19 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
   const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  const micGainRef = useRef<GainNode | null>(null);
   const nextPlayTimeRef = useRef(0);
 
   const stopSession = useCallback(() => {
     sessionRef.current?.close();
     micStreamRef.current?.getTracks().forEach(track => track.stop());
+    micGainRef.current?.disconnect();
+    micGainRef.current = null;
     if (audioContextRef.current?.state !== 'closed') {
       audioContextRef.current?.close();
     }
     setActive(false);
+    setAmplitude(0);
   }, []);
 
   const playAudioChunk = useCallback((base64Data: string) => {
@@ -135,6 +139,12 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
       
       processor.port.onmessage = (e) => {
         const pcmData = e.data; // Int16Array from processor
+        let sum = 0;
+        for (let index = 0; index < pcmData.length; index += 1) {
+          const sample = pcmData[index] / 32768;
+          sum += sample * sample;
+        }
+        setAmplitude(pcmData.length ? Math.min(1, Math.sqrt(sum / pcmData.length) * 4.5) : 0);
         // Convert to base64 for Gemini
         const base64 = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
         sessionRef.current?.sendRealtimeInput([{
@@ -144,6 +154,11 @@ export function useGeminiLive(vivaCase: any, persona: any, candidateName: string
       };
 
       micSource.connect(processor);
+  const silentGain = audioContextRef.current.createGain();
+  silentGain.gain.value = 0;
+  processor.connect(silentGain);
+  silentGain.connect(audioContextRef.current.destination);
+  micGainRef.current = silentGain;
       setActive(true);
     } catch (err) {
       console.error("Failed to start live session:", err);

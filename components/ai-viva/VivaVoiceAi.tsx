@@ -717,6 +717,7 @@ export default function VivaVoiceAi({
     startSession: startLiveSession,
     stopSession: stopLiveSession,
     transcript: liveTranscript,
+    amplitude: liveAmplitude,
   } = useGeminiLive(vivaCase, (vivaCase as any).persona, candidate.name);
 
   async function handleBegin(
@@ -1016,8 +1017,9 @@ export default function VivaVoiceAi({
             <div className="aspect-video min-h-[112px] w-full overflow-hidden bg-slate-950 md:min-h-0 md:flex-1 md:aspect-auto">
               <CandidatePanel
                 cameraOn={cameraOn}
-                listening={isListening}
-                statusDot={candidateStatusDot}
+                listening={isListening || (liveActive && !liveConnecting)}
+                statusDot={liveActive ? "speaking" : candidateStatusDot}
+                micLevel={liveActive ? liveAmplitude : micLevel}
               />
             </div>
 
