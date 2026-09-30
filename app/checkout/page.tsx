@@ -62,7 +62,7 @@ function CheckoutContent() {
     if (authLoading) return;
     if (!user) {
       const returnTo = `${appPath("/checkout")}?${params.toString()}`;
-      window.location.assign(`${appPath("/login")}?redirect=${encodeURIComponent(returnTo)}`);
+      window.location.assign(`https://urologics.co.uk/login?redirect=${encodeURIComponent(returnTo)}`);
       return;
     }
     let active = true;

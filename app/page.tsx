@@ -255,7 +255,7 @@ export default function Home() {
 
   async function submitQuiz() {
     if (!user?.idToken) {
-      router.push("/login");
+      window.location.assign("https://urologics.co.uk/login");
       return;
     }
 
