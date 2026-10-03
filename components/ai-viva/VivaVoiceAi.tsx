@@ -99,6 +99,13 @@ function isVivaEndRequest(value: string) {
   );
 }
 
+function getExitConfirmationAnswer(value: string): "yes" | "no" | null {
+  const text = value.toLowerCase().trim().replace(/[.!?,]/g, " ").replace(/\s+/g, " ");
+  if (/^(yes|yeah|yep|correct|please do|end it|i do|i would|that's right)(\b|$)/.test(text)) return "yes";
+  if (/^(no|nope|not now|continue|keep going|carry on|let's continue)(\b|$)/.test(text)) return "no";
+  return null;
+}
+
 function mergeCurrentCandidateAnswer(history: QaHistoryItem[], candidateText: string) {
   const current = candidateText.trim();
   const merged = history.map((item) => ({ ...item }));
@@ -189,9 +196,14 @@ export default function VivaVoiceAi({
 
   const hasStartedRef = useRef(false);
   const firstQuestionRef = useRef<Awaited<ReturnType<typeof next>> | null>(null);
+  const continuationQuestionIndexRef = useRef(0);
   const examinerVoiceRef = useRef(selectedExaminer);
   const endingRef = useRef(false);
   const endIntentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitConfirmationPendingRef = useRef(false);
+  const exitRequestHandledRef = useRef(false);
+  const exitRequestOriginalTextRef = useRef("");
+  const timerClosingPromptSentRef = useRef(false);
   const endVivaRef = useRef<(() => Promise<void>) | null>(null);
   const fillerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fastSilenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -226,13 +238,15 @@ export default function VivaVoiceAi({
   const [preparingCase, setPreparingCase] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [exitConfirmationPending, setExitConfirmationPending] = useState(false);
+  const [timerClosingComplete, setTimerClosingComplete] = useState(false);
 
   const fastKeywordProgress = isFastMode
     ? getCurrentFastQuestionKeywordProgress(candidateTranscript)
     : { matchedKeywords: [], totalKeywords: 0, allMatched: false };
 
   const vivaDurationSec = CALM_VIVA_TOTAL_DURATION_SEC;
-  const countdownRunning = (isFastMode ? fastTimerStarted : vivaStarted) && !ending && !preparingCase && !sessionError && !audioError;
+  const countdownRunning = (isFastMode ? fastTimerStarted : vivaStarted) && !ending;
   const countdownTotal = isFastMode ? fastModeTotalDurationSec : vivaDurationSec;
 
   function getExaminerSpeechOptions() {
@@ -269,15 +283,13 @@ export default function VivaVoiceAi({
     return [answerPrefixRef.current, value].filter(Boolean).join(" ").trim();
   }
 
-  const { minutes, seconds } = useCountdown(
+  const { minutes, seconds, secondsLeft } = useCountdown(
     countdownTotal,
     countdownRunning,
     () => {
-      if (endingRef.current || advanceLockRef.current) {
-        return;
+      if (!timerClosingPromptSentRef.current) {
+        void endVivaRef.current?.();
       }
-
-      void concludeVivaFromTimer();
     },
     isFastMode ? `fast-total-timer-${fastTimerResetKey}` : vivaDurationSec
   );
@@ -607,15 +619,15 @@ export default function VivaVoiceAi({
       fillerTimeoutRef.current = null;
     }
 
-    if (data?.exit) {
-      await endViva();
-      return;
-    }
-
-    if (!data?.question) {
-      return;
-    }
-    const question = data.question;
+    const continuationQuestions = [
+      "What safety-netting would you provide if the patient's symptoms worsen before review?",
+      "How would your management change if the initial investigation were inconclusive?",
+      "What complications would you discuss, and how would you reduce their risks?",
+      "How would you explain the options and involve the patient in this decision?",
+    ];
+    const question = data?.exit || !data?.question
+      ? continuationQuestions[continuationQuestionIndexRef.current++ % continuationQuestions.length]
+      : data.question;
 
     setMessages((msgs) => [
       ...msgs,
@@ -773,6 +785,8 @@ export default function VivaVoiceAi({
     resumeAudioOutput,
     transcript: liveTranscript,
     candidateLiveTranscript,
+    sendSessionControl,
+    sessionEndReason,
     liveExhibitId,
     clearLiveExhibit,
     speaking: liveSpeaking,
@@ -792,19 +806,86 @@ export default function VivaVoiceAi({
   }, [liveBackendError]);
 
   useEffect(() => {
-    if (!liveActive || isFastMode || !vivaStarted || endingRef.current || !isVivaEndRequest(candidateLiveTranscript)) {
+    const candidateSpeech = isFastMode ? candidateTranscript : candidateLiveTranscript;
+    if (
+      !vivaStarted ||
+      endingRef.current ||
+      exitConfirmationPendingRef.current ||
+      exitRequestHandledRef.current ||
+      !isVivaEndRequest(candidateSpeech)
+    ) {
       return;
     }
 
-    const timeout = setTimeout(() => {
-      if (!endingRef.current) void endVivaRef.current?.();
-    }, 1800);
-    endIntentTimeoutRef.current = timeout;
-    return () => {
-      clearTimeout(timeout);
-      if (endIntentTimeoutRef.current === timeout) endIntentTimeoutRef.current = null;
-    };
-  }, [candidateLiveTranscript, liveActive, isFastMode, vivaStarted]);
+    exitRequestHandledRef.current = true;
+    exitConfirmationPendingRef.current = true;
+    exitRequestOriginalTextRef.current = candidateSpeech;
+    setExitConfirmationPending(true);
+
+    if (isFastMode) {
+      void speakAsExaminer("Would you like to end the viva now? Please say yes or no.");
+    } else if (!sendSessionControl("candidate_exit_request")) {
+      exitConfirmationPendingRef.current = false;
+      setExitConfirmationPending(false);
+      setSessionError("The examiner connection is unavailable, so the viva cannot confirm an early exit yet.");
+    }
+  }, [candidateTranscript, candidateLiveTranscript, isFastMode, vivaStarted, sendSessionControl]);
+
+  useEffect(() => {
+    if (!exitConfirmationPendingRef.current || endingRef.current) return;
+    const candidateSpeech = isFastMode ? candidateTranscript : candidateLiveTranscript;
+    if (!candidateSpeech.trim() || candidateSpeech === exitRequestOriginalTextRef.current) return;
+    const answer = getExitConfirmationAnswer(candidateSpeech);
+    if (!answer) return;
+
+    exitConfirmationPendingRef.current = false;
+    setExitConfirmationPending(false);
+    exitRequestHandledRef.current = false;
+    exitRequestOriginalTextRef.current = "";
+    if (answer === "no") {
+      if (isFastMode) {
+        void speakAsExaminer("Understood. We will continue.");
+      } else {
+        sendSessionControl("exit_confirmation_answer", false);
+      }
+      return;
+    }
+
+    if (isFastMode) {
+      void speakAsExaminer("Thank you. We will end the viva now.", () => {
+        void endVivaRef.current?.();
+      });
+    } else {
+      sendSessionControl("exit_confirmation_answer", true);
+    }
+  }, [candidateTranscript, candidateLiveTranscript, isFastMode, sendSessionControl]);
+
+  useEffect(() => {
+    if (sessionEndReason === "candidate_confirmed_early_exit" && !endingRef.current) {
+      void endVivaRef.current?.();
+    } else if (sessionEndReason === "timer_closing_ready") {
+      setTimerClosingComplete(true);
+    }
+  }, [sessionEndReason]);
+
+  useEffect(() => {
+    if (secondsLeft === 0 && timerClosingComplete && !endingRef.current) {
+      void endVivaRef.current?.();
+    }
+  }, [secondsLeft, timerClosingComplete]);
+
+  useEffect(() => {
+    if (!vivaStarted || ending || secondsLeft <= 0 || secondsLeft > 10 || timerClosingPromptSentRef.current) return;
+    timerClosingPromptSentRef.current = true;
+    if (isFastMode) {
+      stopExaminerAudio();
+      void speakAsExaminer("Hey, we are at the end of the session. Thank you.", () => {
+        setTimerClosingComplete(true);
+      }).catch(() => setTimerClosingComplete(true));
+    } else {
+      sendSessionControl("timer_closing");
+    }
+  }, [vivaStarted, ending, secondsLeft, isFastMode, stopExaminerAudio, sendSessionControl]);
 
   function revealControls() {
     setControlsVisible(true);
@@ -958,7 +1039,7 @@ export default function VivaVoiceAi({
         console.warn("Unable to save the live transcript locally:", error);
       }
       try {
-        await generateScore(liveQa, true, user?.idToken);
+        await generateScore(liveQa);
       } catch (error) {
         console.error("Unable to generate the viva report:", error);
         setSessionError(error instanceof Error ? error.message : "The viva ended, but the report could not be generated.");

@@ -4,7 +4,6 @@ import { useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { appPath } from "@/lib/app-path";
-import { getAiVivaBackendHttpBaseUrl } from "@/lib/ai-viva-backend-url";
 import { getStoredAuth } from "@/lib/urologics-auth";
 import type { VivaCaseRecord, VivaModeQuestion } from "@/lib/viva-case";
 import { getCalmPhaseAtElapsedSec, type ActiveCalmVivaPhase } from "@/lib/viva-flow";
@@ -613,20 +612,13 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
 
   async function generateScore(
     historyOverride?: Array<{ question?: string; answer?: string }>,
-    scoreInPythonBackend = false,
-    idToken?: string,
   ) {
     try {
       const history = historyOverride ?? previousQARef.current;
-
-      const scoreUrl = scoreInPythonBackend
-        ? `${getAiVivaBackendHttpBaseUrl()}/viva/report`
-        : appPath("/api/viva/generateScore");
-      const res = await fetch(scoreUrl, {
+      const res = await fetch(appPath("/api/viva/generateScore"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(scoreInPythonBackend && idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
         body: JSON.stringify({ previousQA: history, vivaCase }),
       });

@@ -181,6 +181,7 @@ export function useGeminiLive(
   const [transcript, setTranscript] = useState("");
   const [candidateLiveTranscript, setCandidateLiveTranscript] = useState("");
   const [liveExhibitId, setLiveExhibitId] = useState<string | null>(null);
+  const [sessionEndReason, setSessionEndReason] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [turns, setTurns] = useState<Array<{ role: "ai" | "candidate"; text: string }>>([]);
@@ -188,6 +189,7 @@ export function useGeminiLive(
   const [startupStage, setStartupStage] = useState<"idle" | "server" | "websocket" | "gemini" | "microphone" | "speaker" | "ready" | "error">("idle");
   
   const sessionRef = useRef<any>(null);
+  const backendSessionReadyRef = useRef(false);
   const liveExhibitIdRef = useRef<string | null>(null);
   const examinerPromptedExhibitRef = useRef(false);
   const candidateSpokeSinceExhibitRef = useRef(false);
@@ -201,6 +203,7 @@ export function useGeminiLive(
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const transcriptPartsRef = useRef({ input: "", output: "" });
   const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speakingRef = useRef(false);
   const initialPromptSentRef = useRef(false);
   const firstBackendAudioLoggedRef = useRef(false);
@@ -251,7 +254,19 @@ export function useGeminiLive(
   const stopSession = useCallback(() => {
     readyRef.current = false;
     initialPromptSentRef.current = false;
-    sessionRef.current?.close();
+    if (sessionEndTimerRef.current) clearTimeout(sessionEndTimerRef.current);
+    sessionEndTimerRef.current = null;
+    const socket = sessionRef.current;
+    sessionRef.current = null;
+    if (socket instanceof WebSocket && socket.readyState === WebSocket.OPEN) {
+      if (backendSessionReadyRef.current) {
+        socket.send(JSON.stringify({ type: "session_complete" }));
+      }
+      socket.close(1000, "Viva completed");
+    } else {
+      socket?.close?.();
+    }
+    backendSessionReadyRef.current = false;
     processorRef.current?.disconnect();
     silentGainRef.current?.disconnect();
     processorRef.current = null;
@@ -373,7 +388,11 @@ export function useGeminiLive(
     setTranscript("");
     setCandidateLiveTranscript("");
     setLiveExhibitId(null);
+    setSessionEndReason(null);
     liveExhibitIdRef.current = null;
+    setSessionEndReason(null);
+    backendSessionReadyRef.current = false;
+    setSessionEndReason(null);
     examinerPromptedExhibitRef.current = false;
     candidateSpokeSinceExhibitRef.current = false;
     setTurns([]);
@@ -409,6 +428,7 @@ export function useGeminiLive(
         console.info("[AI Viva backend] WebSocket connected", { url: connectedUrl });
         setStartupStage("websocket");
         let readyAcknowledged = false;
+        backendSessionReadyRef.current = false;
         let resolveSessionReady!: () => void;
         let rejectSessionReady!: (error: Error) => void;
         const sessionReady = new Promise<void>((resolve, reject) => {
@@ -486,8 +506,35 @@ export function useGeminiLive(
               return;
             }
 
+            if (payload.type === "interrupt_playback") {
+              stopPlayback();
+              return;
+            }
+
+            if (payload.type === "exit_confirmation_required") {
+              transcriptPartsRef.current.input = "";
+              setCandidateLiveTranscript("");
+              return;
+            }
+
+            if (payload.type === "session_end") {
+              const reason = typeof payload.reason === "string" ? payload.reason : "session_complete";
+              const context = playbackContextRef.current;
+              const playbackDelay = context
+                ? Math.max(0, (nextPlayTimeRef.current - context.currentTime) * 1000)
+                : 0;
+              if (sessionEndTimerRef.current) clearTimeout(sessionEndTimerRef.current);
+              sessionEndTimerRef.current = setTimeout(() => {
+                sessionEndTimerRef.current = null;
+                setSessionEndReason(reason);
+              }, Math.ceil(playbackDelay) + 150);
+              return;
+            }
+
             if (payload.type === "session_ready") {
               readyAcknowledged = true;
+              backendSessionReadyRef.current = true;
+              backendSessionReadyRef.current = true;
               clearTimeout(readyTimeout);
               console.info("[AI Viva backend] Session accepted", { url: connectedUrl });
               resolveSessionReady();
@@ -928,6 +975,13 @@ export function useGeminiLive(
     }
   }, [candidate]);
 
+  const sendSessionControl = useCallback((type: string, confirmed?: boolean) => {
+    const socket = sessionRef.current;
+    if (!(socket instanceof WebSocket) || socket.readyState !== WebSocket.OPEN) return false;
+    socket.send(JSON.stringify({ type, ...(confirmed === undefined ? {} : { confirmed }) }));
+    return true;
+  }, []);
+
   useEffect(() => {
     return () => {
       stopSession();
@@ -939,6 +993,7 @@ export function useGeminiLive(
     connecting,
     startSession,
     beginViva,
+    sendSessionControl,
     stopSession,
     resumeAudioOutput,
     transcript,
@@ -950,5 +1005,6 @@ export function useGeminiLive(
     amplitude,
     startupStage,
     backendError,
+    sessionEndReason,
   };
 }
