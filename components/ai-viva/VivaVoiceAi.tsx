@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, PhoneOff, Camera, CameraOff, ShieldCheck, History, X } from "lucide-react";
+import { Clock, PhoneOff, Camera, CameraOff, X, ChevronUp, Captions, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CandidatePanel } from "./CandidatePanel";
@@ -14,8 +14,8 @@ import { useCountdown } from "./useCountdown";
 import ChatTimeline from "./ChatTimeline";
 import { useGeminiLive } from "./useGeminiLive";
 
-import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 
 import type { VivaCaseRecord } from "@/lib/viva-case";
@@ -82,6 +82,44 @@ function resolveExhibitSrc(src: string) {
   return src.startsWith("/") ? appPath(src) : src;
 }
 
+function resolveCaseExhibitSrc(exhibit: VivaCaseRecord["exhibits"][number]) {
+  const src = exhibit.url || (exhibit.file ? `/exhibits/${exhibit.file.replace(/^\/+/, "")}` : "");
+  return src ? resolveExhibitSrc(src) : "";
+}
+
+function isVivaEndRequest(value: string) {
+  const text = value.toLowerCase().replace(/[’]/g, "'");
+  if (/\b(?:don't|do not|never)\b.{0,30}\b(?:end|finish|stop|conclude)\b/.test(text)) return false;
+
+  return (
+    /\b(?:end|finish|stop|conclude)\s+(?:the\s+)?(?:viva|exam(?:ination)?|assessment)\b/.test(text) ||
+    /\b(?:can|could)\s+we\s+(?:end|finish|stop|conclude)(?:\s+(?:the\s+)?(?:viva|exam(?:ination)?|assessment)|\s+(?:now|here))\b/.test(text) ||
+    /\b(?:i(?:'d| would)\s+like|i want)\s+to\s+(?:end|finish|stop|conclude)\b/.test(text) ||
+    /\b(?:i'm|i am)\s+(?:finished|done)\s+(?:with\s+)?(?:the\s+)?(?:viva|exam(?:ination)?|assessment)\b/.test(text)
+  );
+}
+
+function mergeCurrentCandidateAnswer(history: QaHistoryItem[], candidateText: string) {
+  const current = candidateText.trim();
+  const merged = history.map((item) => ({ ...item }));
+  if (!current) return merged;
+
+  const last = merged[merged.length - 1];
+  if (!last) return [{ question: "", answer: current }];
+  const existing = last.answer?.trim() || "";
+  if (!existing) {
+    last.answer = current;
+  } else if (
+    current.toLowerCase().startsWith(existing.toLowerCase()) ||
+    current.toLowerCase().includes(existing.toLowerCase())
+  ) {
+    last.answer = current;
+  } else if (!existing.toLowerCase().includes(current.toLowerCase())) {
+    last.answer = `${existing} ${current}`.trim();
+  }
+  return merged;
+}
+
 export default function VivaVoiceAi({
   vivaCase,
   selectedMode = "calm",
@@ -90,6 +128,7 @@ export default function VivaVoiceAi({
   selectedMode?: VivaMode;
 }) {
   const fastModeTotalDurationSec = 10 * 60;
+  const { user } = useAuth();
   const isFastMode = selectedMode === "fast";
 
   const [candidate, setCandidate] = useState({ name: "", email: "" });
@@ -137,7 +176,6 @@ export default function VivaVoiceAi({
   } = useVivaSession();
 
     const { speak, amplitude, error: audioError, stop: stopExaminerAudio } = useSpeechOutput();
-  const examinerSpeaking = speaking;
   const avatarSessionActiveRef = useRef(false);
 
 
@@ -145,6 +183,8 @@ export default function VivaVoiceAi({
   const firstQuestionRef = useRef<Awaited<ReturnType<typeof next>> | null>(null);
   const examinerVoiceRef = useRef(selectedExaminer);
   const endingRef = useRef(false);
+  const endIntentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const endVivaRef = useRef<(() => Promise<void>) | null>(null);
   const fillerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fastSilenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestCandidateTranscriptRef = useRef("");
@@ -158,9 +198,11 @@ export default function VivaVoiceAi({
   const messagesRef = useRef<CandidateConversationMessage[]>([]);
   const selectedMicDeviceIdRef = useRef<string | undefined>(undefined);
   const prefetchedPhaseRef = useRef("assessment");
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [readyVisible, setReadyVisible] = useState(true);
   const [ending, setEnding] = useState(false);
+  const [reportGenerationFailed, setReportGenerationFailed] = useState(false);
   const [vivaStarted, setVivaStarted] = useState(false);
   const [messages, setMessages] = useState<CandidateConversationMessage[]>([]);
   const [cameraOn, setCameraOn] = useState(false);
@@ -175,6 +217,7 @@ export default function VivaVoiceAi({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [preparingCase, setPreparingCase] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [controlsVisible, setControlsVisible] = useState(true);
 
   const fastKeywordProgress = isFastMode
     ? getCurrentFastQuestionKeywordProgress(candidateTranscript)
@@ -716,11 +759,63 @@ export default function VivaVoiceAi({
 
     const {
     active: liveActive,
-    connecting: liveConnecting,
     startSession: startLiveSession,
+    beginViva: beginLiveViva,
     stopSession: stopLiveSession,
+    resumeAudioOutput,
     transcript: liveTranscript,
-  } = useGeminiLive(vivaCase, (vivaCase as any).persona);
+    candidateLiveTranscript,
+    liveExhibitId,
+    clearLiveExhibit,
+    speaking: liveSpeaking,
+    turns: liveTurns,
+    startupStage: liveStartupStage,
+    backendError: liveBackendError,
+  } = useGeminiLive(vivaCase, user?.idToken, candidate);
+  const examinerSpeaking = liveActive && !isFastMode ? liveSpeaking : speaking;
+  const stageTranscript = liveActive && !isFastMode ? liveTranscript : transcript;
+  const liveExhibit = liveExhibitId
+    ? vivaCase.exhibits.find((item) => item.id === liveExhibitId && item.kind.toLowerCase() === "image")
+    : undefined;
+  const liveExhibitSrc = liveExhibit ? resolveCaseExhibitSrc(liveExhibit) : "";
+
+  useEffect(() => {
+    if (liveBackendError) setSessionError(liveBackendError);
+  }, [liveBackendError]);
+
+  useEffect(() => {
+    if (!liveActive || isFastMode || !vivaStarted || endingRef.current || !isVivaEndRequest(candidateLiveTranscript)) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (!endingRef.current) void endVivaRef.current?.();
+    }, 1800);
+    endIntentTimeoutRef.current = timeout;
+    return () => {
+      clearTimeout(timeout);
+      if (endIntentTimeoutRef.current === timeout) endIntentTimeoutRef.current = null;
+    };
+  }, [candidateLiveTranscript, liveActive, isFastMode, vivaStarted]);
+
+  function revealControls() {
+    setControlsVisible(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    if (vivaStarted) {
+      controlsTimeoutRef.current = setTimeout(() => setControlsVisible(false), 4200);
+    }
+  }
+
+  useEffect(() => {
+    if (!vivaStarted) {
+      setControlsVisible(true);
+      return;
+    }
+    controlsTimeoutRef.current = setTimeout(() => setControlsVisible(false), 4200);
+    return () => {
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    };
+  }, [vivaStarted]);
 
   async function handleBegin(
     cameraPref = true,
@@ -735,7 +830,13 @@ export default function VivaVoiceAi({
     if (selectedMode === "calm") {
       try {
         hasStartedRef.current = true;
-        await startLiveSession();
+        examinerVoiceRef.current = examinerChoice;
+        setSelectedExaminer(examinerChoice);
+        setCameraEnabled(cameraPref);
+        setCameraOn(cameraPref);
+        selectedMicDeviceIdRef.current = micDeviceId;
+        await startLiveSession(examinerChoice, selectedMode, micDeviceId);
+        beginLiveViva();
         setReadyVisible(false);
         setVivaStarted(true);
       } catch (error) {
@@ -811,12 +912,55 @@ export default function VivaVoiceAi({
   }
 
   async function endViva() {
-    if (ending) return;
+    if (endingRef.current || ending) return;
 
     endingRef.current = true;
     advanceLockRef.current = true;
     setEnding(true);
+    setReportGenerationFailed(false);
+    setSessionError(null);
     stopExaminerAudio();
+    if (!isFastMode) {
+      setIsListening(false);
+      stopLiveSession();
+      const liveQa = mergeCurrentCandidateAnswer(liveTurns.reduce<Array<{ question: string; answer: string }>>((rows, turn) => {
+        if (turn.role === "ai") {
+          rows.push({ question: turn.text, answer: "" });
+        } else if (rows.length) {
+          rows[rows.length - 1].answer = `${rows[rows.length - 1].answer} ${turn.text}`.trim();
+        } else {
+          rows.push({ question: "", answer: turn.text });
+        }
+        return rows;
+      }, []).filter((item) => item.question || item.answer), candidateLiveTranscript);
+      try {
+        const storedLive = localStorage.getItem("candidateInfo");
+        if (storedLive) {
+          const parsed = JSON.parse(storedLive);
+          parsed.qaHistory = liveQa;
+          parsed.conversation = liveTurns.map((turn, index) => ({
+            id: `live-${index}`,
+            role: turn.role,
+            text: turn.text,
+            live: true,
+          }));
+          localStorage.setItem("candidateInfo", JSON.stringify(parsed));
+        }
+      } catch (error) {
+        console.warn("Unable to save the live transcript locally:", error);
+      }
+      try {
+        await generateScore(liveQa, true, user?.idToken);
+      } catch (error) {
+        console.error("Unable to generate the viva report:", error);
+        setSessionError(error instanceof Error ? error.message : "The viva ended, but the report could not be generated.");
+        setReportGenerationFailed(true);
+        setEnding(false);
+        endingRef.current = false;
+        advanceLockRef.current = false;
+      }
+      return;
+    }
     setIsListening(false);
     stop();
     closeSocket();
@@ -838,34 +982,67 @@ export default function VivaVoiceAi({
     setFastPauseState("idle");
     setFastTimerStarted(false);
 
-    const stored = localStorage.getItem("candidateInfo");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      const qaHistory = getHistory();
-      parsed.qaHistory = qaHistory;
-      parsed.conversation =
-        messagesRef.current.length > 0
-          ? messagesRef.current
-          : buildConversationFromQaHistory(qaHistory);
-      parsed.selectedCaseId = vivaCase.id;
-      parsed.selectedCaseTitle = vivaCase.case.title;
-      parsed.selectedCase = vivaCase;
-      parsed.selectedMode = selectedMode;
-      parsed.selectedExaminer = selectedExaminer;
-      parsed.selectedExaminerId = selectedExaminer.id;
-      localStorage.setItem("candidateInfo", JSON.stringify(parsed));
+    try {
+      const stored = localStorage.getItem("candidateInfo");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const qaHistory = getHistory();
+        parsed.qaHistory = qaHistory;
+        parsed.conversation =
+          messagesRef.current.length > 0
+            ? messagesRef.current
+            : buildConversationFromQaHistory(qaHistory);
+        parsed.selectedCaseId = vivaCase.id;
+        parsed.selectedCaseTitle = vivaCase.case.title;
+        parsed.selectedCase = vivaCase;
+        parsed.selectedMode = selectedMode;
+        parsed.selectedExaminer = selectedExaminer;
+        parsed.selectedExaminerId = selectedExaminer.id;
+        localStorage.setItem("candidateInfo", JSON.stringify(parsed));
+      }
+    } catch (error) {
+      console.warn("Unable to save the viva transcript locally:", error);
     }
 
-    await generateScore();
+    try {
+      await generateScore();
+    } catch (error) {
+      console.error("Unable to generate the viva report:", error);
+      setSessionError(error instanceof Error ? error.message : "The viva ended, but the report could not be generated.");
+      setReportGenerationFailed(true);
+      setEnding(false);
+      endingRef.current = false;
+      advanceLockRef.current = false;
+    }
   }
+  endVivaRef.current = endViva;
+
+  useEffect(() => {
+    if (!liveActive || isFastMode) return;
+    setMessages(liveTurns.map((turn, index) => ({
+      id: `live-${index}`,
+      role: turn.role,
+      text: turn.text,
+      live: true,
+    })));
+    setIsListening(true);
+    setCandidateStatusDot("idle");
+  }, [liveActive, isFastMode, liveTurns]);
 
   return (
-    <main className="relative flex h-screen w-full flex-col overflow-hidden bg-white text-[#071014]">
+    <main
+      className="relative h-dvh w-full overflow-hidden bg-[#111315] text-white"
+      onPointerMove={revealControls}
+      onFocusCapture={revealControls}
+    >
       {readyVisible && (
         <ReadyOverlay
           onBegin={handleBegin}
           vivaTitle={vivaCase.case.title}
           selectedMode={selectedMode}
+          errorMessage={sessionError}
+          isStarting={preparingCase}
+          startupStage={liveStartupStage}
         />
       )}
 
@@ -884,7 +1061,7 @@ export default function VivaVoiceAi({
           <div className="rounded-[28px] border border-[#0f7896]/12 bg-white px-8 py-7 text-center shadow-[0_24px_60px_rgba(15,120,150,0.18)]">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-cyan-100 border-t-[#0f7896]" />
             <p className="mt-4 text-lg font-semibold text-[#071014]">Preparing your viva</p>
-            <p className="mt-1 text-sm text-[#071014]/55">Preparing examiner audio. Your viva starts automatically when ready.</p>
+            <p className="mt-1 text-sm text-[#071014]/55">Connecting your live speech-to-speech examiner.</p>
           </div>
         </div>
       )}
@@ -892,29 +1069,37 @@ export default function VivaVoiceAi({
       {!preparingCase && !readyVisible && !ending && (sessionError || audioError) && (
         <div role="alert" className="absolute inset-0 z-40 flex items-center justify-center bg-white/95 p-6 backdrop-blur-sm">
           <div className="max-w-md rounded-[28px] border border-[#0f7896]/12 bg-white px-8 py-7 text-center shadow-xl">
-            <p className="text-lg font-semibold">{vivaStarted ? "Unable to continue audio" : "Unable to start your viva"}</p>
+            <p className="text-lg font-semibold">
+              {reportGenerationFailed ? "Your report could not be generated" : vivaStarted ? "Unable to continue audio" : "Unable to start your viva"}
+            </p>
             <p className="mt-3 text-sm text-[#071014]/65">{sessionError || audioError}</p>
-            <button type="button" onClick={() => { void retryCurrentQuestion(); }} className="mt-5 rounded-xl bg-[#0f7896] px-5 py-3 font-medium text-white">Retry question</button>
+            <button
+              type="button"
+              onClick={() => { void (reportGenerationFailed ? endViva() : retryCurrentQuestion()); }}
+              className="mt-5 rounded-xl bg-[#0f7896] px-5 py-3 font-medium text-white"
+            >
+              {reportGenerationFailed ? "Retry report" : "Retry question"}
+            </button>
           </div>
         </div>
       )}
 
       {historyOpen && (
-        <div className="pointer-events-none absolute bottom-[64px] right-0 top-[73px] z-40 flex w-full justify-end sm:bottom-[68px] md:top-[77px]">
-          <div className="pointer-events-auto flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.16)]">
+        <div className="pointer-events-none absolute inset-y-4 right-4 z-50 flex w-full max-w-xl justify-end">
+          <div className="pointer-events-auto flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-[#1c1e20] text-white shadow-2xl">
             <div className="flex items-center justify-between gap-4 border-b border-[#0f7896]/12 px-5 py-4">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-[#0f7896]">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
                   Session Transcript
                 </div>
-                <div className="mt-1 text-base font-semibold text-[#071014]">
+                <div className="mt-1 text-base font-semibold text-white">
                   Examiner questions and your spoken answers
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setHistoryOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#0f7896]/12 bg-white text-[#071014] transition hover:bg-cyan-50"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10"
                 aria-label="Close history"
               >
                 <X size={17} />
@@ -931,145 +1116,120 @@ export default function VivaVoiceAi({
         </div>
       )}
 
-      <div className="border-b border-[#0f7896]/12 bg-white px-3 py-3 shadow-[0_8px_24px_rgba(15,120,150,0.07)] sm:px-5 md:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="hidden sm:block">
-              <UrologicsBrand compact product="AI Viva" tag={vivaCase.case.title} />
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896] sm:hidden">
-              <ShieldCheck size={18} />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs uppercase tracking-[0.22em] text-[#0f7896]">
-                Urologics Session
+      <div className="absolute inset-0">
+        <AiPanel
+          amplitude={amplitude}
+          speaking={examinerSpeaking}
+          thinking={thinking || (liveActive && !stageTranscript)}
+          listening={isListening}
+          transcript={stageTranscript}
+          keywordDetected={keywordDetected}
+          avatarVideo={null}
+          exhibit={
+            liveExhibit && liveExhibitSrc ? (
+              <div className="relative flex h-full max-h-[96vh] w-full max-w-[98vw] items-center justify-center">
+                <img src={liveExhibitSrc} alt={liveExhibit.label || "Viva exhibit"} className="max-h-[92vh] max-w-[96vw] rounded-lg object-contain" />
+                <button onClick={clearLiveExhibit} className="absolute right-2 top-2 rounded-full bg-black/70 p-2 text-white" aria-label="Close exhibit">
+                  <X size={16} />
+                </button>
               </div>
-              <div className="truncate text-sm font-semibold text-[#071014] md:text-base">
-                {selectedExaminer.name} · {selectedExaminer.title}
+            ) : exhibit?.type === "image" ? (
+              <div className="relative mx-auto flex h-full max-w-full items-center justify-center">
+                <img src={exhibit.src} alt="Viva exhibit" className="max-h-[70vh] w-auto rounded-lg" />
+                <button onClick={clearExhibit} className="absolute right-2 top-2 rounded-full bg-black/70 p-2 text-white" aria-label="Close exhibit">
+                  <X size={16} />
+                </button>
               </div>
-            </div>
-          </div>
-
-          <div className="hidden flex-1 justify-center md:flex">
-            <div className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-4 py-2 text-sm text-[#071014]/65">
-              {vivaCase.case.title}
-            </div>
-          </div>
-
-                    <div className="flex items-center gap-2">
-            {vivaCase.isUroAiPowered && (
-              <span className="flex items-center gap-1.5 rounded-full bg-cyan-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[#0f7896] shadow-[0_0_12px_rgba(15,120,150,0.2)]">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75"></span>
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500"></span>
-                </span>
-                UroAI Powered
-              </span>
-            )}
-            <span className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-1 text-xs uppercase tracking-[0.18em] text-[#071014]/65">
-
-            {isFastMode ? "Fast and Furious" : "Live Viva"}
-            </span>
-            <div className="flex items-center gap-2 rounded-full bg-[#0f7896] px-3 py-1.5 text-sm font-semibold text-white">
-              <Clock size={14} />
-              <span>{minutes}:{seconds.toString().padStart(2, "0")}</span>
-            </div>
-          </div>
-        </div>
+            ) : null
+          }
+        />
       </div>
 
-      <div className="min-h-0 flex-1 p-3 sm:p-4 md:p-5">
-        <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 md:grid-cols-[minmax(0,4fr)_minmax(220px,1fr)] md:grid-rows-1 md:gap-4">
-          <section className="relative min-h-0 overflow-hidden rounded-[24px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)] md:rounded-[28px]">
-          <AiPanel
-            amplitude={amplitude}
-            speaking={examinerSpeaking}
-            thinking={thinking}
-            transcript={transcript}
-            keywordDetected={keywordDetected}
-                avatarVideo={null}
+      <header className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 px-4 pt-4 sm:px-7 sm:pt-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/6 text-xs font-semibold text-white/80">U</div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-white/45">Urologics · AI Viva</p>
+            <p className="truncate text-sm font-medium text-white/90 sm:text-base">{selectedExaminer.name}</p>
+          </div>
+        </div>
+        <div className="mr-[min(35vw,280px)] hidden max-w-[35vw] truncate pt-2 text-sm text-white/55 sm:block">{vivaCase.case.title}</div>
+        <div className="flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-2 text-sm tabular-nums text-white/80 backdrop-blur-md">
+          <Clock size={14} />
+          <span>{minutes}:{seconds.toString().padStart(2, "0")}</span>
+        </div>
+      </header>
 
-            exhibit={
-                exhibit?.type === "image" ? (
-                  <div className="relative mx-auto flex h-full max-w-full items-center justify-center md:max-w-3xl">
-                    <img
-                      src={exhibit.src}
-                      alt="Viva exhibit"
-                      className="max-h-[60vh] w-auto rounded-2xl shadow-xl md:max-h-[70vh]"
-                    />
+      <aside className="absolute right-4 top-19 z-20 w-[min(58vw,340px)] min-w-28 sm:right-7 sm:top-24">
+        <div className="aspect-video overflow-hidden rounded-lg border border-white/15 bg-[#202326] shadow-2xl">
+          <CandidatePanel cameraOn={cameraOn} listening={isListening} transcript={candidateLiveTranscript} statusDot={candidateStatusDot} />
+        </div>
+        <p className="mt-2 truncate text-right text-xs text-white/65">{candidate.name || "You"}</p>
+        {candidateLiveTranscript && (
+          <div
+            className="ml-auto mt-2 w-full rounded-lg border border-white/10 bg-[#242629]/95 px-3 py-2 text-left text-xs leading-5 text-white shadow-lg sm:text-sm"
+            aria-live="polite"
+            aria-label="Your live transcription"
+          >
+            {candidateLiveTranscript}
+          </div>
+        )}
+      </aside>
 
-                    <button
-                      onClick={clearExhibit}
-                      className="absolute right-2 top-2 rounded-full bg-black/70 px-3 py-1 text-xs text-white transition-colors hover:bg-black/90 md:right-3 md:top-3"
-                    >
-                      Close
-                    </button>
-                  </div>
-                ) : null
-              }
-            />
-          </section>
+      {!controlsVisible && vivaStarted && (
+        <button
+          type="button"
+          onClick={revealControls}
+          onPointerEnter={revealControls}
+          className="absolute bottom-1 left-1/2 z-40 flex h-10 w-14 -translate-x-1/2 items-center justify-center rounded-t-lg border border-b-0 border-white/15 bg-[#25282b]/90 text-white/65 backdrop-blur-xl transition hover:text-white"
+          aria-label="Show call controls"
+          title="Show call controls"
+        >
+          <ChevronUp size={18} />
+        </button>
+      )}
 
-          <aside className="flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)] md:rounded-[28px]">
-            <div className="hidden border-b border-[#0f7896]/10 px-4 py-3 md:block">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#0f7896]">Candidate</p>
-              <p className="mt-0.5 truncate text-sm font-semibold text-[#071014]">{candidate.name || "You"}</p>
-            </div>
-
-            <div className="aspect-video min-h-[112px] w-full overflow-hidden bg-slate-950 md:min-h-0 md:flex-1 md:aspect-auto">
-              <CandidatePanel
-                cameraOn={cameraOn}
-                listening={isListening}
-                statusDot={candidateStatusDot}
-              />
-            </div>
-
-            <div className="border-t border-[#0f7896]/10 bg-[#f8fcfd] p-3 md:p-4">
-              <p className="mb-3 hidden text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#071014]/40 md:block">Call controls</p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => setCameraOn((v) => !v)}
-                  disabled={!cameraEnabled}
-                  className={`group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium transition-colors ${
-                    cameraEnabled
-                      ? "text-[#071014]/70 hover:bg-cyan-50"
-                      : "cursor-not-allowed text-[#071014]/25"
-                  }`}
-                  title={cameraEnabled ? "Toggle camera" : "Camera not enabled in system check"}
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#0f7896]/15 bg-white shadow-sm transition group-hover:border-[#0f7896]/30">
-                    {cameraOn ? <CameraOff size={17} /> : <Camera size={17} />}
-                  </span>
-                  <span>{cameraOn ? "Camera off" : "Camera on"}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setHistoryOpen(true)}
-                  className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium text-[#071014]/70 transition-colors hover:bg-cyan-50"
-                  title="Show session transcript"
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#0f7896]/15 bg-white shadow-sm transition group-hover:border-[#0f7896]/30">
-                    <History size={17} />
-                  </span>
-                  <span>Transcript</span>
-                </button>
-
-                                <button
-                  onClick={liveActive ? stopLiveSession : endViva}
-                  disabled={(!vivaStarted && !liveActive) || ending}
-
-                  className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="End viva examination"
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white shadow-[0_6px_16px_rgba(220,38,38,0.25)] transition group-hover:bg-red-700">
-                    <PhoneOff size={17} />
-                  </span>
-                  <span>End viva</span>
-                </button>
-              </div>
-            </div>
-          </aside>
+      <div className={`absolute bottom-5 left-1/2 z-40 -translate-x-1/2 transition-all duration-300 ${controlsVisible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-24 opacity-0"}`}>
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-[#242629]/90 p-2 shadow-2xl backdrop-blur-2xl sm:gap-3 sm:px-3">
+          <button
+            type="button"
+            onClick={() => setCameraOn((current) => !current)}
+            disabled={!cameraEnabled}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-35"
+            title={cameraOn ? "Turn camera off" : "Turn camera on"}
+            aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}
+          >
+            {cameraOn ? <CameraOff size={19} /> : <Camera size={19} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((open) => !open)}
+            className={`flex h-11 w-11 items-center justify-center rounded-full transition ${historyOpen ? "bg-white text-[#161819]" : "bg-white/10 text-white hover:bg-white/20"}`}
+            title={historyOpen ? "Close transcript" : "Open transcript"}
+            aria-label={historyOpen ? "Close transcript" : "Open transcript"}
+          >
+            <Captions size={20} />
+          </button>
+          <button
+            type="button"
+            onClick={() => void resumeAudioOutput().catch((error) => setSessionError(error instanceof Error ? error.message : "Unable to resume examiner audio."))}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            title="Enable examiner audio"
+            aria-label="Enable examiner audio"
+          >
+            <Volume2 size={19} />
+          </button>
+          <div className="mx-1 hidden h-7 w-px bg-white/15 sm:block" />
+          <button
+            type="button"
+            onClick={endViva}
+            disabled={(!vivaStarted && !liveActive) || ending}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e5484d] text-white transition hover:bg-[#f05a5f] disabled:cursor-not-allowed disabled:opacity-40"
+            title="End viva"
+            aria-label="End viva"
+          >
+            <PhoneOff size={19} />
+          </button>
         </div>
       </div>
     </main>

@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { appPath } from "@/lib/app-path";
+import { getAiVivaBackendHttpBaseUrl } from "@/lib/ai-viva-backend-url";
 import { getStoredAuth } from "@/lib/urologics-auth";
 import type { VivaCaseRecord, VivaModeQuestion } from "@/lib/viva-case";
 import { getCalmPhaseAtElapsedSec, type ActiveCalmVivaPhase } from "@/lib/viva-flow";
@@ -610,23 +611,29 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     }
   }
 
-  async function generateScore() {
+  async function generateScore(
+    historyOverride?: Array<{ question?: string; answer?: string }>,
+    scoreInPythonBackend = false,
+    idToken?: string,
+  ) {
     try {
-      const history = previousQARef.current;
+      const history = historyOverride ?? previousQARef.current;
 
-      const res = await fetch(appPath("/api/viva/generateScore"), {
+      const scoreUrl = scoreInPythonBackend
+        ? `${getAiVivaBackendHttpBaseUrl()}/viva/report`
+        : appPath("/api/viva/generateScore");
+      const res = await fetch(scoreUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(scoreInPythonBackend && idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
-        body: JSON.stringify({
-          previousQA: history,
-          vivaCase,
-        }),
+        body: JSON.stringify({ previousQA: history, vivaCase }),
       });
 
       if (!res.ok) {
-        throw new Error("Score API failed");
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || payload?.detail || "Score generation failed");
       }
 
       const data = await res.json();
@@ -647,6 +654,7 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
       router.push("/ai-viva/score");
     } catch (err) {
       console.error("Score generation error:", err);
+      throw err instanceof Error ? err : new Error("Score generation failed");
     }
   }
 

@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "next dev",
     "deb": "next dev",
     "build": "next build",
     "start": "next start",
@@ -15,6 +16,7 @@
     "@google-cloud/speech": "^7.3.0",
     "@google-cloud/text-to-speech": "^6.4.0",
     "@google-cloud/vertexai": "^1.10.0",
+    "@google/adk": "^2.1.0",
     "@google/genai": "^1.52.0",
     "@google/generative-ai": "^0.24.1",
     "@ricky0123/vad-web": "^0.0.30",
@@ -23,6 +25,7 @@
     "@vapi-ai/web": "^2.5.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^18.0.4",
     "google-auth-library": "^11.1.0",
     "html2pdf.js": "^0.14.0",
     "livekit-client": "^2.18.5",
@@ -38,9 +41,11 @@
     "react-hot-toast": "^2.6.0",
     "siriwave": "^2.4.0",
     "tailwind-merge": "^3.5.0",
-    "ws": "^8.19.0"
+    "ws": "^8.19.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@google/adk-devtools": "^2.1.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.11",

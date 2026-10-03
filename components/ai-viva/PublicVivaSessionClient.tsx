@@ -60,7 +60,7 @@ function getStoredPublicCandidate(vivaCase: VivaCaseRecord, mode: VivaMode) {
         email: parsed.email || "",
       },
       submitted:
-        Boolean(parsed.name && parsed.email) &&
+        Boolean(parsed.name) &&
         parsed.selectedCaseId === vivaCase.id &&
         parsed.selectedMode === mode,
     };
@@ -87,8 +87,13 @@ export default function PublicVivaSessionClient({ vivaCase }: { vivaCase: VivaCa
     const name = candidate.name.trim();
     const email = candidate.email.trim().toLowerCase();
 
-    if (!name || !EMAIL_PATTERN.test(email)) {
-      toast.error("Please enter your name and a valid email.");
+    if (!name) {
+      toast.error("Please enter your name.");
+      return;
+    }
+
+    if (email && !EMAIL_PATTERN.test(email)) {
+      toast.error("Please provide a valid email or leave it blank.");
       return;
     }
 
@@ -201,7 +206,7 @@ export default function PublicVivaSessionClient({ vivaCase }: { vivaCase: VivaCa
             </div>
             <div>
               <label htmlFor="email" className="mb-1 block text-sm font-medium text-[#071014]/65">
-                Email Address
+                Email Address (optional)
               </label>
               <input
                 id="email"
@@ -210,7 +215,6 @@ export default function PublicVivaSessionClient({ vivaCase }: { vivaCase: VivaCa
                 onChange={(e) => setCandidate({ ...candidate, email: e.target.value })}
                 className="urologics-input"
                 placeholder="Enter your email"
-                required
               />
             </div>
             <Button

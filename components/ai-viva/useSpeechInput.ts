@@ -209,23 +209,24 @@ export function useSpeechInput(
         await audioContext.resume();
       }
 
-      await audioContext.audioWorklet.addModule(getPublicAssetPath("/audio-processor.js"));
+      await audioContext.audioWorklet.addModule(getPublicAssetPath("/pcm-recorder-processor.js"));
 
       const source = audioContext.createMediaStreamSource(stream);
       sourceRef.current = source;
 
-      const worklet = new AudioWorkletNode(audioContext, "audio-processor");
+      const worklet = new AudioWorkletNode(audioContext, "pcm-recorder-processor");
       workletRef.current = worklet;
 
       const silentGain = audioContext.createGain();
       silentGain.gain.value = 0;
       silentGainRef.current = silentGain;
 
-      worklet.port.onmessage = (event: MessageEvent<Int16Array | ArrayBuffer>) => {
-        const pcm =
-          event.data instanceof Int16Array
-            ? event.data
-            : new Int16Array(event.data);
+      worklet.port.onmessage = (event: MessageEvent<Float32Array>) => {
+        const pcm = new Int16Array(event.data.length);
+        for (let index = 0; index < event.data.length; index += 1) {
+          pcm[index] = Math.max(-32768, Math.min(32767, Math.round(event.data[index] * 32767)));
+        }
+
         const now = performance.now();
 
         if (now - lastLevelUpdateRef.current > 80 && pcm.length > 0) {
@@ -241,7 +242,7 @@ export function useSpeechInput(
         }
 
         if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(event.data);
+          wsRef.current.send(pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength));
         } else {
           console.debug("[Viva STT WebSocket] audio chunk skipped; socket is not open", {
             readyState: wsRef.current?.readyState,

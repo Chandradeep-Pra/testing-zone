@@ -1,0 +1,22 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\chand\\Downloads\\ai-viva-backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [21596] using WatchFiles
+INFO:     Started server process [27664]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [27664]
+INFO:     Started server process [16112]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:54452 - "WebSocket /ws/viva-01110996-890e-4848-a449-b7e277a2ccea/f46f9997-9c55-4acc-8dee-e8aa6e5b9ac5" [accepted]
+INFO:     connection open
+C:\Users\chand\Downloads\ai-viva-backend\.venv\Lib\site-packages\google\adk\models\llm_request.py:306: UserWarning: [EXPERIMENTAL] feature FeatureName.JSON_SCHEMA_FOR_FUNC_DECL is enabled.
+  declaration = tool._get_declaration()
+INFO:     127.0.0.1:54534 - "WebSocket /ws/viva-d32095c9-0dd9-4ec3-b110-211fb646c122/395bd53e-44a1-46da-8212-fdaabd6cb462" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:55390 - "WebSocket /ws/viva-9d07b73e-b9a4-4845-9065-3eebb38e9e05/78097a8d-9543-4822-bf55-4372685d7e3e" [accepted]
+INFO:     connection open

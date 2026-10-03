@@ -20,7 +20,6 @@ export const vivaContext = {
       kind: "image",
       label: "CT Urography",
       file: "img-ct-001.png", // File reference unchanged
-      // 'description' is now the 'Ground Truth' for the AI to grade against
       description: "CT urography (delayed phase) demonstrates a 2cm filling defect arising from the left posterolateral bladder wall. No evidence of hydroureter or upper tract urothelial tumor (UTUC)."
     },
     {

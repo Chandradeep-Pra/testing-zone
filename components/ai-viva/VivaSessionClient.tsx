@@ -64,7 +64,7 @@ function getStoredCandidate(vivaCase: VivaCaseRecord, mode: VivaMode, initialCan
         email: parsed.email || "",
       },
       submitted:
-        Boolean(parsed.name && parsed.email) && parsed.selectedCaseId === vivaCase.id,
+        Boolean(parsed.name) && parsed.selectedCaseId === vivaCase.id,
       selectedMode: parsed.selectedMode || "calm",
       selectedExaminerId: parsed.selectedExaminerId || getDefaultExaminer(parsed.selectedMode || "calm").id,
     };
@@ -118,7 +118,7 @@ export default function VivaSessionClient({
   );
 
   useEffect(() => {
-    if (!autoStart || !initialCandidate?.name || !initialCandidate.email) return;
+    if (!autoStart || !initialCandidate?.name) return;
 
     saveCandidateSession(vivaCase, selectedModeFromUrl, initialCandidate);
   }, [autoStart, initialCandidate, selectedModeFromUrl, vivaCase]);
@@ -129,8 +129,13 @@ export default function VivaSessionClient({
     const name = candidate.name.trim();
     const email = candidate.email.trim().toLowerCase();
 
-    if (!name || !email) {
-      toast.error("Please fill all fields");
+    if (!name) {
+      toast.error("Please enter your name");
+      return;
+    }
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Please enter a valid email or leave it blank");
       return;
     }
 
@@ -183,7 +188,7 @@ export default function VivaSessionClient({
             </div>
             <div>
               <label htmlFor="email" className="mb-1 block text-sm font-medium text-[#071014]/65">
-                Email Address
+                Email Address (optional)
               </label>
               <input
                 id="email"
@@ -192,7 +197,6 @@ export default function VivaSessionClient({
                 onChange={(e) => setCandidate({ ...candidate, email: e.target.value })}
                 className="urologics-input"
                 placeholder="Enter your email"
-                required
               />
             </div>
             <Button type="submit" className="w-full rounded-full bg-[#0f7896] text-white hover:bg-[#0b6078]">

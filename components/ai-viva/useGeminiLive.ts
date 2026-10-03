@@ -1,25 +1,273 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { GoogleGenAI, Modality } from "@google/genai";
+import type { ExaminerVoice, VivaMode } from "@/lib/examiner-voices";
+import { appPath } from "@/lib/app-path";
+import { normalizeSessionStartPayload } from "@/lib/session-start";
 
-export function useGeminiLive(vivaCase: any, persona: any) {
+function getBackendWebSocketCandidates() {
+  const configured =
+    process.env.NEXT_PUBLIC_AI_VIVA_BACKEND_WS_URL ||
+    process.env.NEXT_PUBLIC_AI_VIVA_WS_URL;
+
+  const isLocalPage = typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const configuredCandidates = configured
+    ? [configured]
+    : isLocalPage
+      ? ["ws://localhost:8000", "ws://localhost:8001"]
+      : [];
+
+  if (!configuredCandidates.length) {
+    throw new Error("The AI Viva WebSocket URL is not configured for this site. Set NEXT_PUBLIC_AI_VIVA_BACKEND_WS_URL to the secure backend WSS address.");
+  }
+
+  const baseCandidates = configuredCandidates.map((base) => {
+    const trimmed = base.trim().replace(/\/+$/, "").replace(/\/ws$/i, "");
+    if (!trimmed) throw new Error("The AI Viva WebSocket URL is empty.");
+    if (trimmed.startsWith("https://")) return trimmed.replace(/^https:/, "wss:");
+    if (trimmed.startsWith("http://")) return trimmed.replace(/^http:/, "ws:");
+    if (!/^wss?:\/\//i.test(trimmed)) {
+      throw new Error("The AI Viva WebSocket URL must start with ws:// or wss://.");
+    }
+    return trimmed.replace(/^wss?:/i, (protocol) => protocol.toLowerCase());
+  });
+
+  const hasSecurePage = typeof window !== "undefined" && window.location.protocol === "https:";
+  const isLoopback = (base: string) => ["localhost", "127.0.0.1", "::1"].includes(new URL(base).hostname);
+  if (hasSecurePage && baseCandidates.some((base) => base.startsWith("ws://") && !isLoopback(base))) {
+    throw new Error("This secure site requires a wss:// AI Viva backend URL.");
+  }
+
+  const userId = `viva-${crypto.randomUUID()}`;
+  const sessionId = crypto.randomUUID();
+
+  return baseCandidates.map((base) => `${base}/ws/${userId}/${sessionId}`);
+}
+
+async function connectToBackendWebSocket() {
+  const urls = getBackendWebSocketCandidates();
+  let lastError: Error | null = null;
+
+  for (const url of urls) {
+    try {
+      const socket = await new Promise<WebSocket>((resolve, reject) => {
+        const ws = new WebSocket(url);
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          ws.close();
+          reject(new Error(`Timed out connecting to the backend live session at ${url}.`));
+        }, 10000);
+
+        ws.onopen = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(ws);
+        };
+
+        ws.onerror = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          reject(new Error(`Unable to connect to the backend live session at ${url}.`));
+        };
+
+        ws.onclose = (event) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          reject(new Error(`Backend closed before connecting (${event.code}: ${event.reason || "no reason provided"}) at ${url}.`));
+        };
+      });
+      return { socket, url };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Unable to connect to the backend live session.");
+    }
+  }
+
+  throw lastError ?? new Error("Unable to connect to the backend live session.");
+}
+
+function parseBackendPayload(raw: unknown) {
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return { text: trimmed };
+    }
+  }
+
+  if (raw instanceof Blob) {
+    return { binary: raw };
+  }
+
+  if (raw instanceof ArrayBuffer) {
+    return { binary: raw };
+  }
+
+  if (typeof raw === "object" && raw !== null) {
+    return raw;
+  }
+
+  return null;
+}
+
+function decodeBase64Audio(data: string): ArrayBuffer | null {
+  const normalized = data
+    .replace(/^data:audio\/[^;,]+;base64,/i, "")
+    .replace(/\s/g, "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+
+  if (!normalized || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized) || normalized.length % 4 === 1) {
+    return null;
+  }
+
+  try {
+    const binary = window.atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes.buffer;
+  } catch {
+    return null;
+  }
+}
+
+function summarizeBackendPayload(value: unknown, key = ""): unknown {
+  if (value instanceof ArrayBuffer) {
+    return `[binary payload: ${value.byteLength} bytes]`;
+  }
+
+  if (value instanceof Blob) {
+    return `[binary payload: ${value.size} bytes, ${value.type || "unknown type"}]`;
+  }
+
+  if (typeof value === "string") {
+    if (key === "data" && value.length > 256) {
+      return `[encoded payload: ${value.length} characters]`;
+    }
+    return value.length > 2000 ? `${value.slice(0, 2000)}… [truncated]` : value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => summarizeBackendPayload(item));
+  }
+
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        summarizeBackendPayload(entryValue, entryKey),
+      ]),
+    );
+  }
+
+  return value;
+}
+
+export function useGeminiLive(
+  vivaCase: any,
+  idToken?: string,
+  candidate?: { name?: string; email?: string }
+) {
   const [active, setActive] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [candidateLiveTranscript, setCandidateLiveTranscript] = useState("");
+  const [liveExhibitId, setLiveExhibitId] = useState<string | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const [backendError, setBackendError] = useState<string | null>(null);
+  const [turns, setTurns] = useState<Array<{ role: "ai" | "candidate"; text: string }>>([]);
   const [amplitude, setAmplitude] = useState(0);
+  const [startupStage, setStartupStage] = useState<"idle" | "server" | "websocket" | "gemini" | "microphone" | "speaker" | "ready" | "error">("idle");
   
   const sessionRef = useRef<any>(null);
+  const liveExhibitIdRef = useRef<string | null>(null);
+  const examinerPromptedExhibitRef = useRef(false);
+  const candidateSpokeSinceExhibitRef = useRef(false);
+  const readyRef = useRef(false);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const playbackContextRef = useRef<AudioContext | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const nextPlayTimeRef = useRef(0);
+  const processorRef = useRef<AudioWorkletNode | null>(null);
+  const silentGainRef = useRef<GainNode | null>(null);
+  const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  const transcriptPartsRef = useRef({ input: "", output: "" });
+  const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speakingRef = useRef(false);
+  const initialPromptSentRef = useRef(false);
+  const firstBackendAudioLoggedRef = useRef(false);
+
+  const appendTranscript = useCallback((role: "ai" | "candidate", text: string) => {
+    const value = text.trim();
+    if (!value) return;
+    setTurns((current) => {
+      const last = current[current.length - 1];
+      if (last?.role === role) {
+        return [...current.slice(0, -1), { role, text: `${last.text} ${value}`.trim() }];
+      }
+      return [...current, { role, text: value }];
+    });
+  }, []);
+
+  const clearLiveExhibit = useCallback(() => {
+    liveExhibitIdRef.current = null;
+    examinerPromptedExhibitRef.current = false;
+    candidateSpokeSinceExhibitRef.current = false;
+    setLiveExhibitId(null);
+  }, []);
+
+  const noteExaminerOutputForExhibit = useCallback(() => {
+    if (!liveExhibitIdRef.current) return;
+    if (candidateSpokeSinceExhibitRef.current) clearLiveExhibit();
+    else examinerPromptedExhibitRef.current = true;
+  }, [clearLiveExhibit]);
+
+  useEffect(() => {
+    if (!liveExhibitId) return;
+    const timeout = setTimeout(clearLiveExhibit, 60_000);
+    return () => clearTimeout(timeout);
+  }, [liveExhibitId, candidateLiveTranscript, clearLiveExhibit]);
+
+  const stopPlayback = useCallback(() => {
+    sourcesRef.current.forEach((source) => {
+      try { source.stop(); } catch { /* already stopped */ }
+    });
+    sourcesRef.current.clear();
+    nextPlayTimeRef.current = 0;
+    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current);
+    speakingTimerRef.current = null;
+    speakingRef.current = false;
+    setSpeaking(false);
+  }, []);
 
   const stopSession = useCallback(() => {
+    readyRef.current = false;
+    initialPromptSentRef.current = false;
     sessionRef.current?.close();
+    processorRef.current?.disconnect();
+    silentGainRef.current?.disconnect();
+    processorRef.current = null;
+    silentGainRef.current = null;
     micStreamRef.current?.getTracks().forEach(track => track.stop());
     if (audioContextRef.current?.state !== 'closed') {
       audioContextRef.current?.close();
     }
+    if (playbackContextRef.current?.state !== "closed") {
+      playbackContextRef.current?.close();
+    }
+    playbackContextRef.current = null;
+    stopPlayback();
+    clearLiveExhibit();
     setActive(false);
-  }, []);
+  }, [stopPlayback, clearLiveExhibit]);
 
   const playAudioChunk = useCallback((base64Data: string) => {
     if (!audioContextRef.current) return;
@@ -44,6 +292,11 @@ export function useGeminiLive(vivaCase: any, persona: any) {
     const source = audioContextRef.current.createBufferSource();
     source.buffer = buffer;
     source.connect(audioContextRef.current.destination);
+    setSpeaking(true);
+    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current);
+    speakingTimerRef.current = setTimeout(() => setSpeaking(false), 260);
+    sourcesRef.current.add(source);
+    source.onended = () => sourcesRef.current.delete(source);
     
     // Schedule playback for gapless audio
     const startTime = Math.max(audioContextRef.current.currentTime, nextPlayTimeRef.current);
@@ -51,14 +304,438 @@ export function useGeminiLive(vivaCase: any, persona: any) {
     nextPlayTimeRef.current = startTime + buffer.duration;
   }, []);
 
-  const startSession = useCallback(async () => {
+  const playBackendPcm = useCallback((data: ArrayBuffer, sampleRate = 24000) => {
+    const context = playbackContextRef.current;
+    const sampleCount = Math.floor(data.byteLength / 2);
+    if (!context || context.state !== "running" || sampleCount === 0) {
+      console.warn("[AI Viva audio] PCM output unavailable", {
+        contextState: context?.state || "missing",
+        bytes: data.byteLength,
+      });
+      return;
+    }
+
+    if (!firstBackendAudioLoggedRef.current) {
+      firstBackendAudioLoggedRef.current = true;
+      console.info("[AI Viva audio] first backend PCM packet", {
+        bytes: data.byteLength,
+        sampleRate,
+        contextState: context.state,
+      });
+    }
+
+    const view = new DataView(data);
+    const samples = new Float32Array(sampleCount);
+    for (let index = 0; index < sampleCount; index += 1) {
+      samples[index] = view.getInt16(index * 2, true) / 32768;
+    }
+
+    const audioBuffer = context.createBuffer(1, sampleCount, sampleRate);
+    audioBuffer.getChannelData(0).set(samples);
+    const source = context.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(context.destination);
+    sourcesRef.current.add(source);
+    source.onended = () => sourcesRef.current.delete(source);
+
+    const startTime = Math.max(context.currentTime, nextPlayTimeRef.current);
+    source.start(startTime);
+    nextPlayTimeRef.current = startTime + audioBuffer.duration;
+    speakingRef.current = true;
+    setSpeaking(true);
+    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current);
+    speakingTimerRef.current = setTimeout(
+      () => {
+        speakingRef.current = false;
+        setSpeaking(false);
+      },
+      Math.max(260, audioBuffer.duration * 1000 + 100),
+    );
+  }, []);
+
+  const resumeAudioOutput = useCallback(async () => {
+    const contexts = [playbackContextRef.current, audioContextRef.current]
+      .filter((context): context is AudioContext => Boolean(context));
+    await Promise.all(contexts.map((context) => (
+      context.state === "suspended" ? context.resume() : Promise.resolve()
+    )));
+    if (contexts.length && contexts.every((context) => context.state !== "running")) {
+      throw new Error("Browser audio output is unavailable. Check the selected output device and try again.");
+    }
+  }, []);
+
+  const startSession = useCallback(async (examiner?: ExaminerVoice, mode: VivaMode = "calm", micDeviceId?: string) => {
+    readyRef.current = false;
+    initialPromptSentRef.current = false;
     setConnecting(true);
+    setStartupStage("server");
+    setBackendError(null);
     setTranscript("");
+    setCandidateLiveTranscript("");
+    setLiveExhibitId(null);
+    liveExhibitIdRef.current = null;
+    examinerPromptedExhibitRef.current = false;
+    candidateSpokeSinceExhibitRef.current = false;
+    setTurns([]);
+    transcriptPartsRef.current = { input: "", output: "" };
+    firstBackendAudioLoggedRef.current = false;
+
     try {
-      const res = await fetch("/api/viva/live/session", {
+      const backendWsUrls = getBackendWebSocketCandidates();
+      const useFastApiBackend = backendWsUrls.length > 0;
+
+      const playbackContext = useFastApiBackend ? new AudioContext({ sampleRate: 24000 }) : null;
+      playbackContextRef.current = playbackContext;
+      const playbackResume = playbackContext?.resume().then(
+        () => null,
+        (error) => error instanceof Error ? error : new Error("Unable to start speaker output."),
+      );
+
+      audioContextRef.current = new AudioContext({ sampleRate: 16000 });
+      await audioContextRef.current.resume();
+      if (audioContextRef.current.state !== "running") {
+        throw new Error("Audio output is blocked by the browser. Allow sound for this site, then try again.");
+      }
+
+      await audioContextRef.current.audioWorklet.addModule(appPath("/audio-processor.js"));
+
+      if (useFastApiBackend) {
+        if (!playbackContext) throw new Error("Audio playback could not be initialized.");
+
+        const { socket: ws, url: connectedUrl } = await connectToBackendWebSocket();
+        ws.binaryType = "arraybuffer";
+        sessionRef.current = ws;
+
+        console.info("[AI Viva backend] WebSocket connected", { url: connectedUrl });
+        setStartupStage("websocket");
+        let readyAcknowledged = false;
+        let resolveSessionReady!: () => void;
+        let rejectSessionReady!: (error: Error) => void;
+        const sessionReady = new Promise<void>((resolve, reject) => {
+          resolveSessionReady = resolve;
+          rejectSessionReady = reject;
+        });
+        let resolveFirstModelAudio!: () => void;
+        let rejectFirstModelAudio!: (error: Error) => void;
+        let waitingForFirstModelAudio = false;
+        const firstModelAudio = new Promise<void>((resolve, reject) => {
+          resolveFirstModelAudio = resolve;
+          rejectFirstModelAudio = reject;
+        });
+        void firstModelAudio.catch(() => {});
+        let firstModelAudioTimeout: ReturnType<typeof setTimeout> | null = null;
+        const markFirstModelAudio = () => {
+          if (!waitingForFirstModelAudio) return;
+          waitingForFirstModelAudio = false;
+          if (firstModelAudioTimeout) clearTimeout(firstModelAudioTimeout);
+          firstModelAudioTimeout = null;
+          setStartupStage("ready");
+          readyRef.current = true;
+          setActive(true);
+          resolveFirstModelAudio();
+        };
+        const readyTimeout = setTimeout(() => {
+          rejectSessionReady(new Error("The backend did not prepare the viva session in time. Check the backend process and retry."));
+        }, 45000);
+
+        ws.onerror = (event) => {
+          console.error("[AI Viva backend] WebSocket error", { url: connectedUrl, event });
+          clearTimeout(readyTimeout);
+          const message = new Error(`Backend WebSocket failed at ${connectedUrl}.`);
+          rejectSessionReady(message);
+          if (waitingForFirstModelAudio) {
+            if (firstModelAudioTimeout) clearTimeout(firstModelAudioTimeout);
+            rejectFirstModelAudio(message);
+          }
+        };
+
+        ws.onclose = (event) => {
+          console.error("[AI Viva backend] WebSocket closed", {
+            url: connectedUrl,
+            code: event.code,
+            reason: event.reason || "(no reason provided)",
+            wasClean: event.wasClean,
+            readyState: ws.readyState,
+          });
+          clearTimeout(readyTimeout);
+          setActive(false);
+          readyRef.current = false;
+          if (!readyAcknowledged) {
+            rejectSessionReady(new Error(`Backend closed during startup (${event.code}: ${event.reason || "no reason provided"}).`));
+          } else if (waitingForFirstModelAudio) {
+            if (firstModelAudioTimeout) clearTimeout(firstModelAudioTimeout);
+            rejectFirstModelAudio(new Error(`Gemini Live disconnected before returning audio (${event.code}: ${event.reason || "no reason provided"}).`));
+          } else if (event.code !== 1000) {
+            setBackendError(`Backend connection closed (${event.code}: ${event.reason || "no reason provided"}).`);
+          }
+        };
+
+        ws.onmessage = (event) => {
+            const payload = parseBackendPayload(event.data);
+
+            if (!payload) return;
+
+            if (payload.type === "show_exhibit") {
+              const exhibitId = typeof payload.exhibit_id === "string" ? payload.exhibit_id : "";
+              if (exhibitId) {
+                liveExhibitIdRef.current = exhibitId;
+                examinerPromptedExhibitRef.current = false;
+                candidateSpokeSinceExhibitRef.current = false;
+                setLiveExhibitId(exhibitId);
+              }
+              return;
+            }
+
+            if (payload.type === "session_ready") {
+              readyAcknowledged = true;
+              clearTimeout(readyTimeout);
+              console.info("[AI Viva backend] Session accepted", { url: connectedUrl });
+              resolveSessionReady();
+              return;
+            }
+
+            if (payload.type === "session_error") {
+              const message = typeof payload.error === "string" ? payload.error : "Backend rejected the viva startup payload.";
+              console.error("[AI Viva backend] Session startup rejected", { url: connectedUrl, message });
+              setBackendError(message);
+              clearTimeout(readyTimeout);
+              if (firstModelAudioTimeout) clearTimeout(firstModelAudioTimeout);
+              rejectSessionReady(new Error(message));
+              rejectFirstModelAudio(new Error(message));
+              return;
+            }
+
+            console.info("[AI Viva backend] Response", summarizeBackendPayload(payload));
+
+            if (payload.binary) {
+              const audioBuffer = payload.binary instanceof Blob ? payload.binary : new Blob([payload.binary]);
+              void audioBuffer.arrayBuffer().then((buffer: ArrayBuffer) => {
+                if (buffer.byteLength < 2 || buffer.byteLength % 2 !== 0) return;
+                noteExaminerOutputForExhibit();
+                markFirstModelAudio();
+                playBackendPcm(buffer);
+              });
+              return;
+            }
+
+            const parts = payload.content?.parts ?? payload.parts ?? [];
+            const eventHasFunctionCall = parts.some((part: any) => Boolean(part.functionCall ?? part.function_call));
+            const outputText = payload.outputTranscription?.text ?? payload.output_transcription?.text;
+
+            for (const part of parts) {
+              const inlineData = part.inlineData ?? part.inline_data;
+              const mimeType = inlineData?.mimeType ?? inlineData?.mime_type;
+              const data = inlineData?.data;
+
+              if (mimeType?.toLowerCase().startsWith("audio/pcm") && typeof data === "string") {
+                const audioData = decodeBase64Audio(data);
+                if (!audioData || audioData.byteLength < 2 || audioData.byteLength % 2 !== 0) {
+                  console.warn("[AI Viva audio] Ignoring invalid PCM audio chunk", {
+                    mimeType,
+                    encodedLength: data.length,
+                  });
+                  continue;
+                }
+                noteExaminerOutputForExhibit();
+                markFirstModelAudio();
+                const sampleRate = Number(/rate=(\d+)/i.exec(mimeType)?.[1]) || 24000;
+                playBackendPcm(audioData, sampleRate);
+              }
+            }
+
+            const inputText = payload.inputTranscription?.text ?? payload.input_transcription?.text;
+            if (typeof inputText === "string" && inputText) {
+              if (liveExhibitIdRef.current && examinerPromptedExhibitRef.current && !eventHasFunctionCall) {
+                candidateSpokeSinceExhibitRef.current = true;
+              }
+              const isNewCandidateTurn = !transcriptPartsRef.current.input;
+              const delta = inputText.startsWith(transcriptPartsRef.current.input)
+                ? inputText.slice(transcriptPartsRef.current.input.length)
+                : inputText;
+              transcriptPartsRef.current.input = inputText;
+              appendTranscript("candidate", delta);
+              setCandidateLiveTranscript((current) => {
+                if (isNewCandidateTurn) return inputText;
+                return inputText.startsWith(current) ? inputText : `${current} ${delta}`.trim();
+              });
+            }
+
+            if (typeof outputText === "string" && outputText) {
+              noteExaminerOutputForExhibit();
+              const delta = outputText.startsWith(transcriptPartsRef.current.output)
+                ? outputText.slice(transcriptPartsRef.current.output.length)
+                : outputText;
+              transcriptPartsRef.current.output = outputText;
+              appendTranscript("ai", delta);
+              setTranscript(outputText);
+            } else {
+              for (const part of parts) {
+                const textValue = typeof part.text === "string" ? part.text : "";
+                if (textValue.trim()) {
+                  noteExaminerOutputForExhibit();
+                  appendTranscript("ai", textValue);
+                  setTranscript((current) => `${current} ${textValue}`.trim());
+                }
+              }
+            }
+
+            if (payload.interrupted) {
+              stopPlayback();
+            }
+
+            if (payload.turnComplete || payload.turn_complete) {
+              transcriptPartsRef.current = { input: "", output: "" };
+            }
+
+            const payloadText = typeof payload.text === "string" ? payload.text :
+              typeof payload.message === "string" ? payload.message :
+              typeof payload.question === "string" ? payload.question :
+              typeof payload.response === "string" ? payload.response : "";
+
+            if (!payloadText) return;
+            noteExaminerOutputForExhibit();
+            appendTranscript("ai", payloadText);
+            setTranscript((prev) => `${prev} ${payloadText}`.trim());
+        };
+
+        const startupPayload = normalizeSessionStartPayload({
+          candidate: {
+            name: candidate?.name?.trim() || "candidate",
+            email: candidate?.email?.trim() || "",
+          },
+          case: vivaCase,
+          meta: { source: "urologics-web" },
+        });
+        const authoritativeCase = {
+          ...startupPayload.case,
+          session_authority: "This case replaces every sample case and rubric in any agent instructions. Use only this API case, its exhibits, rules, and marking criteria. Do not import diagnoses or marking points from another case.",
+        };
+
+        ws.send(JSON.stringify({
+          ...startupPayload,
+          case: authoritativeCase,
+          examiner: examiner ? {
+            id: examiner.id,
+            name: examiner.name,
+            title: examiner.title,
+            personality: examiner.personality,
+            languageCode: examiner.languageCode,
+          } : undefined,
+          mode,
+        }));
+        await sessionReady;
+        if (ws.readyState !== WebSocket.OPEN) {
+          throw new Error("Backend WebSocket closed after accepting the viva session.");
+        }
+
+        setStartupStage("speaker");
+        const playbackError = await playbackResume;
+        if (playbackError) throw playbackError;
+        if (playbackContext.state !== "running") {
+          throw new Error("Speaker output is not ready. Play the speaker test and check your selected output device.");
+        }
+
+        setStartupStage("microphone");
+        micStreamRef.current = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            ...(micDeviceId ? { deviceId: { exact: micDeviceId } } : {}),
+          },
+        });
+
+        const micSource = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
+        const processor = new AudioWorkletNode(audioContextRef.current, "audio-processor");
+        processorRef.current = processor;
+        const silentGain = audioContextRef.current.createGain();
+        silentGain.gain.value = 0;
+        silentGainRef.current = silentGain;
+
+        let resolveFirstFrame!: () => void;
+        let rejectFirstFrame!: (error: Error) => void;
+        const firstMicFrame = new Promise<void>((resolve, reject) => {
+          resolveFirstFrame = resolve;
+          rejectFirstFrame = reject;
+        });
+        let firstFrameSeen = false;
+
+        processor.port.onmessage = (e) => {
+          const pcmData = e.data;
+          if (ws.readyState !== WebSocket.OPEN) {
+            if (!firstFrameSeen) rejectFirstFrame(new Error("Backend WebSocket closed before microphone audio was sent."));
+            return;
+          }
+          if (initialPromptSentRef.current) {
+            try {
+              ws.send(pcmData.buffer.slice(pcmData.byteOffset, pcmData.byteOffset + pcmData.byteLength));
+            } catch {
+              if (!firstFrameSeen) rejectFirstFrame(new Error("Microphone audio could not be sent to the backend."));
+              return;
+            }
+          }
+          if (!firstFrameSeen) {
+            firstFrameSeen = true;
+            resolveFirstFrame();
+          }
+        };
+
+        micSource.connect(processor);
+        processor.connect(silentGain);
+        silentGain.connect(audioContextRef.current.destination);
+
+        let micFrameTimeout: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            firstMicFrame,
+            new Promise<never>((_, reject) => {
+              micFrameTimeout = setTimeout(() => reject(new Error("Microphone audio is not reaching the backend live session.")), 5000);
+            }),
+          ]);
+        } finally {
+          if (micFrameTimeout) clearTimeout(micFrameTimeout);
+        }
+
+        if (ws.readyState !== WebSocket.OPEN) {
+          throw new Error("Backend WebSocket closed during microphone startup.");
+        }
+        if (audioContextRef.current.state !== "running") {
+          throw new Error("Microphone audio processing stopped before the viva was ready.");
+        }
+
+        setStartupStage("gemini");
+        waitingForFirstModelAudio = true;
+        firstModelAudioTimeout = setTimeout(() => {
+          waitingForFirstModelAudio = false;
+          firstModelAudioTimeout = null;
+          rejectFirstModelAudio(new Error("Gemini Live did not return opening audio. Check the backend model access, response audio settings, and speaker output, then retry."));
+        }, 45000);
+        const candidateName = candidate?.name?.trim() || "there";
+        initialPromptSentRef.current = true;
+        ws.send(JSON.stringify({
+          type: "text",
+          text: `Please begin the viva. My name is ${candidateName}.`,
+        }));
+        await firstModelAudio;
+        return;
+      }
+
+      const res = await fetch(appPath("/api/viva/live/session"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vivaCase, persona }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          caseId: vivaCase?.id,
+          case: vivaCase,
+          candidate: {
+            name: candidate?.name?.trim() || "candidate",
+            email: candidate?.email?.trim() || "",
+          },
+          examinerId: examiner?.id,
+          mode,
+        }),
       });
       const payload = (await res.json()) as {
         token?: string;
@@ -70,78 +747,186 @@ export function useGeminiLive(vivaCase: any, persona: any) {
       }
       const { token, model } = payload;
 
-      const live = new GoogleGenAI({ 
+      const live = new GoogleGenAI({
         apiKey: token,
         httpOptions: { apiVersion: "v1alpha" }
       });
 
-      // 1. Setup Audio Context
-      audioContextRef.current = new AudioContext({ sampleRate: 16000 });
-      await audioContextRef.current.audioWorklet.addModule("/audio-processor.js");
-
-      // 2. Connect to Gemini Live
-      sessionRef.current = await live.live.connect({
-        model,
-        config: { responseModalities: [Modality.AUDIO] },
-        callbacks: {
-          onmessage: (msg: any) => {
-            // Handle Audio from AI
-            if (msg.serverContent?.modelTurn?.parts) {
-              msg.serverContent.modelTurn.parts.forEach((part: any) => {
-                if (part.inlineData?.mimeType?.includes("audio/pcm")) {
-                  playAudioChunk(part.inlineData.data);
-                }
-                if (part.text) {
-                  setTranscript(prev => prev + " " + part.text);
-                }
-              });
-            }
-            
-            // Handle Interruption (Server tells us if user interrupted)
-            if (msg.serverContent?.interrupted) {
-              nextPlayTimeRef.current = 0; // Reset playback queue
-            }
-          },
-          onerror: (err: any) => {
-            console.error("Live Error:", err);
-            stopSession();
-          },
-          onclose: () => setActive(false),
-        }
+      let resolveSetup!: () => void;
+      let rejectSetup!: (error: Error) => void;
+      let setupWasReady = false;
+      let socketClosed = false;
+      const setupComplete = new Promise<void>((resolve, reject) => {
+        resolveSetup = resolve;
+        rejectSetup = reject;
+      });
+      let connectTimeout: ReturnType<typeof setTimeout> | undefined;
+      const connectTimedOut = new Promise<never>((_, reject) => {
+        connectTimeout = setTimeout(() => reject(new Error("Timed out connecting to the Gemini Live WebSocket.")), 30000);
       });
 
-      // 3. Setup Microphone and Stream to Gemini
-      micStreamRef.current = await navigator.mediaDevices.getUserMedia({ 
+      try {
+        sessionRef.current = await Promise.race([live.live.connect({
+          model,
+          config: {
+            responseModalities: [Modality.AUDIO],
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+          },
+          callbacks: {
+            onopen: () => setStartupStage("websocket"),
+            onmessage: (msg: any) => {
+              if (msg.setupComplete) {
+                setupWasReady = true;
+                setStartupStage("gemini");
+                resolveSetup();
+                return;
+              }
+              if (msg.serverContent?.modelTurn?.parts) {
+                msg.serverContent.modelTurn.parts.forEach((part: any) => {
+                  if (part.inlineData?.mimeType?.includes("audio/pcm")) {
+                    playAudioChunk(part.inlineData.data);
+                  }
+                  if (part.text) {
+                    setTranscript(prev => prev + " " + part.text);
+                  }
+                });
+              }
+              if (msg.serverContent?.interrupted) {
+                stopPlayback();
+              }
+              const inputText = msg.serverContent?.inputTranscription?.text;
+              if (inputText) {
+                const isNewCandidateTurn = !transcriptPartsRef.current.input;
+                const delta = inputText.startsWith(transcriptPartsRef.current.input)
+                  ? inputText.slice(transcriptPartsRef.current.input.length)
+                  : inputText;
+                transcriptPartsRef.current.input = inputText;
+                appendTranscript("candidate", delta);
+                setCandidateLiveTranscript((current) => {
+                  if (isNewCandidateTurn) return inputText;
+                  return inputText.startsWith(current) ? inputText : `${current} ${delta}`.trim();
+                });
+              }
+              const outputText = msg.serverContent?.outputTranscription?.text;
+              if (outputText) {
+                const delta = outputText.startsWith(transcriptPartsRef.current.output)
+                  ? outputText.slice(transcriptPartsRef.current.output.length)
+                  : outputText;
+                transcriptPartsRef.current.output = outputText;
+                appendTranscript("ai", delta);
+                setTranscript(outputText);
+              }
+            },
+            onerror: (err: any) => {
+              console.error("Live Error:", err);
+              const message = err?.message || err?.error?.message || "Gemini Live connection failed.";
+              rejectSetup(new Error(message));
+              stopSession();
+            },
+            onclose: () => {
+              socketClosed = true;
+              setActive(false);
+              readyRef.current = false;
+              if (!setupWasReady) rejectSetup(new Error("Gemini closed the connection before the live session was ready."));
+            },
+          }
+        }), connectTimedOut]);
+      } finally {
+        if (connectTimeout) clearTimeout(connectTimeout);
+      }
+
+      setStartupStage((current) => current === "server" ? "websocket" : current);
+      let setupTimeout: ReturnType<typeof setTimeout> | undefined;
+      setupTimeout = setTimeout(() => rejectSetup(new Error("Timed out waiting for Gemini Live session setup.")), 20000);
+      try {
+        await setupComplete;
+      } finally {
+        if (setupTimeout) clearTimeout(setupTimeout);
+      }
+
+      setStartupStage("microphone");
+      micStreamRef.current = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
-        } 
+          autoGainControl: true,
+          ...(micDeviceId ? { deviceId: { exact: micDeviceId } } : {}),
+        }
       });
-      
+
       const micSource = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
       const processor = new AudioWorkletNode(audioContextRef.current, "audio-processor");
-      
+      processorRef.current = processor;
+      const silentGain = audioContextRef.current.createGain();
+      silentGain.gain.value = 0;
+      silentGainRef.current = silentGain;
+      let resolveFirstFrame!: () => void;
+      const firstMicFrame = new Promise<void>((resolve) => { resolveFirstFrame = resolve; });
+      let firstFrameSeen = false;
+
       processor.port.onmessage = (e) => {
-        const pcmData = e.data; // Int16Array from processor
-        // Convert to base64 for Gemini
+        const pcmData = e.data;
         const base64 = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
-        sessionRef.current?.sendRealtimeInput([{
-          mimeType: "audio/pcm;rate=16000",
-          data: base64
-        }]);
+        sessionRef.current?.sendRealtimeInput({
+          audio: { mimeType: "audio/pcm;rate=16000", data: base64 },
+        });
+        if (!firstFrameSeen) {
+          firstFrameSeen = true;
+          resolveFirstFrame();
+        }
       };
 
       micSource.connect(processor);
+      processor.connect(silentGain);
+      silentGain.connect(audioContextRef.current.destination);
+      let micFrameTimeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          firstMicFrame,
+          new Promise<never>((_, reject) => {
+            micFrameTimeout = setTimeout(() => reject(new Error("Microphone audio is not reaching the live session. Check the selected input device.")), 5000);
+          }),
+        ]);
+      } finally {
+        if (micFrameTimeout) clearTimeout(micFrameTimeout);
+      }
+      if (socketClosed) throw new Error("Gemini Live disconnected during microphone startup. Please try again.");
+      setStartupStage("ready");
+      readyRef.current = true;
       setActive(true);
     } catch (err) {
       console.error("Failed to start live session:", err);
+      setBackendError(err instanceof Error ? err.message : "Unable to start the live viva.");
+      setStartupStage("error");
       stopSession();
       throw err;
     } finally {
       setConnecting(false);
     }
-  }, [vivaCase, persona, playAudioChunk, stopSession]);
+  }, [candidate, vivaCase, idToken, playAudioChunk, playBackendPcm, stopSession, stopPlayback, appendTranscript, noteExaminerOutputForExhibit]);
+
+  const beginViva = useCallback(() => {
+    if (!sessionRef.current || !readyRef.current) throw new Error("The Gemini Live session is not ready yet.");
+    if (sessionRef.current instanceof WebSocket && initialPromptSentRef.current) return;
+    const candidateName = candidate?.name?.trim() || "there";
+    const openingPrompt = `Please begin the viva. My name is ${candidateName}.`;
+
+    if (typeof (sessionRef.current as any).sendClientContent === "function") {
+      (sessionRef.current as any).sendClientContent({
+        turns: [{ role: "user", parts: [{ text: openingPrompt }] }],
+        turnComplete: true,
+      });
+      return;
+    }
+
+    if (sessionRef.current instanceof WebSocket && sessionRef.current.readyState === WebSocket.OPEN) {
+      sessionRef.current.send(JSON.stringify({
+        type: "text",
+        text: openingPrompt,
+      }));
+    }
+  }, [candidate]);
 
   useEffect(() => {
     return () => {
@@ -153,8 +938,17 @@ export function useGeminiLive(vivaCase: any, persona: any) {
     active,
     connecting,
     startSession,
+    beginViva,
     stopSession,
+    resumeAudioOutput,
     transcript,
+    candidateLiveTranscript,
+    liveExhibitId,
+    clearLiveExhibit,
+    speaking,
+    turns,
     amplitude,
+    startupStage,
+    backendError,
   };
 }

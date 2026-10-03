@@ -6,12 +6,14 @@ import { useEffect, useRef } from "react";
 type Props = {
   cameraOn: boolean;
   listening: boolean;
+  transcript?: string;
   statusDot?: "idle" | "speaking" | "keyword" | "silence";
 };
 
 export function CandidatePanel({
   cameraOn,
   listening,
+  transcript = "",
   statusDot = "idle",
 }: Props) {
 
@@ -132,18 +134,6 @@ export function CandidatePanel({
           <span className="hidden sm:inline">Listening</span>
         </div>
       )}
-
-      {/* LIVE TRANSCRIPT */}
-
-      {/* {transcript && (
-        <div
-          className="absolute bottom-1 left-1/2 -translate-x-1/2
-          bg-black/70 backdrop-blur px-2 md:px-4 py-1 md:py-2 rounded-lg
-          text-xs md:text-sm text-white max-w-[95%] md:max-w-[90%] text-center line-clamp-2"
-        >
-          {transcript}
-        </div>
-      )} */}
 
     </div>
   );
