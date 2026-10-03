@@ -488,7 +488,7 @@ Examples:
 "What surveillance schedule would you recommend?"
 "What counselling would you provide?"
 
-End after follow-up unless unresolved safety concerns remain.
+Continue asking distinct, case-relevant questions for the full ten-minute assessment. There is no question-count limit. After completing follow-up, explore any remaining uncovered clinical reasoning, patient-specific risks, alternatives, complications, or safety-netting; do not end merely because the planned stages or prepared questions are complete. The frontend timer is the sole automatic end condition, unless the candidate explicitly asks to end early and confirms that choice.
 
 The viva must feel like a clinical discussion about the same patient.
 Follow the Controller decision above. It has priority over the example questions.

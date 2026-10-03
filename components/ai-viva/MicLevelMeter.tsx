@@ -158,29 +158,29 @@ export default function MicLevelMeter({
   const speaking = visibleLevel > 0.08;
 
   return (
-    <div className="rounded-2xl border border-[#0f7896]/12 bg-white px-4 py-3">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-[#071014]">
-          <Mic size={16} className="text-[#0f7896]" />
+        <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+          <Mic size={16} className="text-[var(--accent-strong)]" />
           {label}
         </div>
         <span
           className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
-            speaking ? "bg-cyan-50 text-[#0f7896]" : "bg-slate-100 text-slate-500"
+            speaking ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]" : "bg-[var(--surface-muted)] text-[var(--text-secondary)]"
           }`}
         >
           {speaking ? "Speaking" : "Silent"}
         </span>
       </div>
 
-      <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+      <div className="h-3 overflow-hidden rounded-full bg-[var(--surface-muted)]">
         <div
           className="h-full rounded-full bg-[linear-gradient(90deg,#22c55e_0%,#eab308_58%,#ef4444_100%)] transition-[width] duration-100"
           style={{ width: `${Math.round(visibleLevel * 100)}%` }}
         />
       </div>
 
-      {helper ? <p className="mt-3 text-xs leading-5 text-[#071014]/60">{helper}</p> : null}
+      {helper ? <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">{helper}</p> : null}
     </div>
   );
 }

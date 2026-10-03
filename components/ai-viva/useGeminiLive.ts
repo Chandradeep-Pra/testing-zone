@@ -204,6 +204,11 @@ export function useGeminiLive(
   const transcriptPartsRef = useRef({ input: "", output: "" });
   const speakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const silenceCheckInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const candidateSpeechVersionRef = useRef(0);
+  const micSpeechActiveRef = useRef(false);
+  const micSpeechStartFramesRef = useRef(0);
+  const micSilenceFramesRef = useRef(0);
   const speakingRef = useRef(false);
   const initialPromptSentRef = useRef(false);
   const firstBackendAudioLoggedRef = useRef(false);
@@ -256,6 +261,8 @@ export function useGeminiLive(
     initialPromptSentRef.current = false;
     if (sessionEndTimerRef.current) clearTimeout(sessionEndTimerRef.current);
     sessionEndTimerRef.current = null;
+    if (silenceCheckInTimerRef.current) clearTimeout(silenceCheckInTimerRef.current);
+    silenceCheckInTimerRef.current = null;
     const socket = sessionRef.current;
     sessionRef.current = null;
     if (socket instanceof WebSocket && socket.readyState === WebSocket.OPEN) {
@@ -392,6 +399,10 @@ export function useGeminiLive(
     liveExhibitIdRef.current = null;
     setSessionEndReason(null);
     backendSessionReadyRef.current = false;
+    candidateSpeechVersionRef.current = 0;
+    micSpeechActiveRef.current = false;
+    micSpeechStartFramesRef.current = 0;
+    micSilenceFramesRef.current = 0;
     setSessionEndReason(null);
     examinerPromptedExhibitRef.current = false;
     candidateSpokeSinceExhibitRef.current = false;
@@ -592,6 +603,9 @@ export function useGeminiLive(
 
             const inputText = payload.inputTranscription?.text ?? payload.input_transcription?.text;
             if (typeof inputText === "string" && inputText) {
+              candidateSpeechVersionRef.current += 1;
+              if (silenceCheckInTimerRef.current) clearTimeout(silenceCheckInTimerRef.current);
+              silenceCheckInTimerRef.current = null;
               if (liveExhibitIdRef.current && examinerPromptedExhibitRef.current && !eventHasFunctionCall) {
                 candidateSpokeSinceExhibitRef.current = true;
               }
@@ -631,6 +645,38 @@ export function useGeminiLive(
             }
 
             if (payload.turnComplete || payload.turn_complete) {
+              const hasModelOutput = Boolean(outputText) || parts.some((part: any) =>
+                Boolean(part.text || part.inlineData || part.inline_data),
+              );
+              const isExaminerTurn = payload.author !== "user" && hasModelOutput;
+              if (isExaminerTurn) {
+                if (silenceCheckInTimerRef.current) clearTimeout(silenceCheckInTimerRef.current);
+                const playbackContext = playbackContextRef.current;
+                const queuedAudioMs = playbackContext
+                  ? Math.max(0, (nextPlayTimeRef.current - playbackContext.currentTime) * 1000)
+                  : 0;
+                const armSilenceCheck = (speechVersion: number, delayMs: number) => {
+                  silenceCheckInTimerRef.current = setTimeout(() => {
+                    silenceCheckInTimerRef.current = null;
+                    if (speechVersion !== candidateSpeechVersionRef.current || micSpeechActiveRef.current) {
+                      armSilenceCheck(candidateSpeechVersionRef.current, 5000);
+                      return;
+                    }
+
+                    const socket = sessionRef.current;
+                    if (
+                      !backendSessionReadyRef.current ||
+                      !(socket instanceof WebSocket) ||
+                      socket.readyState !== WebSocket.OPEN
+                    ) return;
+                    socket.send(JSON.stringify({ type: "candidate_silence_timeout" }));
+                  }, delayMs);
+                };
+                armSilenceCheck(
+                  candidateSpeechVersionRef.current,
+                  Math.ceil(queuedAudioMs) + 5000,
+                );
+              }
               transcriptPartsRef.current = { input: "", output: "" };
             }
 
@@ -709,6 +755,35 @@ export function useGeminiLive(
 
         processor.port.onmessage = (e) => {
           const pcmData = e.data;
+          const samples = new Int16Array(
+            pcmData.buffer,
+            pcmData.byteOffset,
+            pcmData.byteLength / Int16Array.BYTES_PER_ELEMENT,
+          );
+          let energy = 0;
+          for (let index = 0; index < samples.length; index += 1) {
+            const sample = samples[index] / 32768;
+            energy += sample * sample;
+          }
+          const rms = Math.sqrt(energy / Math.max(samples.length, 1));
+          if (rms >= 0.015) {
+            micSilenceFramesRef.current = 0;
+            micSpeechStartFramesRef.current += 1;
+            if (micSpeechStartFramesRef.current >= 3 && !micSpeechActiveRef.current) {
+              micSpeechActiveRef.current = true;
+              candidateSpeechVersionRef.current += 1;
+              if (silenceCheckInTimerRef.current) clearTimeout(silenceCheckInTimerRef.current);
+              silenceCheckInTimerRef.current = null;
+              const activeSocket = sessionRef.current;
+              if (activeSocket instanceof WebSocket && activeSocket.readyState === WebSocket.OPEN) {
+                activeSocket.send(JSON.stringify({ type: "candidate_speech_activity" }));
+              }
+            }
+          } else {
+            micSpeechStartFramesRef.current = 0;
+            micSilenceFramesRef.current += 1;
+            if (micSilenceFramesRef.current >= 10) micSpeechActiveRef.current = false;
+          }
           if (ws.readyState !== WebSocket.OPEN) {
             if (!firstFrameSeen) rejectFirstFrame(new Error("Backend WebSocket closed before microphone audio was sent."));
             return;

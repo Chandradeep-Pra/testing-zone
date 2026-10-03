@@ -38,7 +38,7 @@ type CandidateConversationMessage =
       description?: string;
     };
 type FastPauseState = "idle" | "monitoring" | "detected";
-type CandidateStatusDot = "idle" | "speaking" | "keyword" | "silence";
+type CandidateStatusDot = "idle" | "speaking" | "silence";
 type StoredCandidateInfo = {
   name?: string;
   email?: string;
@@ -52,31 +52,6 @@ type StoredCandidateInfo = {
   selectedCase?: VivaCaseRecord;
   selectedMode?: VivaMode;
 };
-
-function buildConversationFromQaHistory(history: QaHistoryItem[]) {
-  return history.flatMap((item) => {
-    const entries = [];
-
-    if (item.question?.trim()) {
-      entries.push({
-        id: crypto.randomUUID(),
-        role: "ai",
-        text: item.question.trim(),
-      });
-    }
-
-    if (item.answer?.trim()) {
-      entries.push({
-        id: crypto.randomUUID(),
-        role: "candidate",
-        text: item.answer.trim(),
-        live: false,
-      });
-    }
-
-    return entries;
-  });
-}
 
 function resolveExhibitSrc(src: string) {
   return src.startsWith("/") ? appPath(src) : src;
@@ -137,7 +112,6 @@ export default function VivaVoiceAi({
   initialCandidate?: { name: string; email: string };
   aiMode?: boolean;
 }) {
-  const fastModeTotalDurationSec = 10 * 60;
   const { user } = useAuth();
   const isFastMode = selectedMode === "fast";
 
@@ -148,9 +122,6 @@ export default function VivaVoiceAi({
   const {
     generateScore,
     next,
-    doesAnswerMatchCurrentFastQuestion,
-    getCurrentFastQuestionKeywordProgress,
-    getHistory,
     prefetchNextCalmPhase,
     prepareCalmCase,
     getMedicalTerminology,
@@ -213,7 +184,6 @@ export default function VivaVoiceAi({
   const fillerIndexRef = useRef(0);
   const liveCandidateMsgId = useRef<string | null>(null);
   const advanceLockRef = useRef(false);
-  const keywordFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const answerPrefixRef = useRef("");
   const messagesRef = useRef<CandidateConversationMessage[]>([]);
   const selectedMicDeviceIdRef = useRef<string | undefined>(undefined);
@@ -228,12 +198,9 @@ export default function VivaVoiceAi({
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [keywordDetected, setKeywordDetected] = useState(false);
   const [candidateTranscript, setCandidateTranscript] = useState("");
   const [fastPauseState, setFastPauseState] = useState<FastPauseState>("idle");
   const [candidateStatusDot, setCandidateStatusDot] = useState<CandidateStatusDot>("idle");
-  const [fastTimerStarted, setFastTimerStarted] = useState(false);
-  const fastTimerResetKey = 0;
   const [historyOpen, setHistoryOpen] = useState(false);
   const [preparingCase, setPreparingCase] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -241,13 +208,9 @@ export default function VivaVoiceAi({
   const [exitConfirmationPending, setExitConfirmationPending] = useState(false);
   const [timerClosingComplete, setTimerClosingComplete] = useState(false);
 
-  const fastKeywordProgress = isFastMode
-    ? getCurrentFastQuestionKeywordProgress(candidateTranscript)
-    : { matchedKeywords: [], totalKeywords: 0, allMatched: false };
-
   const vivaDurationSec = CALM_VIVA_TOTAL_DURATION_SEC;
-  const countdownRunning = (isFastMode ? fastTimerStarted : vivaStarted) && !ending;
-  const countdownTotal = isFastMode ? fastModeTotalDurationSec : vivaDurationSec;
+  const countdownRunning = vivaStarted && !ending;
+  const countdownTotal = vivaDurationSec;
 
   function getExaminerSpeechOptions() {
     return {
@@ -291,7 +254,7 @@ export default function VivaVoiceAi({
         void endVivaRef.current?.();
       }
     },
-    isFastMode ? `fast-total-timer-${fastTimerResetKey}` : vivaDurationSec
+    vivaDurationSec
   );
   const elapsedSec = Math.max(0, countdownTotal - (minutes * 60 + seconds));
   const calmPhaseTiming = getCalmPhaseTiming(elapsedSec);
@@ -320,26 +283,11 @@ export default function VivaVoiceAi({
     messagesRef.current = messages;
   }, [messages]);
 
-  function flashKeywordDetected() {
-    setKeywordDetected(true);
-    setCandidateStatusDot("keyword");
-
-    if (keywordFlashTimeoutRef.current) {
-      clearTimeout(keywordFlashTimeoutRef.current);
-    }
-
-    keywordFlashTimeoutRef.current = setTimeout(() => {
-      setKeywordDetected(false);
-      setCandidateStatusDot((current) => (current === "keyword" ? "idle" : current));
-      keywordFlashTimeoutRef.current = null;
-    }, 700);
-  }
-
   function beginListeningForAnswer(
     existingText = "",
     reuseCurrentMessage = false
   ) {
-    if (endingRef.current) {
+    if (endingRef.current || isFastMode) {
       return;
     }
 
@@ -394,8 +342,7 @@ export default function VivaVoiceAi({
       !vivaStarted ||
       endingRef.current ||
       advanceLockRef.current ||
-      !latestAnswer ||
-      (isFastMode && doesAnswerMatchCurrentFastQuestion(latestAnswer))
+      !latestAnswer
     ) {
       return;
     }
@@ -419,8 +366,7 @@ export default function VivaVoiceAi({
       !vivaStarted ||
       endingRef.current ||
       advanceLockRef.current ||
-      !latestAnswer ||
-      (isFastMode && doesAnswerMatchCurrentFastQuestion(latestAnswer))
+      !latestAnswer
     ) {
       return;
     }
@@ -429,7 +375,7 @@ export default function VivaVoiceAi({
     setCandidateStatusDot("speaking");
     const generation = fastSilenceGenerationRef.current + 1;
     fastSilenceGenerationRef.current = generation;
-    const inactivityDelayMs = isFastMode ? 2000 : 4000;
+    const inactivityDelayMs = 4000;
     const remainingDelayMs = Math.max(
       0,
       inactivityDelayMs - (Date.now() - lastSpeechActivityAtRef.current),
@@ -443,26 +389,6 @@ export default function VivaVoiceAi({
 
       handleSpeechPause(latestCandidateTranscriptRef.current || latestAnswer);
     }, remainingDelayMs);
-  }
-
-  function tryAdvanceFastMode(answerText: string) {
-    if (
-      !isFastMode ||
-      !vivaStarted ||
-      endingRef.current ||
-      advanceLockRef.current
-    ) {
-      return false;
-    }
-
-    if (!doesAnswerMatchCurrentFastQuestion(answerText)) {
-      return false;
-    }
-
-    flashKeywordDetected();
-    clearFastSilencePromptTimer();
-    void submitCurrentAnswer(answerText);
-    return true;
   }
 
   async function finalizeFromTranscriptFallback() {
@@ -484,10 +410,6 @@ export default function VivaVoiceAi({
 
     setCandidateTranscript(fallbackText);
     latestCandidateTranscriptRef.current = fallbackText;
-
-    if (tryAdvanceFastMode(fallbackText)) {
-      return;
-    }
 
     answerPrefixRef.current = fallbackText;
     syncCandidateMessage(fallbackText, false);
@@ -517,31 +439,17 @@ export default function VivaVoiceAi({
         )
       );
 
-      if (!tryAdvanceFastMode(combinedInterim)) {
-        scheduleSilenceAdvance(combinedInterim, true);
-      }
+      scheduleSilenceAdvance(combinedInterim, true);
     },
 
     // The STT hook invokes this only after its server reports speechEnded.
-    // Calm mode therefore waits for the candidate's full answer and advances
-    // on silence; keyword-triggered advancement remains Fast-only above.
+    // This local speech input is retained for the non-live calm fallback.
     async (finalText) => {
       if (ending || endingRef.current || advanceLockRef.current) return;
 
       const combinedFinalText = mergeWithAnswerPrefix(finalText);
       latestCandidateTranscriptRef.current = combinedFinalText;
       setCandidateTranscript(combinedFinalText);
-
-      if (isFastMode) {
-        if (tryAdvanceFastMode(combinedFinalText)) {
-          return;
-        }
-
-        answerPrefixRef.current = combinedFinalText;
-        syncCandidateMessage(combinedFinalText, false);
-        scheduleSilenceAdvance(combinedFinalText);
-        return;
-      }
 
       answerPrefixRef.current = combinedFinalText;
       syncCandidateMessage(combinedFinalText, false);
@@ -555,31 +463,6 @@ export default function VivaVoiceAi({
   );
 
   useEffect(() => {
-    if (
-      !isFastMode ||
-      !vivaStarted ||
-      ending ||
-      endingRef.current ||
-      advanceLockRef.current ||
-      !fastKeywordProgress.allMatched
-    ) {
-      return;
-    }
-
-    flashKeywordDetected();
-    clearFastSilencePromptTimer();
-    void submitCurrentAnswer(
-      mergeWithAnswerPrefix(getTranscriptBuffer() || candidateTranscript || answerPrefixRef.current)
-    );
-  }, [
-    isFastMode,
-    vivaStarted,
-    ending,
-    fastKeywordProgress.allMatched,
-    candidateTranscript,
-  ]);
-
-  useEffect(() => {
     endingRef.current = false;
     return () => {
       endingRef.current = true;
@@ -588,9 +471,6 @@ export default function VivaVoiceAi({
       }
       if (fastSilenceTimeoutRef.current) {
         clearTimeout(fastSilenceTimeoutRef.current);
-      }
-      if (keywordFlashTimeoutRef.current) {
-        clearTimeout(keywordFlashTimeoutRef.current);
       }
       clearFastSilencePromptTimer();
       setCandidateStatusDot("idle");
@@ -710,7 +590,7 @@ export default function VivaVoiceAi({
     latestCandidateTranscriptRef.current = finalAnswer;
     syncCandidateMessage(finalAnswer, false);
 
-    if (!isFastMode) {
+    if (hasStartedRef.current) {
       setThinking(true);
 
       fillerTimeoutRef.current = setTimeout(() => {
@@ -762,7 +642,6 @@ export default function VivaVoiceAi({
       if (endingRef.current) return false;
       // Start the exam clock only once the first question is actually playing.
       setVivaStarted(true);
-      if (isFastMode) setFastTimerStarted(true);
       return true;
     } catch (error) {
       if (endingRef.current) return false;
@@ -794,8 +673,8 @@ export default function VivaVoiceAi({
     startupStage: liveStartupStage,
     backendError: liveBackendError,
   } = useGeminiLive(vivaCase, user?.idToken, candidate);
-  const examinerSpeaking = liveActive && !isFastMode ? liveSpeaking : speaking;
-  const stageTranscript = liveActive && !isFastMode ? liveTranscript : transcript;
+  const examinerSpeaking = liveActive ? liveSpeaking : speaking;
+  const stageTranscript = liveActive ? liveTranscript : transcript;
   const liveExhibit = liveExhibitId
     ? vivaCase.exhibits.find((item) => item.id === liveExhibitId && item.kind.toLowerCase() === "image")
     : undefined;
@@ -806,7 +685,7 @@ export default function VivaVoiceAi({
   }, [liveBackendError]);
 
   useEffect(() => {
-    const candidateSpeech = isFastMode ? candidateTranscript : candidateLiveTranscript;
+    const candidateSpeech = candidateLiveTranscript;
     if (
       !vivaStarted ||
       endingRef.current ||
@@ -822,18 +701,16 @@ export default function VivaVoiceAi({
     exitRequestOriginalTextRef.current = candidateSpeech;
     setExitConfirmationPending(true);
 
-    if (isFastMode) {
-      void speakAsExaminer("Would you like to end the viva now? Please say yes or no.");
-    } else if (!sendSessionControl("candidate_exit_request")) {
+    if (!sendSessionControl("candidate_exit_request")) {
       exitConfirmationPendingRef.current = false;
       setExitConfirmationPending(false);
       setSessionError("The examiner connection is unavailable, so the viva cannot confirm an early exit yet.");
     }
-  }, [candidateTranscript, candidateLiveTranscript, isFastMode, vivaStarted, sendSessionControl]);
+  }, [candidateLiveTranscript, vivaStarted, sendSessionControl]);
 
   useEffect(() => {
     if (!exitConfirmationPendingRef.current || endingRef.current) return;
-    const candidateSpeech = isFastMode ? candidateTranscript : candidateLiveTranscript;
+    const candidateSpeech = candidateLiveTranscript;
     if (!candidateSpeech.trim() || candidateSpeech === exitRequestOriginalTextRef.current) return;
     const answer = getExitConfirmationAnswer(candidateSpeech);
     if (!answer) return;
@@ -843,25 +720,18 @@ export default function VivaVoiceAi({
     exitRequestHandledRef.current = false;
     exitRequestOriginalTextRef.current = "";
     if (answer === "no") {
-      if (isFastMode) {
-        void speakAsExaminer("Understood. We will continue.");
-      } else {
-        sendSessionControl("exit_confirmation_answer", false);
-      }
+      sendSessionControl("exit_confirmation_answer", false);
       return;
     }
 
-    if (isFastMode) {
-      void speakAsExaminer("Thank you. We will end the viva now.", () => {
-        void endVivaRef.current?.();
-      });
-    } else {
-      sendSessionControl("exit_confirmation_answer", true);
-    }
-  }, [candidateTranscript, candidateLiveTranscript, isFastMode, sendSessionControl]);
+    sendSessionControl("exit_confirmation_answer", true);
+  }, [candidateLiveTranscript, sendSessionControl]);
 
   useEffect(() => {
-    if (sessionEndReason === "candidate_confirmed_early_exit" && !endingRef.current) {
+    if (
+      (sessionEndReason === "candidate_confirmed_early_exit" || sessionEndReason === "candidate_no_response") &&
+      !endingRef.current
+    ) {
       void endVivaRef.current?.();
     } else if (sessionEndReason === "timer_closing_ready") {
       setTimerClosingComplete(true);
@@ -877,15 +747,8 @@ export default function VivaVoiceAi({
   useEffect(() => {
     if (!vivaStarted || ending || secondsLeft <= 0 || secondsLeft > 10 || timerClosingPromptSentRef.current) return;
     timerClosingPromptSentRef.current = true;
-    if (isFastMode) {
-      stopExaminerAudio();
-      void speakAsExaminer("Hey, we are at the end of the session. Thank you.", () => {
-        setTimerClosingComplete(true);
-      }).catch(() => setTimerClosingComplete(true));
-    } else {
-      sendSessionControl("timer_closing");
-    }
-  }, [vivaStarted, ending, secondsLeft, isFastMode, stopExaminerAudio, sendSessionControl]);
+    sendSessionControl("timer_closing");
+  }, [vivaStarted, ending, secondsLeft, sendSessionControl]);
 
   function revealControls() {
     setControlsVisible(true);
@@ -916,27 +779,6 @@ export default function VivaVoiceAi({
     setPreparingCase(true);
     setSessionError(null);
 
-    if (selectedMode === "calm") {
-      try {
-        hasStartedRef.current = true;
-        examinerVoiceRef.current = examinerChoice;
-        setSelectedExaminer(examinerChoice);
-        setCameraEnabled(cameraPref);
-        setCameraOn(cameraPref);
-        selectedMicDeviceIdRef.current = micDeviceId;
-        await startLiveSession(examinerChoice, selectedMode, micDeviceId);
-        beginLiveViva();
-        setReadyVisible(false);
-        setVivaStarted(true);
-      } catch (error) {
-        hasStartedRef.current = false;
-        setSessionError(error instanceof Error ? error.message : "Unable to connect the live viva.");
-      } finally {
-        setPreparingCase(false);
-      }
-      return;
-    }
-
     hasStartedRef.current = true;
 
     examinerVoiceRef.current = examinerChoice;
@@ -956,19 +798,13 @@ export default function VivaVoiceAi({
       console.warn("Unable to save examiner preference:", error);
     }
     try {
-      // Complete the dependencies before the first question is requested.
-      await prepareSpeechConnection();
-      await prepareCalmCase();
-      const started = await startViva();
-      if (!started) {
-        hasStartedRef.current = false;
-        setReadyVisible(true);
-        return;
-      }
+      await startLiveSession(examinerChoice, selectedMode, micDeviceId);
+      beginLiveViva();
       setReadyVisible(false);
+      setVivaStarted(true);
     } catch (error) {
       hasStartedRef.current = false;
-      setSessionError(error instanceof Error ? error.message : "Unable to start your viva.");
+      setSessionError(error instanceof Error ? error.message : "Unable to connect the live viva.");
       setReadyVisible(true);
     } finally {
       if (!endingRef.current) setPreparingCase(false);
@@ -978,25 +814,19 @@ export default function VivaVoiceAi({
   async function retryCurrentQuestion() {
     if (preparingCase || endingRef.current) return;
     if (!vivaStarted) {
-      await startViva();
+      hasStartedRef.current = false;
+      await handleBegin(cameraEnabled, selectedExaminer, selectedMicDeviceIdRef.current);
+      return;
+    }
+    if (!liveActive) {
+      setSessionError("The live examiner connection has ended. Please end the viva to score the transcript collected so far.");
       return;
     }
     setSessionError(null);
-    setPreparingCase(true);
-    stop();
-    setIsListening(false);
     try {
-      applyApiResponse({ question: transcript });
-      await speakAsExaminer(transcript, () => {
-        if (endingRef.current) return;
-        markSpeechEnded();
-        beginListeningForAnswer();
-      });
+      await resumeAudioOutput();
     } catch (error) {
-      markSpeechEnded();
-      setSessionError(error instanceof Error ? error.message : "Unable to play the question.");
-    } finally {
-      setPreparingCase(false);
+      setSessionError(error instanceof Error ? error.message : "Unable to resume live audio output.");
     }
   }
 
@@ -1009,52 +839,11 @@ export default function VivaVoiceAi({
     setReportGenerationFailed(false);
     setSessionError(null);
     stopExaminerAudio();
-    if (!isFastMode) {
-      setIsListening(false);
-      stopLiveSession();
-      const liveQa = mergeCurrentCandidateAnswer(liveTurns.reduce<Array<{ question: string; answer: string }>>((rows, turn) => {
-        if (turn.role === "ai") {
-          rows.push({ question: turn.text, answer: "" });
-        } else if (rows.length) {
-          rows[rows.length - 1].answer = `${rows[rows.length - 1].answer} ${turn.text}`.trim();
-        } else {
-          rows.push({ question: "", answer: turn.text });
-        }
-        return rows;
-      }, []).filter((item) => item.question || item.answer), candidateLiveTranscript);
-      try {
-        const storedLive = localStorage.getItem("candidateInfo");
-        if (storedLive) {
-          const parsed = JSON.parse(storedLive);
-          parsed.qaHistory = liveQa;
-          parsed.conversation = liveTurns.map((turn, index) => ({
-            id: `live-${index}`,
-            role: turn.role,
-            text: turn.text,
-            live: true,
-          }));
-          localStorage.setItem("candidateInfo", JSON.stringify(parsed));
-        }
-      } catch (error) {
-        console.warn("Unable to save the live transcript locally:", error);
-      }
-      try {
-        await generateScore(liveQa);
-      } catch (error) {
-        console.error("Unable to generate the viva report:", error);
-        setSessionError(error instanceof Error ? error.message : "The viva ended, but the report could not be generated.");
-        setReportGenerationFailed(true);
-        setEnding(false);
-        endingRef.current = false;
-        advanceLockRef.current = false;
-      }
-      return;
-    }
     setIsListening(false);
+    stopLiveSession();
     stop();
     closeSocket();
-        void setAvatarListening(false);
-    // await liveAvatar.stopSession();
+    void setAvatarListening(false);
     avatarSessionActiveRef.current = false;
 
 
@@ -1063,24 +852,31 @@ export default function VivaVoiceAi({
       fillerTimeoutRef.current = null;
     }
 
-    if (keywordFlashTimeoutRef.current) {
-      clearTimeout(keywordFlashTimeoutRef.current);
-      keywordFlashTimeoutRef.current = null;
-    }
     clearFastSilencePromptTimer();
     setFastPauseState("idle");
-    setFastTimerStarted(false);
+
+    const liveQa = mergeCurrentCandidateAnswer(liveTurns.reduce<Array<{ question: string; answer: string }>>((rows, turn) => {
+      if (turn.role === "ai") {
+        rows.push({ question: turn.text, answer: "" });
+      } else if (rows.length) {
+        rows[rows.length - 1].answer = `${rows[rows.length - 1].answer} ${turn.text}`.trim();
+      } else {
+        rows.push({ question: "", answer: turn.text });
+      }
+      return rows;
+    }, []).filter((item) => item.question || item.answer), candidateLiveTranscript);
 
     try {
       const stored = localStorage.getItem("candidateInfo");
       if (stored) {
         const parsed = JSON.parse(stored);
-        const qaHistory = getHistory();
-        parsed.qaHistory = qaHistory;
-        parsed.conversation =
-          messagesRef.current.length > 0
-            ? messagesRef.current
-            : buildConversationFromQaHistory(qaHistory);
+        parsed.qaHistory = liveQa;
+        parsed.conversation = liveTurns.map((turn, index) => ({
+          id: `live-${index}`,
+          role: turn.role,
+          text: turn.text,
+          live: true,
+        }));
         parsed.selectedCaseId = vivaCase.id;
         parsed.selectedCaseTitle = vivaCase.case.title;
         parsed.selectedCase = vivaCase;
@@ -1094,7 +890,7 @@ export default function VivaVoiceAi({
     }
 
     try {
-      await generateScore();
+      await generateScore(liveQa);
     } catch (error) {
       console.error("Unable to generate the viva report:", error);
       setSessionError(error instanceof Error ? error.message : "The viva ended, but the report could not be generated.");
@@ -1107,7 +903,7 @@ export default function VivaVoiceAi({
   endVivaRef.current = endViva;
 
   useEffect(() => {
-    if (!liveActive || isFastMode) return;
+    if (!liveActive) return;
     setMessages(liveTurns.map((turn, index) => ({
       id: `live-${index}`,
       role: turn.role,
@@ -1116,7 +912,7 @@ export default function VivaVoiceAi({
     })));
     setIsListening(true);
     setCandidateStatusDot("idle");
-  }, [liveActive, isFastMode, liveTurns]);
+  }, [liveActive, liveTurns]);
 
   return (
     <main
@@ -1212,7 +1008,6 @@ export default function VivaVoiceAi({
           thinking={thinking || (liveActive && !stageTranscript)}
           listening={isListening}
           transcript={stageTranscript}
-          keywordDetected={keywordDetected}
           avatarVideo={null}
           exhibit={
             liveExhibit && liveExhibitSrc ? (

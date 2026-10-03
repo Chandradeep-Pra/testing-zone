@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Clock3,
   Filter,
-  FolderOpen,
   LockKeyhole,
   Search,
   Sparkles,
@@ -14,8 +13,9 @@ import {
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import type { VivaCaseRecord } from "@/lib/viva-case";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { VivaCaseRecord } from "@/lib/viva-case";
 import GlobalLoading from "@/components/ui/GlobalLoading";
 import { appPath } from "@/lib/app-path";
 
@@ -212,66 +212,71 @@ const VivaCasesPage: React.FC = () => {
 
   return (
     <main className="urologics-shell overflow-hidden">
-      <div className="mobile-native-page mx-auto max-w-7xl sm:px-6 sm:py-6">
-        <UrologicsHeader current="AI Viva" product="AI Viva" tag="Case library" />
+      <div className="mobile-native-page mx-auto max-w-7xl px-2 pb-8 sm:px-3 sm:py-4">
+        <UrologicsHeader current="AI Viva" product="Uro AI" tag="Case library" />
 
-        <section className="grid gap-4 py-2 sm:gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="urologics-panel p-5 sm:p-7 md:p-10">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
-              <Sparkles size={14} />
-              AI Viva
-            </div>
-            <h1 className="mobile-native-title mt-6 max-w-3xl font-semibold text-[var(--text-primary)] sm:mt-7 sm:text-5xl sm:tracking-[-0.04em]">
-              Choose a viva case.
-            </h1>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--text-secondary)] sm:mt-5 sm:text-base sm:leading-8 md:text-lg">
-              Select a case and start in calm or fast mode.
-            </p>
+        <section className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3 sm:mb-5 sm:p-4">
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setSelectedFolderKey("all")}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                selectedFolderKey === "all"
+                  ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-text)]"
+                  : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--accent-soft)]"
+              }`}
+            >
+              All cases
+            </button>
+            {allFolderGroups.map((folder) => (
+              <button
+                key={folder.key}
+                type="button"
+                onClick={() => setSelectedFolderKey(folder.key)}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  selectedFolderKey === folder.key
+                    ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-text)]"
+                    : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--accent-soft)]"
+                }`}
+              >
+                {folder.name}
+              </button>
+            ))}
           </div>
-
-          <div className="urologics-panel p-5 sm:p-7 md:p-8">
-            <div className="flex items-center gap-3 text-[var(--accent-strong)]">
-              <Sparkles size={18} />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.22em]">Filters</span>
-            </div>
-            <div className="mt-6 grid gap-4">
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                  <Search size={14} />
-                  Search
-                </label>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by title, level, or objective"
-                  className="urologics-input"
-                />
-              </div>
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                  <Filter size={14} />
-                  Level
-                </label>
-                <select
-                  value={levelFilter}
-                  onChange={(e) => setLevelFilter(e.target.value)}
-                  className="urologics-input"
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <label className="relative block">
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search cases, levels, or objectives"
+                aria-label="Search viva cases"
+                className="urologics-input !py-2.5 !pl-9"
+              />
+            </label>
+            <div className="relative">
+              <Filter size={15} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[var(--text-tertiary)]" />
+              <Select value={levelFilter} onValueChange={setLevelFilter}>
+                <SelectTrigger
+                  aria-label="Filter by level"
+                  className="urologics-input !h-auto !rounded-2xl !border-[var(--border)] !bg-[var(--surface)] !px-4 !py-2.5 !pl-9 !pr-10 !text-base shadow-none focus-visible:!border-[var(--accent)] focus-visible:!bg-[var(--surface-raised)] focus-visible:!ring-4 focus-visible:!ring-[var(--focus)]"
                 >
-                  <option value="all">All Levels</option>
+                  <SelectValue placeholder="All Levels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
                   {levels.map((level) => (
-                    <option key={level} value={level}>
-                      {level}
-                    </option>
+                    <SelectItem key={level} value={level}>{level}</SelectItem>
                   ))}
-                </select>
-              </div>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </section>
 
         {user && vivaCredit && vivaCredit.totalMinutes > 0 ? (
-          <section className="urologics-panel mb-6 overflow-hidden p-6">
+          <section className="urologics-panel mb-4 overflow-hidden p-4">
             <div className="flex flex-wrap items-center justify-between gap-5">
               <div className="flex items-center gap-4">
                 <div className="grid h-12 w-12 place-items-center rounded-2xl border border-[var(--border)] bg-[var(--accent-soft)] text-[var(--accent-strong)]">
@@ -304,87 +309,9 @@ const VivaCasesPage: React.FC = () => {
           </section>
         ) : null}
 
-        <section className="grid gap-4 pb-16 sm:gap-5 lg:grid-cols-[340px_1fr]">
-          <aside className="urologics-panel h-fit overflow-hidden p-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-120px)]">
-            <div className="mb-3 px-1">
-              <div className="inline-flex items-center gap-2 rounded-full bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
-                <FolderOpen className="h-3.5 w-3.5" />
-                AI Viva folders
-              </div>
-              <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                {visibleCases.filter(isVivaAllowed).length}/{visibleCases.length} accessible
-              </p>
-            </div>
-
-            <div className="urologics-thin-scrollbar flex max-h-[172px] gap-2 overflow-x-auto overflow-y-hidden pr-1 lg:block lg:max-h-[calc(100vh-220px)] lg:space-y-2 lg:overflow-y-auto">
-              {allFolderGroups.length === 0 ? (
-                <div className="rounded-[22px] bg-[var(--accent-soft)] p-4 text-sm text-[var(--text-secondary)]">
-                  No viva folders found.
-                </div>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedFolderKey("all")}
-                    className={`flex min-w-[190px] items-center gap-3 rounded-[22px] border px-3 py-3 text-left transition lg:w-full lg:min-w-0 ${
-                      selectedFolderKey === "all"
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                        : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--accent-soft)]"
-                    }`}
-                  >
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--surface-raised)] text-[var(--accent-strong)]">
-                      <Sparkles className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">
-                        All
-                      </span>
-                      <span className="mt-0.5 block text-xs text-[var(--text-tertiary)]">
-                        {filteredCases.length} cases
-                      </span>
-                    </span>
-                  </button>
-
-                  {allFolderGroups.map((folder) => {
-                    const selected = selectedFolderKey === folder.key;
-                    const matchingCount = filteredCases.filter((viva) => {
-                      const folderName = String(viva.folderName || "").trim();
-                      const key = String(viva.folderId || folderName || UNFILED_FOLDER_KEY).trim();
-                      return key === folder.key;
-                    }).length;
-
-                    return (
-                      <button
-                        key={folder.key}
-                        type="button"
-                        onClick={() => setSelectedFolderKey(folder.key)}
-                        className={`flex min-w-[220px] items-center gap-3 rounded-[22px] border px-3 py-3 text-left transition lg:w-full lg:min-w-0 ${
-                          selected
-                            ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                            : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--accent-soft)]"
-                        }`}
-                      >
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[var(--surface-raised)] text-[var(--accent-strong)]">
-                          <FolderOpen className="h-4 w-4" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">
-                            {folder.name}
-                          </span>
-                          <span className="mt-0.5 block text-xs text-[var(--text-tertiary)]">
-                            {matchingCount} cases
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          </aside>
-
+        <section className="pb-12">
           {visibleCases.length === 0 ? (
-            <div className="urologics-panel p-10 text-center">
+                    <div className="urologics-panel p-6 text-center sm:p-8">
               <div className="text-xl font-semibold text-[var(--text-primary)]">No cases found</div>
               <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">Try a wider filter or a simpler search term.</p>
             </div>
@@ -401,11 +328,11 @@ const VivaCasesPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid min-w-0 gap-4 sm:gap-6 xl:grid-cols-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
               {visibleCases.map((viva) => (
                 <article
   key={viva.id}
-  className={`flex w-full min-w-0 max-w-full flex-col justify-between overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-[0_16px_40px_var(--shadow-soft)] transition sm:p-6 ${
+  className={`flex w-full min-w-0 max-w-full flex-col justify-between overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3 shadow-[0_8px_22px_var(--shadow-soft)] transition sm:p-4 ${
     isVivaAllowed(viva)
       ? "cursor-pointer hover:-translate-y-1 hover:border-[var(--accent)]"
       : "cursor-pointer opacity-75 hover:-translate-y-1 hover:border-amber-300"
@@ -428,21 +355,15 @@ const VivaCasesPage: React.FC = () => {
 </span>
                   </div>
 
-                  <h2 className="mt-5 line-clamp-2 break-words text-xl font-semibold text-[var(--text-primary)] sm:mt-6 sm:text-2xl">
+                  <h2 className="mt-3 line-clamp-2 break-words text-lg font-semibold text-[var(--text-primary)] sm:text-xl">
   {viva.case.title}
 </h2>
-                  {viva.folderName ? (
-                    <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)]">
-                      <FolderOpen size={14} className="shrink-0 text-[var(--accent-strong)]" />
-                      <span className="truncate">{viva.folderName}</span>
-                    </div>
-                  ) : null}
                   <p className="mt-3 line-clamp-1 min-w-0 break-words text-sm font-semibold leading-6 text-[var(--text-secondary)]">
   {viva.case.stem}
 </p>
 
                   <div
-  className="mt-5 min-w-0 rounded-[22px] border border-[var(--border)] bg-[var(--accent-soft)] p-2 sm:mt-6"
+  className="mt-3 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--accent-soft)] p-1.5"
   onClick={(e) => e.stopPropagation()}
 >
   <div className="grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-2">
@@ -490,7 +411,7 @@ const VivaCasesPage: React.FC = () => {
                     </button>
                   ) : null}
 
-                  <div className="mt-6 space-y-2.5">
+                  <div className="mt-4 space-y-2">
                     {viva.case.objectives.slice(0, 3).map((objective, objectiveIndex) => (
                       <div key={objectiveIndex} className={`flex min-w-0 gap-3 text-sm text-[var(--text-secondary)]`}>
                         <span className={`mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--accent)]`} />
@@ -501,7 +422,7 @@ const VivaCasesPage: React.FC = () => {
                 </div>
 
                 <button
-                  className={`mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition ${
+                  className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                     isVivaAllowed(viva)
                       ? "bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
                       : "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"

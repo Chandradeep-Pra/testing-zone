@@ -56,80 +56,6 @@ export type VivaApiResponse = {
   exit?: boolean;
 };
 
-function normalizeKeyword(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
-
-function stemToken(token: string) {
-  return token
-    .replace(/(ing|ed|es|s)$/i, "")
-    .trim();
-}
-
-function tokenize(value: string) {
-  return normalizeKeyword(value)
-    .split(" ")
-    .map((token) => stemToken(token))
-    .filter(Boolean);
-}
-
-function getKeywordAlternatives(keyword: string) {
-  return keyword
-    .split(/\s*(?:\/|\||\bor\b|,)\s*/i)
-    .map((option) => option.trim())
-    .filter(Boolean);
-}
-
-function doesKeywordVariantMatch(answer: string, answerTokens: Set<string>, keyword: string) {
-  const normalizedKeyword = normalizeKeyword(keyword);
-
-  if (!normalizedKeyword) {
-    return false;
-  }
-
-  const keywordTokens = tokenize(keyword);
-  const tokenMatch =
-    keywordTokens.length > 0 &&
-    keywordTokens.every((token) => answerTokens.has(token));
-
-  return normalizeKeyword(answer).includes(normalizedKeyword) || tokenMatch;
-}
-
-function getMatchedKeywords(answer: string, keywords: string[]) {
-  const normalizedAnswer = normalizeKeyword(answer);
-  const answerTokens = new Set(tokenize(answer));
-
-  if (!normalizedAnswer) {
-    return [];
-  }
-
-  return keywords.filter((keyword, index) => {
-    const normalizedKeyword = normalizeKeyword(keyword);
-
-    if (!normalizedKeyword) {
-      return false;
-    }
-
-    const alternatives = getKeywordAlternatives(keyword);
-    const keywordMatched = alternatives.some((variant) =>
-      doesKeywordVariantMatch(normalizedAnswer, answerTokens, variant)
-    );
-
-    return (
-      keywordMatched &&
-      keywords.findIndex(
-        (candidate) => normalizeKeyword(candidate) === normalizedKeyword
-      ) === index
-    );
-  });
-}
-
-function getFastModeQuestions(vivaCase: VivaCaseRecord): VivaModeQuestion[] {
-  return (vivaCase.modes?.fastAndFurious?.questions || []).filter(
-    (item) => item.question.trim().length > 0,
-  );
-}
-
 function getCalmModeQuestions(vivaCase: VivaCaseRecord): VivaModeQuestion[] {
   return (vivaCase.modes?.calmAndComposed?.questions || []).filter(
     (item) => item.question.trim().length > 0,
@@ -200,7 +126,6 @@ async function submitAuthenticatedVivaAttempt(params: {
 export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode = "calm") {
   const previousQARef = useRef<QA[]>([]);
   const shownExhibitIdsRef = useRef<Set<string>>(new Set());
-  const fastQuestionIndexRef = useRef(0);
   const calmQuestionIndexRef = useRef(0);
   const summaryUpdateInFlightRef = useRef(false);
   const pendingSummaryQARef = useRef<QA | null>(null);
@@ -216,99 +141,6 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     weakAreas: [],
   });
   const router = useRouter();
-
-  function getCurrentFastQuestionIndex() {
-    return fastQuestionIndexRef.current;
-  }
-
-  function getCurrentFastQuestion() {
-    const questions = getFastModeQuestions(vivaCase);
-    const currentAskedIndex = Math.max(0, fastQuestionIndexRef.current - 1);
-
-    return questions[currentAskedIndex] || questions[0] || null;
-  }
-
-  function getCurrentFastQuestionKeywordProgress(answer: string) {
-    if (selectedMode !== "fast") {
-      return {
-        matchedKeywords: [],
-        totalKeywords: 0,
-        allMatched: false,
-      };
-    }
-
-    const currentQuestion = getCurrentFastQuestion();
-    if (!currentQuestion) {
-      return {
-        matchedKeywords: [],
-        totalKeywords: 0,
-        allMatched: false,
-      };
-    }
-
-    const matchedKeywords = getMatchedKeywords(answer, currentQuestion.answerKeywords);
-    const totalKeywords = currentQuestion.answerKeywords.filter(
-      (keyword, index, allKeywords) =>
-        normalizeKeyword(keyword) &&
-        allKeywords.findIndex(
-          (candidate) => normalizeKeyword(candidate) === normalizeKeyword(keyword)
-        ) === index
-    ).length;
-
-    return {
-      matchedKeywords,
-      totalKeywords,
-      allMatched: totalKeywords > 0 && matchedKeywords.length === totalKeywords,
-    };
-  }
-
-  function doesAnswerMatchCurrentFastQuestion(answer: string) {
-    return getCurrentFastQuestionKeywordProgress(answer).allMatched;
-  }
-
-  async function nextFast(userAnswer: string, exit = false): Promise<VivaApiResponse> {
-    const history = previousQARef.current;
-
-    if (history.length > 0) {
-      history[history.length - 1].answer = userAnswer;
-    }
-
-    if (exit) {
-      return { exit: true };
-    }
-
-    const questions = getFastModeQuestions(vivaCase);
-    const currentQuestion = questions[fastQuestionIndexRef.current];
-
-    if (!currentQuestion) {
-      return { exit: true };
-    }
-
-    const linkedExhibit = getQuestionExhibit(vivaCase, currentQuestion);
-    const imageLink = linkedExhibit
-      ? linkedExhibit.url || (linkedExhibit.file ? `/exhibits/${linkedExhibit.file}` : null)
-      : null;
-
-    if (linkedExhibit?.id) {
-      shownExhibitIdsRef.current.add(linkedExhibit.id);
-    }
-
-    history.push({
-      question: currentQuestion.question,
-      answer: "",
-    });
-
-    fastQuestionIndexRef.current += 1;
-
-    return {
-      question: currentQuestion.question,
-      imageUsed: Boolean(imageLink),
-      imageLink,
-      imageDescription: linkedExhibit?.description || null,
-      imageId: linkedExhibit?.id || null,
-      exit: false,
-    };
-  }
 
   async function nextCalm(userAnswer: string, exit = false, elapsedSec = 0): Promise<VivaApiResponse> {
     const history = previousQARef.current;
@@ -597,10 +429,10 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   async function next(userAnswer: string, exit = false, elapsedSec = 0): Promise<VivaApiResponse> {
     try {
       if (selectedMode === "fast") {
-        return await nextFast(userAnswer, exit);
+        throw new Error("Fast and Furious questions are controlled by the live examiner backend.");
       }
 
-      return getCalmModeQuestions(vivaCase).length > 0
+      return calmQuestionIndexRef.current < getCalmModeQuestions(vivaCase).length
         ? await nextCalm(userAnswer, exit, elapsedSec)
         : await nextLegacyCalm(userAnswer, exit, elapsedSec);
     } catch (err) {
@@ -653,7 +485,6 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
   function reset() {
     previousQARef.current = [];
     shownExhibitIdsRef.current = new Set();
-    fastQuestionIndexRef.current = 0;
     calmQuestionIndexRef.current = 0;
     summaryUpdateInFlightRef.current = false;
     pendingSummaryQARef.current = null;
@@ -670,19 +501,10 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     };
   }
 
-  function getHistory() {
-    return previousQARef.current;
-  }
-
   return {
     next,
     generateScore,
     reset,
-    getHistory,
-    getCurrentFastQuestionIndex,
-    getCurrentFastQuestion,
-    getCurrentFastQuestionKeywordProgress,
-    doesAnswerMatchCurrentFastQuestion,
     prefetchNextCalmPhase,
     prepareCalmCase,
     getMedicalTerminology,
