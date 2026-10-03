@@ -7,12 +7,46 @@ import { getUrologicsApiUrl } from "@/lib/urologics-api";
 
 export async function POST(req: NextRequest) {
   try {
-    const { vivaCase: rawCase, persona } = await req.json();
-    const vivaCase = rawCase ? normalizeVivaCase(rawCase) : getDefaultVivaCase();
-    
-    const apiKey = process.env.GEMINI_API_KEY;
+    const rawBody = await req.json().catch(() => ({}));
+    const startupPayload = normalizeSessionStartPayload(rawBody);
+    const caseId = typeof rawBody.caseId === "string" ? rawBody.caseId.trim() : startupPayload.case.id?.trim();
+    const mode: VivaMode = rawBody.mode === "fast" ? "fast" : "calm";
+    const examiner = EXAMINER_VOICES[mode].find((item) => item.id === rawBody.examinerId) || EXAMINER_VOICES[mode][0];
+    const authHeader = req.headers.get("authorization");
+    let vivaCase: VivaCaseRecord | null = null;
+
+    if (rawBody.case && typeof rawBody.case === "object") {
+      vivaCase = normalizeVivaCase(rawBody.case);
+    } else if (typeof caseId === "string" && caseId.trim()) {
+      if (authHeader?.startsWith("Bearer ")) {
+        const response = await fetch(getUrologicsApiUrl("/api/app/viva-cases"), {
+          headers: { Authorization: authHeader },
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => ({})) as {
+          cases?: Array<VivaCaseRecord & { access?: { allowed?: boolean } }>;
+        };
+        if (!response.ok) return NextResponse.json({ error: "Unable to verify access to this viva case." }, { status: response.status });
+        const record = (payload.cases || []).find((item) => item.id === caseId);
+        if (!record || record.access?.allowed === false) {
+          return NextResponse.json({ error: "This viva case is not available for your account." }, { status: 403 });
+        }
+        vivaCase = normalizeVivaCase(record);
+      } else {
+        vivaCase = await fetchRemotePublicVivaCaseById(caseId);
+        if (!vivaCase) return NextResponse.json({ error: "This viva case is not publicly available." }, { status: 404 });
+      }
+    } else {
+      return NextResponse.json({ error: "A viva case is required." }, { status: 400 });
+    }
+
+    if (!vivaCase) {
+      return NextResponse.json({ error: "A viva case is required." }, { status: 400 });
+    }
+
+    const apiKey = process.env.GEMINI_LIVE_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "Missing GEMINI_API_KEY" }, { status: 500 });
+      return NextResponse.json({ error: "Missing GEMINI_LIVE_API_KEY" }, { status: 500 });
     }
 
     const model = process.env.GEMINI_LIVE_MODEL || "gemini-2.5-flash-native-audio-latest";
@@ -32,6 +66,8 @@ export async function POST(req: NextRequest) {
           config: {
             responseModalities: [Modality.AUDIO],
             inputAudioTranscription: {},
+            outputAudioTranscription: {},
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: examiner.voiceName } } },
             systemInstruction: {
               parts: [{
                 text: `

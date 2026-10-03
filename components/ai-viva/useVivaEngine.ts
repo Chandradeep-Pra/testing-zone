@@ -611,9 +611,13 @@ export function useVivaEngine(vivaCase: VivaCaseRecord, selectedMode: VivaMode =
     }
   }
 
-  async function generateScore(historyOverride?: Array<{ question: string; answer: string }>) {
+  async function generateScore(
+    historyOverride?: Array<{ question?: string; answer?: string }>,
+    scoreInPythonBackend = false,
+    idToken?: string,
+  ) {
     try {
-      const history = historyOverride || previousQARef.current;
+      const history = historyOverride ?? previousQARef.current;
 
       const scoreUrl = scoreInPythonBackend
         ? `${getAiVivaBackendHttpBaseUrl()}/viva/report`
