@@ -12,11 +12,21 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
   const [active, setActive] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [candidateLiveTranscript, setCandidateLiveTranscript] = useState("");
+  const [liveExhibitId, setLiveExhibitId] = useState<string | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const [backendError, setBackendError] = useState<string | null>(null);
+  const [turns, setTurns] = useState<Array<{ role: "ai" | "candidate"; text: string }>>([]);
   const [amplitude, setAmplitude] = useState(0);
   const [history, setHistory] = useState<Array<{ question: string; answer: string }>>([]);
   
   const sessionRef = useRef<any>(null);
+  const liveExhibitIdRef = useRef<string | null>(null);
+  const examinerPromptedExhibitRef = useRef(false);
+  const candidateSpokeSinceExhibitRef = useRef(false);
+  const readyRef = useRef(false);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const playbackContextRef = useRef<AudioContext | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
   const micGainRef = useRef<GainNode | null>(null);
   const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -48,6 +58,12 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
     if (audioContextRef.current?.state !== 'closed') {
       audioContextRef.current?.close();
     }
+    if (playbackContextRef.current?.state !== "closed") {
+      playbackContextRef.current?.close();
+    }
+    playbackContextRef.current = null;
+    stopPlayback();
+    clearLiveExhibit();
     setActive(false);
     setAmplitude(0);
     pendingSpeechRef.current?.();
@@ -89,8 +105,72 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
     nextPlayTimeRef.current = startTime + buffer.duration;
   }, []);
 
-  const startSession = useCallback(async () => {
+  const playBackendPcm = useCallback((data: ArrayBuffer, sampleRate = 24000) => {
+    const context = playbackContextRef.current;
+    const sampleCount = Math.floor(data.byteLength / 2);
+    if (!context || context.state !== "running" || sampleCount === 0) {
+      console.warn("[AI Viva audio] PCM output unavailable", {
+        contextState: context?.state || "missing",
+        bytes: data.byteLength,
+      });
+      return;
+    }
+
+    if (!firstBackendAudioLoggedRef.current) {
+      firstBackendAudioLoggedRef.current = true;
+      console.info("[AI Viva audio] first backend PCM packet", {
+        bytes: data.byteLength,
+        sampleRate,
+        contextState: context.state,
+      });
+    }
+
+    const view = new DataView(data);
+    const samples = new Float32Array(sampleCount);
+    for (let index = 0; index < sampleCount; index += 1) {
+      samples[index] = view.getInt16(index * 2, true) / 32768;
+    }
+
+    const audioBuffer = context.createBuffer(1, sampleCount, sampleRate);
+    audioBuffer.getChannelData(0).set(samples);
+    const source = context.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(context.destination);
+    sourcesRef.current.add(source);
+    source.onended = () => sourcesRef.current.delete(source);
+
+    const startTime = Math.max(context.currentTime, nextPlayTimeRef.current);
+    source.start(startTime);
+    nextPlayTimeRef.current = startTime + audioBuffer.duration;
+    speakingRef.current = true;
+    setSpeaking(true);
+    if (speakingTimerRef.current) clearTimeout(speakingTimerRef.current);
+    speakingTimerRef.current = setTimeout(
+      () => {
+        speakingRef.current = false;
+        setSpeaking(false);
+      },
+      Math.max(260, audioBuffer.duration * 1000 + 100),
+    );
+  }, []);
+
+  const resumeAudioOutput = useCallback(async () => {
+    const contexts = [playbackContextRef.current, audioContextRef.current]
+      .filter((context): context is AudioContext => Boolean(context));
+    await Promise.all(contexts.map((context) => (
+      context.state === "suspended" ? context.resume() : Promise.resolve()
+    )));
+    if (contexts.length && contexts.every((context) => context.state !== "running")) {
+      throw new Error("Browser audio output is unavailable. Check the selected output device and try again.");
+    }
+  }, []);
+
+  const startSession = useCallback(async (examiner?: ExaminerVoice, mode: VivaMode = "calm", micDeviceId?: string) => {
+    readyRef.current = false;
+    initialPromptSentRef.current = false;
     setConnecting(true);
+    setStartupStage("server");
+    setBackendError(null);
     setTranscript("");
     setHistory([]);
     currentAnswerRef.current = "";
@@ -98,8 +178,20 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
     try {
       const res = await fetch(appPath("/api/viva/live/session"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vivaCase, persona }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          caseId: vivaCase?.id,
+          case: vivaCase,
+          candidate: {
+            name: candidate?.name?.trim() || "candidate",
+            email: candidate?.email?.trim() || "",
+          },
+          examinerId: examiner?.id,
+          mode,
+        }),
       });
       const payload = (await res.json()) as {
         token?: string;
@@ -111,7 +203,7 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
       }
       const { token, model } = payload;
 
-      const live = new GoogleGenAI({ 
+      const live = new GoogleGenAI({
         apiKey: token,
         httpOptions: { apiVersion: "v1alpha" }
       });
@@ -173,15 +265,96 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
         }
       });
 
-      // 3. Setup Microphone and Stream to Gemini
-      micStreamRef.current = await navigator.mediaDevices.getUserMedia({ 
+      try {
+        sessionRef.current = await Promise.race([live.live.connect({
+          model,
+          config: {
+            responseModalities: [Modality.AUDIO],
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+          },
+          callbacks: {
+            onopen: () => setStartupStage("websocket"),
+            onmessage: (msg: any) => {
+              if (msg.setupComplete) {
+                setupWasReady = true;
+                setStartupStage("gemini");
+                resolveSetup();
+                return;
+              }
+              if (msg.serverContent?.modelTurn?.parts) {
+                msg.serverContent.modelTurn.parts.forEach((part: any) => {
+                  if (part.inlineData?.mimeType?.includes("audio/pcm")) {
+                    playAudioChunk(part.inlineData.data);
+                  }
+                  if (part.text) {
+                    setTranscript(prev => prev + " " + part.text);
+                  }
+                });
+              }
+              if (msg.serverContent?.interrupted) {
+                stopPlayback();
+              }
+              const inputText = msg.serverContent?.inputTranscription?.text;
+              if (inputText) {
+                const isNewCandidateTurn = !transcriptPartsRef.current.input;
+                const delta = inputText.startsWith(transcriptPartsRef.current.input)
+                  ? inputText.slice(transcriptPartsRef.current.input.length)
+                  : inputText;
+                transcriptPartsRef.current.input = inputText;
+                appendTranscript("candidate", delta);
+                setCandidateLiveTranscript((current) => {
+                  if (isNewCandidateTurn) return inputText;
+                  return inputText.startsWith(current) ? inputText : `${current} ${delta}`.trim();
+                });
+              }
+              const outputText = msg.serverContent?.outputTranscription?.text;
+              if (outputText) {
+                const delta = outputText.startsWith(transcriptPartsRef.current.output)
+                  ? outputText.slice(transcriptPartsRef.current.output.length)
+                  : outputText;
+                transcriptPartsRef.current.output = outputText;
+                appendTranscript("ai", delta);
+                setTranscript(outputText);
+              }
+            },
+            onerror: (err: any) => {
+              console.error("Live Error:", err);
+              const message = err?.message || err?.error?.message || "Gemini Live connection failed.";
+              rejectSetup(new Error(message));
+              stopSession();
+            },
+            onclose: () => {
+              socketClosed = true;
+              setActive(false);
+              readyRef.current = false;
+              if (!setupWasReady) rejectSetup(new Error("Gemini closed the connection before the live session was ready."));
+            },
+          }
+        }), connectTimedOut]);
+      } finally {
+        if (connectTimeout) clearTimeout(connectTimeout);
+      }
+
+      setStartupStage((current) => current === "server" ? "websocket" : current);
+      let setupTimeout: ReturnType<typeof setTimeout> | undefined;
+      setupTimeout = setTimeout(() => rejectSetup(new Error("Timed out waiting for Gemini Live session setup.")), 20000);
+      try {
+        await setupComplete;
+      } finally {
+        if (setupTimeout) clearTimeout(setupTimeout);
+      }
+
+      setStartupStage("microphone");
+      micStreamRef.current = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
-        } 
+          autoGainControl: true,
+          ...(micDeviceId ? { deviceId: { exact: micDeviceId } } : {}),
+        }
       });
-      
+
       const micSource = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
       const processor = new AudioWorkletNode(audioContextRef.current, "audio-processor");
       micSourceRef.current = micSource;
@@ -233,12 +406,36 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
       setActive(true);
     } catch (err) {
       console.error("Failed to start live session:", err);
+      setBackendError(err instanceof Error ? err.message : "Unable to start the live viva.");
+      setStartupStage("error");
       stopSession();
       throw err;
     } finally {
       setConnecting(false);
     }
-  }, [vivaCase, persona, playAudioChunk, stopSession]);
+  }, [candidate, vivaCase, idToken, playAudioChunk, playBackendPcm, stopSession, stopPlayback, appendTranscript, noteExaminerOutputForExhibit]);
+
+  const beginViva = useCallback(() => {
+    if (!sessionRef.current || !readyRef.current) throw new Error("The Gemini Live session is not ready yet.");
+    if (sessionRef.current instanceof WebSocket && initialPromptSentRef.current) return;
+    const candidateName = candidate?.name?.trim() || "there";
+    const openingPrompt = `Please begin the viva. My name is ${candidateName}.`;
+
+    if (typeof (sessionRef.current as any).sendClientContent === "function") {
+      (sessionRef.current as any).sendClientContent({
+        turns: [{ role: "user", parts: [{ text: openingPrompt }] }],
+        turnComplete: true,
+      });
+      return;
+    }
+
+    if (sessionRef.current instanceof WebSocket && sessionRef.current.readyState === WebSocket.OPEN) {
+      sessionRef.current.send(JSON.stringify({
+        type: "text",
+        text: openingPrompt,
+      }));
+    }
+  }, [candidate]);
 
   const speakText = useCallback((text: string) => {
     if (!sessionRef.current) return Promise.reject(new Error("Live session is not connected."));
@@ -266,9 +463,15 @@ export function useGeminiLive(vivaCase: any, persona: any, callbacks: LiveCallba
     active,
     connecting,
     startSession,
+    beginViva,
     stopSession,
     speakText,
     transcript,
+    candidateLiveTranscript,
+    liveExhibitId,
+    clearLiveExhibit,
+    speaking,
+    turns,
     amplitude,
     history,
   };

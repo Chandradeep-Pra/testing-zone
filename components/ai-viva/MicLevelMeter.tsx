@@ -10,6 +10,7 @@ type MicLevelMeterProps = {
   helper?: string;
   selfTest?: boolean;
   deviceId?: string;
+  onVoiceDetected?: () => void;
 };
 
 function normalizeLevel(value: number) {
@@ -33,6 +34,7 @@ export default function MicLevelMeter({
   helper,
   selfTest = false,
   deviceId,
+  onVoiceDetected,
 }: MicLevelMeterProps) {
   const [selfLevel, setSelfLevel] = useState(0);
   const animationRef = useRef<number | null>(null);
@@ -40,6 +42,9 @@ export default function MicLevelMeter({
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const onVoiceDetectedRef = useRef(onVoiceDetected);
+  const hasDetectedVoiceRef = useRef(false);
+  onVoiceDetectedRef.current = onVoiceDetected;
 
   useEffect(() => {
     if (!selfTest || !active) {
@@ -48,6 +53,7 @@ export default function MicLevelMeter({
 
     let cancelled = false;
     let smoothedLevel = 0;
+    hasDetectedVoiceRef.current = false;
 
     async function startMeter() {
       try {
@@ -85,6 +91,7 @@ export default function MicLevelMeter({
         }
 
         const audioContext = new AudioContext();
+        await audioContext.resume();
         const source = audioContext.createMediaStreamSource(stream);
         const analyser = audioContext.createAnalyser();
 
@@ -110,6 +117,10 @@ export default function MicLevelMeter({
           const nextLevel = rmsToVoiceLevel(rms);
           smoothedLevel = smoothedLevel * 0.72 + nextLevel * 0.28;
           setSelfLevel(smoothedLevel < 0.03 ? 0 : smoothedLevel);
+          if (smoothedLevel > 0.08 && !hasDetectedVoiceRef.current) {
+            hasDetectedVoiceRef.current = true;
+            onVoiceDetectedRef.current?.();
+          }
           animationRef.current = window.requestAnimationFrame(tick);
         };
 

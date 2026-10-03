@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, PhoneOff, Camera, CameraOff, ShieldCheck, History, X } from "lucide-react";
+import { Clock, PhoneOff, Camera, CameraOff, X, ChevronUp, Captions, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CandidatePanel } from "./CandidatePanel";
@@ -14,8 +14,8 @@ import { useCountdown } from "./useCountdown";
 import ChatTimeline from "./ChatTimeline";
 import { useGeminiLive } from "./useGeminiLive";
 
-import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 
 import type { VivaCaseRecord } from "@/lib/viva-case";
@@ -84,6 +84,44 @@ function resolveExhibitSrc(src: string) {
   return src.startsWith("/") ? appPath(src) : src;
 }
 
+function resolveCaseExhibitSrc(exhibit: VivaCaseRecord["exhibits"][number]) {
+  const src = exhibit.url || (exhibit.file ? `/exhibits/${exhibit.file.replace(/^\/+/, "")}` : "");
+  return src ? resolveExhibitSrc(src) : "";
+}
+
+function isVivaEndRequest(value: string) {
+  const text = value.toLowerCase().replace(/[’]/g, "'");
+  if (/\b(?:don't|do not|never)\b.{0,30}\b(?:end|finish|stop|conclude)\b/.test(text)) return false;
+
+  return (
+    /\b(?:end|finish|stop|conclude)\s+(?:the\s+)?(?:viva|exam(?:ination)?|assessment)\b/.test(text) ||
+    /\b(?:can|could)\s+we\s+(?:end|finish|stop|conclude)(?:\s+(?:the\s+)?(?:viva|exam(?:ination)?|assessment)|\s+(?:now|here))\b/.test(text) ||
+    /\b(?:i(?:'d| would)\s+like|i want)\s+to\s+(?:end|finish|stop|conclude)\b/.test(text) ||
+    /\b(?:i'm|i am)\s+(?:finished|done)\s+(?:with\s+)?(?:the\s+)?(?:viva|exam(?:ination)?|assessment)\b/.test(text)
+  );
+}
+
+function mergeCurrentCandidateAnswer(history: QaHistoryItem[], candidateText: string) {
+  const current = candidateText.trim();
+  const merged = history.map((item) => ({ ...item }));
+  if (!current) return merged;
+
+  const last = merged[merged.length - 1];
+  if (!last) return [{ question: "", answer: current }];
+  const existing = last.answer?.trim() || "";
+  if (!existing) {
+    last.answer = current;
+  } else if (
+    current.toLowerCase().startsWith(existing.toLowerCase()) ||
+    current.toLowerCase().includes(existing.toLowerCase())
+  ) {
+    last.answer = current;
+  } else if (!existing.toLowerCase().includes(current.toLowerCase())) {
+    last.answer = `${existing} ${current}`.trim();
+  }
+  return merged;
+}
+
 export default function VivaVoiceAi({
   vivaCase,
   selectedMode = "calm",
@@ -96,6 +134,7 @@ export default function VivaVoiceAi({
   aiMode?: boolean;
 }) {
   const fastModeTotalDurationSec = 10 * 60;
+  const { user } = useAuth();
   const isFastMode = selectedMode === "fast";
 
   const [candidate, setCandidate] = useState<CandidateInfo>(
@@ -150,13 +189,14 @@ export default function VivaVoiceAi({
   } = useVivaSession();
 
     const { speak, amplitude, error: audioError, stop: stopExaminerAudio } = useSpeechOutput();
-  const examinerSpeaking = speaking;
   const avatarSessionActiveRef = useRef(false);
 
 
   const hasStartedRef = useRef(false);
   const examinerVoiceRef = useRef(selectedExaminer);
   const endingRef = useRef(false);
+  const endIntentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const endVivaRef = useRef<(() => Promise<void>) | null>(null);
   const fillerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fastSilenceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestCandidateTranscriptRef = useRef("");
@@ -175,6 +215,7 @@ export default function VivaVoiceAi({
 
   const [readyVisible, setReadyVisible] = useState(true);
   const [ending, setEnding] = useState(false);
+  const [reportGenerationFailed, setReportGenerationFailed] = useState(false);
   const [vivaStarted, setVivaStarted] = useState(false);
   const [messages, setMessages] = useState<CandidateConversationMessage[]>([]);
   const [cameraOn, setCameraOn] = useState(false);
@@ -191,6 +232,7 @@ export default function VivaVoiceAi({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [preparingCase, setPreparingCase] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [controlsVisible, setControlsVisible] = useState(true);
 
   const fastKeywordProgress = isFastMode
     ? getCurrentFastQuestionKeywordProgress(candidateTranscript)
@@ -738,8 +780,8 @@ export default function VivaVoiceAi({
 
     const {
     active: liveActive,
-    connecting: liveConnecting,
     startSession: startLiveSession,
+    beginViva: beginLiveViva,
     stopSession: stopLiveSession,
     amplitude: liveAmplitude,
     speakText: speakLiveText,
@@ -913,12 +955,14 @@ export default function VivaVoiceAi({
   }
 
   async function endViva() {
-    if (ending) return;
+    if (endingRef.current || ending) return;
 
     const wasLiveSession = liveActive;
     endingRef.current = true;
     advanceLockRef.current = true;
     setEnding(true);
+    setReportGenerationFailed(false);
+    setSessionError(null);
     stopExaminerAudio();
     stopLiveSession();
     setIsListening(false);
@@ -966,14 +1010,34 @@ export default function VivaVoiceAi({
 
     await generateScore(wasLiveSession ? liveHistoryRef.current : undefined);
   }
+  endVivaRef.current = endViva;
+
+  useEffect(() => {
+    if (!liveActive || isFastMode) return;
+    setMessages(liveTurns.map((turn, index) => ({
+      id: `live-${index}`,
+      role: turn.role,
+      text: turn.text,
+      live: true,
+    })));
+    setIsListening(true);
+    setCandidateStatusDot("idle");
+  }, [liveActive, isFastMode, liveTurns]);
 
   return (
-    <main className="relative flex h-screen w-full flex-col overflow-hidden bg-white text-[#071014]">
+    <main
+      className="relative h-dvh w-full overflow-hidden bg-[#111315] text-white"
+      onPointerMove={revealControls}
+      onFocusCapture={revealControls}
+    >
       {readyVisible && (
         <ReadyOverlay
           onBegin={handleBegin}
           vivaTitle={vivaCase.case.title}
           selectedMode={selectedMode}
+          errorMessage={sessionError}
+          isStarting={preparingCase}
+          startupStage={liveStartupStage}
         />
       )}
 
@@ -992,7 +1056,7 @@ export default function VivaVoiceAi({
           <div className="rounded-[28px] border border-[#0f7896]/12 bg-white px-8 py-7 text-center shadow-[0_24px_60px_rgba(15,120,150,0.18)]">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-cyan-100 border-t-[#0f7896]" />
             <p className="mt-4 text-lg font-semibold text-[#071014]">Preparing your viva</p>
-            <p className="mt-1 text-sm text-[#071014]/55">Preparing examiner audio. Your viva starts automatically when ready.</p>
+            <p className="mt-1 text-sm text-[#071014]/55">Connecting your live speech-to-speech examiner.</p>
           </div>
         </div>
       )}
@@ -1000,29 +1064,37 @@ export default function VivaVoiceAi({
       {!preparingCase && !readyVisible && !ending && (sessionError || audioError) && (
         <div role="alert" className="absolute inset-0 z-40 flex items-center justify-center bg-white/95 p-6 backdrop-blur-sm">
           <div className="max-w-md rounded-[28px] border border-[#0f7896]/12 bg-white px-8 py-7 text-center shadow-xl">
-            <p className="text-lg font-semibold">{vivaStarted ? "Unable to continue audio" : "Unable to start your viva"}</p>
+            <p className="text-lg font-semibold">
+              {reportGenerationFailed ? "Your report could not be generated" : vivaStarted ? "Unable to continue audio" : "Unable to start your viva"}
+            </p>
             <p className="mt-3 text-sm text-[#071014]/65">{sessionError || audioError}</p>
-            <button type="button" onClick={() => { void retryCurrentQuestion(); }} className="mt-5 rounded-xl bg-[#0f7896] px-5 py-3 font-medium text-white">Retry question</button>
+            <button
+              type="button"
+              onClick={() => { void (reportGenerationFailed ? endViva() : retryCurrentQuestion()); }}
+              className="mt-5 rounded-xl bg-[#0f7896] px-5 py-3 font-medium text-white"
+            >
+              {reportGenerationFailed ? "Retry report" : "Retry question"}
+            </button>
           </div>
         </div>
       )}
 
       {historyOpen && (
-        <div className="pointer-events-none absolute bottom-[64px] right-0 top-[73px] z-40 flex w-full justify-end sm:bottom-[68px] md:top-[77px]">
-          <div className="pointer-events-auto flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.16)]">
+        <div className="pointer-events-none absolute inset-y-4 right-4 z-50 flex w-full max-w-xl justify-end">
+          <div className="pointer-events-auto flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-[#1c1e20] text-white shadow-2xl">
             <div className="flex items-center justify-between gap-4 border-b border-[#0f7896]/12 px-5 py-4">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-[#0f7896]">
+                <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
                   Session Transcript
                 </div>
-                <div className="mt-1 text-base font-semibold text-[#071014]">
+                <div className="mt-1 text-base font-semibold text-white">
                   Examiner questions and your spoken answers
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setHistoryOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-[#0f7896]/12 bg-white text-[#071014] transition hover:bg-cyan-50"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10"
                 aria-label="Close history"
               >
                 <X size={17} />
@@ -1039,30 +1111,34 @@ export default function VivaVoiceAi({
         </div>
       )}
 
-      <div className="border-b border-[#0f7896]/12 bg-white px-3 py-3 shadow-[0_8px_24px_rgba(15,120,150,0.07)] sm:px-5 md:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="hidden sm:block">
-              <UrologicsBrand compact product="AI Viva" tag={vivaCase.case.title} />
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-50 text-[#0f7896] sm:hidden">
-              <ShieldCheck size={18} />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs uppercase tracking-[0.22em] text-[#0f7896]">
-                Urologics Session
+      <div className="absolute inset-0">
+        <AiPanel
+          amplitude={amplitude}
+          speaking={examinerSpeaking}
+          thinking={thinking || (liveActive && !stageTranscript)}
+          listening={isListening}
+          transcript={stageTranscript}
+          keywordDetected={keywordDetected}
+          avatarVideo={null}
+          exhibit={
+            liveExhibit && liveExhibitSrc ? (
+              <div className="relative flex h-full max-h-[96vh] w-full max-w-[98vw] items-center justify-center">
+                <img src={liveExhibitSrc} alt={liveExhibit.label || "Viva exhibit"} className="max-h-[92vh] max-w-[96vw] rounded-lg object-contain" />
+                <button onClick={clearLiveExhibit} className="absolute right-2 top-2 rounded-full bg-black/70 p-2 text-white" aria-label="Close exhibit">
+                  <X size={16} />
+                </button>
               </div>
-              <div className="truncate text-sm font-semibold text-[#071014] md:text-base">
-                {selectedExaminer.name} · {selectedExaminer.title}
+            ) : exhibit?.type === "image" ? (
+              <div className="relative mx-auto flex h-full max-w-full items-center justify-center">
+                <img src={exhibit.src} alt="Viva exhibit" className="max-h-[70vh] w-auto rounded-lg" />
+                <button onClick={clearExhibit} className="absolute right-2 top-2 rounded-full bg-black/70 p-2 text-white" aria-label="Close exhibit">
+                  <X size={16} />
+                </button>
               </div>
-            </div>
-          </div>
-
-          <div className="hidden flex-1 justify-center md:flex">
-            <div className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-4 py-2 text-sm text-[#071014]/65">
-              {vivaCase.case.title}
-            </div>
-          </div>
+            ) : null
+          }
+        />
+      </div>
 
                         <div className="flex items-center gap-2">
                       <ThemeToggle />
@@ -1157,17 +1233,34 @@ export default function VivaVoiceAi({
                   <span>{cameraOn ? "Camera off" : "Camera on"}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setHistoryOpen(true)}
-                  className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium text-[#071014]/70 transition-colors hover:bg-cyan-50"
-                  title="Show session transcript"
-                >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#0f7896]/15 bg-white shadow-sm transition group-hover:border-[#0f7896]/30">
-                    <History size={17} />
-                  </span>
-                  <span>Transcript</span>
-                </button>
+      <aside className="absolute right-4 top-19 z-20 w-[min(58vw,340px)] min-w-28 sm:right-7 sm:top-24">
+        <div className="aspect-video overflow-hidden rounded-lg border border-white/15 bg-[#202326] shadow-2xl">
+          <CandidatePanel cameraOn={cameraOn} listening={isListening} transcript={candidateLiveTranscript} statusDot={candidateStatusDot} />
+        </div>
+        <p className="mt-2 truncate text-right text-xs text-white/65">{candidate.name || "You"}</p>
+        {candidateLiveTranscript && (
+          <div
+            className="ml-auto mt-2 w-full rounded-lg border border-white/10 bg-[#242629]/95 px-3 py-2 text-left text-xs leading-5 text-white shadow-lg sm:text-sm"
+            aria-live="polite"
+            aria-label="Your live transcription"
+          >
+            {candidateLiveTranscript}
+          </div>
+        )}
+      </aside>
+
+      {!controlsVisible && vivaStarted && (
+        <button
+          type="button"
+          onClick={revealControls}
+          onPointerEnter={revealControls}
+          className="absolute bottom-1 left-1/2 z-40 flex h-10 w-14 -translate-x-1/2 items-center justify-center rounded-t-lg border border-b-0 border-white/15 bg-[#25282b]/90 text-white/65 backdrop-blur-xl transition hover:text-white"
+          aria-label="Show call controls"
+          title="Show call controls"
+        >
+          <ChevronUp size={18} />
+        </button>
+      )}
 
                                 <button
                   onClick={endViva}

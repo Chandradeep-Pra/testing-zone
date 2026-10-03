@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import SiriWaveComponent from "./SiriWaveForm";
 
 type Props = {
@@ -22,35 +22,6 @@ type Props = {
   }>;
 };
 
-// const fillers = [
-//   "Alright, let me consider that.",
-//   "Okay, I understand.",
-//   "Hmm, let me think about that.",
-//   "Got it, one moment.",
-//   "Right, I see.",
-//   "Okay, processing your response.",
-//   "I understand what you're saying.",
-//   "Alright, just a second.",
-//   "Let me go through that.",
-//   "Okay, thinking it through.",
-//   "Right, let me consider your answer.",
-//   "Understood, give me a moment.",
-// ];
-
-const fillers: string[] = [
-  // "Alright, let me consider that.",
-  // "Okay, I understand.",
-  // "Hmm, let me think about that.",
-  // "Got it, one moment.",
-  // "Right, I see.",
-  // "Okay, processing your response.",
-  // "I understand what you're saying.",
-  // "Alright, just a second.",
-  // "Let me go through that.",
-  // "Okay, thinking it through.",
-  // "Right, let me consider your answer.",
-  // "Understood, give me a moment.",
-];
 export function AiPanel({
   speaking,
   thinking = false,
@@ -95,33 +66,12 @@ export function AiPanel({
 
   return (
     <div
-      className={`relative h-full w-full overflow-hidden rounded-[28px] border bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.75),_rgba(2,6,23,0.96))] transition-all duration-300 ${
-        keywordDetected
-          ? "border-orange-400 shadow-[0_0_32px_rgba(251,146,60,0.45)]"
-          : speaking
-          ? "border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.35)]"
-          : thinking
-          ? "border-yellow-400 shadow-[0_0_30px_rgba(234,179,8,0.25)]"
-          : "border-slate-800"
-      }`}
+      className={`relative h-full w-full overflow-hidden bg-[#111315] transition-colors duration-500 ${speaking ? "bg-[#121817]" : ""}`}
     >
-      <div className="absolute left-5 top-5 text-xs uppercase tracking-[0.28em] text-slate-500">
-        Urologics AI Viva
-      </div>
-
-      <div className="absolute right-5 top-5 text-xs">
-        <span
-          className={`rounded-full border px-3 py-1 ${
-            keywordDetected
-              ? "border-orange-400/30 bg-orange-400/10 text-orange-300"
-              : speaking
-              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-              : thinking
-              ? "border-yellow-400/20 bg-yellow-400/10 text-yellow-300"
-              : "border-white/10 bg-white/[0.04] text-slate-400"
-          }`}
-        >
-          {keywordDetected ? "Keyword Heard" : statusText}
+      <div className="pointer-events-none absolute inset-x-0 top-[15%] flex justify-center text-[10px] font-medium uppercase tracking-[0.2em] text-white/40 sm:top-[18%]">
+        <span className={`flex items-center gap-2 ${speaking ? "text-emerald-200/80" : ""}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${speaking ? "animate-pulse bg-emerald-300" : thinking ? "animate-pulse bg-white/60" : "bg-white/30"}`} />
+          {keywordDetected ? "Key point heard" : statusText}
         </span>
       </div>
 
@@ -159,16 +109,16 @@ export function AiPanel({
         ) : avatarVideo ? (
           <div className="h-full w-full">{avatarVideo}</div>
         ) : (
-          <div className="flex items-center justify-center scale-110">
-            {thinking && <SiriWaveComponent amplitude={0.2} speed={0.02} />}
-            {speaking && <SiriWaveComponent amplitude={amplitude} speed={0.08} />}
-            {!thinking && !speaking && <SiriWaveComponent amplitude={0.1} speed={0.03} />}
+          <div className="flex h-[220px] w-full items-center justify-center sm:h-[300px]">
+            <div className={`transition-opacity duration-700 ${speaking ? "opacity-100" : "opacity-55"}`}>
+              <SiriWaveComponent amplitude={speaking ? amplitude : thinking ? 0.2 : 0.08} speed={speaking ? 0.08 : 0.025} />
+            </div>
           </div>
         )}
       </div>
 
       {activeExhibit && (
-        <div className="absolute inset-0 z-20 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6">
+        <div className="absolute inset-0 z-20 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-3">
           {activeExhibit}
         </div>
       )}

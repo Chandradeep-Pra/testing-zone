@@ -63,6 +63,10 @@ export function useSpeechOutput() {
       let source: MediaElementAudioSourceNode | null = null;
       let playbackTimeout: ReturnType<typeof setTimeout> | undefined;
       let rejectStart: ((error: Error) => void) | undefined;
+
+      if (options?.voiceName) {
+        audio.setAttribute("data-voice-name", options.voiceName);
+      }
       const cleanup = () => {
         if (playbackTimeout) clearTimeout(playbackTimeout);
         cancelAnimationFrame(frame);
