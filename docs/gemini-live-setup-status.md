@@ -7,11 +7,11 @@ Verified on 16 September 2026.
 - API Keys management API: enabled during setup.
 - Dedicated service account: `gemini-live-viva@proud-woods-489814-s6.iam.gserviceaccount.com`.
 - Authorization key: `gemini-live-viva`, bound to that account and restricted to `generativelanguage.googleapis.com`.
-- Local server configuration: Git-ignored `.env.local`, containing `GEMINI_LIVE_API_KEY`, `GEMINI_LIVE_PROJECT_ID` and `GEMINI_LIVE_MODEL`.
+- Local server configuration: Git-ignored `.env.local`, containing `GEMINI_API_KEY`, `GEMINI_LIVE_PROJECT_ID` and `GEMINI_LIVE_MODEL`.
 - Verified model: `gemini-2.5-flash-native-audio-latest`. This is an alias; verify availability again before release.
 - Tests passed: model access, restricted ephemeral token creation, Live WebSocket connection and generated audio response to a synthetic prompt.
 
-The older `GEMINI_API_KEY` in `.env.prod.stud` returned HTTP 401. It was not changed. The existing Vertex AI configuration was also preserved. New Live code must explicitly use `GEMINI_LIVE_API_KEY` rather than relying on automatic environment-variable selection.
+The Live route uses `GEMINI_API_KEY` from the server environment. The existing Vertex AI configuration is preserved.
 
 ## Next implementation
 
@@ -21,4 +21,4 @@ Local verification can be repeated with `node scripts/check-gemini-live.mjs`. Th
 
 ## Production work remaining
 
-Store the Live key in Secret Manager and grant only the application runtime access to that secret. Configure Cloud Run to inject it as `GEMINI_LIVE_API_KEY`, along with the verified model ID. The image does not load local environment files. No Secret Manager secret, Cloud Run revision, spending cap or billing alert was created by this setup. The browser microphone and full viva flow have not yet been implemented or tested.
+Store the Live key in Secret Manager and grant only the application runtime access to that secret. Configure Cloud Run to inject it as `GEMINI_API_KEY`, along with the verified model ID. The image does not load local environment files. No Secret Manager secret, Cloud Run revision, spending cap or billing alert was created by this setup. The browser microphone and full viva flow have not yet been implemented or tested.

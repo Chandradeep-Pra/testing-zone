@@ -21,8 +21,10 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
 import { appPath } from "@/lib/app-path";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 type VivaMode = "calm" | "fast";
+type CandidateInfo = { name: string; email: string };
 type QaHistoryItem = { question?: string; answer?: string };
 type CandidateConversationMessage =
   | {
@@ -123,15 +125,21 @@ function mergeCurrentCandidateAnswer(history: QaHistoryItem[], candidateText: st
 export default function VivaVoiceAi({
   vivaCase,
   selectedMode = "calm",
+  initialCandidate,
+  aiMode = false,
 }: {
   vivaCase: VivaCaseRecord;
   selectedMode?: VivaMode;
+  initialCandidate?: CandidateInfo;
+  aiMode?: boolean;
 }) {
   const fastModeTotalDurationSec = 10 * 60;
   const { user } = useAuth();
   const isFastMode = selectedMode === "fast";
 
-  const [candidate, setCandidate] = useState({ name: "", email: "" });
+  const [candidate, setCandidate] = useState<CandidateInfo>(
+    initialCandidate || { name: "", email: "" },
+  );
   const [selectedExaminer, setSelectedExaminer] = useState<ExaminerVoice>(
     getDefaultExaminer(selectedMode)
   );
@@ -147,13 +155,18 @@ export default function VivaVoiceAi({
   } = useVivaEngine(vivaCase, selectedMode);
 
   useEffect(() => {
+    if (initialCandidate?.name && initialCandidate.email) {
+      setCandidate(initialCandidate);
+    }
     const stored = localStorage.getItem("candidateInfo");
     if (stored) {
       const parsed = JSON.parse(stored) as StoredCandidateInfo;
-      setCandidate({
-        name: parsed.name || "",
-        email: parsed.email || "",
-      });
+      if (!initialCandidate) {
+        setCandidate({
+          name: parsed.name || "",
+          email: parsed.email || "",
+        });
+      }
       if (parsed.selectedExaminer) {
         setSelectedExaminer(parsed.selectedExaminer);
         examinerVoiceRef.current = parsed.selectedExaminer;
@@ -162,7 +175,7 @@ export default function VivaVoiceAi({
         setMessages(parsed.conversation);
       }
     }
-  }, []);
+  }, [initialCandidate]);
 
   const {
     transcript,
@@ -180,7 +193,6 @@ export default function VivaVoiceAi({
 
 
   const hasStartedRef = useRef(false);
-  const firstQuestionRef = useRef<Awaited<ReturnType<typeof next>> | null>(null);
   const examinerVoiceRef = useRef(selectedExaminer);
   const endingRef = useRef(false);
   const endIntentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -198,7 +210,8 @@ export default function VivaVoiceAi({
   const messagesRef = useRef<CandidateConversationMessage[]>([]);
   const selectedMicDeviceIdRef = useRef<string | undefined>(undefined);
   const prefetchedPhaseRef = useRef("assessment");
-  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveHistoryRef = useRef<Array<{ question: string; answer: string }>>([]);
+  const liveAnswerLockRef = useRef(false);
 
   const [readyVisible, setReadyVisible] = useState(true);
   const [ending, setEnding] = useState(false);
@@ -210,6 +223,8 @@ export default function VivaVoiceAi({
   const [isListening, setIsListening] = useState(false);
   const [keywordDetected, setKeywordDetected] = useState(false);
   const [candidateTranscript, setCandidateTranscript] = useState("");
+  const [liveQuestion, setLiveQuestion] = useState("");
+  const [liveUserTranscript, setLiveUserTranscript] = useState("");
   const [fastPauseState, setFastPauseState] = useState<FastPauseState>("idle");
   const [candidateStatusDot, setCandidateStatusDot] = useState<CandidateStatusDot>("idle");
   const [fastTimerStarted, setFastTimerStarted] = useState(false);
@@ -719,22 +734,28 @@ export default function VivaVoiceAi({
     setSessionError(null);
     setThinking(true);
     try {
-      // next() reads the backend-authored case questions directly. Retain the
-      // first result so an audio retry cannot consume the next question.
-      const data = firstQuestionRef.current ?? await next("");
-      if (!data?.question || data.exit) throw new Error("No questions are available for this viva. Please choose another case.");
-      firstQuestionRef.current = data;
+      const greeting = `Hi ${candidate.name || "there"}, how are you doing today ?`;
       if (endingRef.current) return false;
-      const question = data.question;
-      setMessages([
-        { id: crypto.randomUUID(), role: "ai", text: question },
-        ...(data.imageUsed && data.imageLink ? [{
-          id: crypto.randomUUID(), role: "image" as const,
-          src: resolveExhibitSrc(data.imageLink), description: data.imageDescription || undefined,
+      setMessages([{ id: crypto.randomUUID(), role: "ai", text: greeting }]);
+      await speakAsExaminer(greeting);
+      if (endingRef.current) return false;
+
+      const firstQuestion = await next("");
+      if (!firstQuestion?.question || firstQuestion.exit) {
+        throw new Error("No questions are available for this viva. Please choose another case.");
+      }
+      setMessages((items) => [
+        ...items,
+        { id: crypto.randomUUID(), role: "ai", text: firstQuestion.question! },
+        ...(firstQuestion.imageUsed && firstQuestion.imageLink ? [{
+          id: crypto.randomUUID(),
+          role: "image" as const,
+          src: resolveExhibitSrc(firstQuestion.imageLink),
+          description: firstQuestion.imageDescription || undefined,
         }] : []),
       ]);
-      applyApiResponse(data);
-      await speakAsExaminer(question, () => {
+      applyApiResponse(firstQuestion);
+      await speakAsExaminer(firstQuestion.question, () => {
         if (endingRef.current) return;
         markSpeechEnded();
         beginListeningForAnswer();
@@ -762,60 +783,85 @@ export default function VivaVoiceAi({
     startSession: startLiveSession,
     beginViva: beginLiveViva,
     stopSession: stopLiveSession,
-    resumeAudioOutput,
-    transcript: liveTranscript,
-    candidateLiveTranscript,
-    liveExhibitId,
-    clearLiveExhibit,
-    speaking: liveSpeaking,
-    turns: liveTurns,
-    startupStage: liveStartupStage,
-    backendError: liveBackendError,
-  } = useGeminiLive(vivaCase, user?.idToken, candidate);
-  const examinerSpeaking = liveActive && !isFastMode ? liveSpeaking : speaking;
-  const stageTranscript = liveActive && !isFastMode ? liveTranscript : transcript;
-  const liveExhibit = liveExhibitId
-    ? vivaCase.exhibits.find((item) => item.id === liveExhibitId && item.kind.toLowerCase() === "image")
-    : undefined;
-  const liveExhibitSrc = liveExhibit ? resolveCaseExhibitSrc(liveExhibit) : "";
+    amplitude: liveAmplitude,
+    speakText: speakLiveText,
+  } = useGeminiLive(vivaCase, (vivaCase as any).persona, {
+    onInputTranscript: (text) => {
+      setLiveUserTranscript(text);
+      if (!liveCandidateMsgId.current) {
+        const messageId = crypto.randomUUID();
+        liveCandidateMsgId.current = messageId;
+        setMessages((items) => [...items, {
+          id: messageId,
+          role: "candidate",
+          text,
+          live: true,
+        }]);
+      } else {
+        setMessages((items) => items.map((item) =>
+          item.id === liveCandidateMsgId.current ? { ...item, text, live: true } : item
+        ));
+      }
+    },
+    onInputTurnComplete: (text) => {
+      void submitLiveAnswer(text);
+    },
+  });
 
-  useEffect(() => {
-    if (liveBackendError) setSessionError(liveBackendError);
-  }, [liveBackendError]);
-
-  useEffect(() => {
-    if (!liveActive || isFastMode || !vivaStarted || endingRef.current || !isVivaEndRequest(candidateLiveTranscript)) {
+  async function presentLiveQuestion(data: Awaited<ReturnType<typeof next>>) {
+    if (!data?.question || data.exit) {
+      await endViva();
       return;
     }
 
-    const timeout = setTimeout(() => {
-      if (!endingRef.current) void endVivaRef.current?.();
-    }, 1800);
-    endIntentTimeoutRef.current = timeout;
-    return () => {
-      clearTimeout(timeout);
-      if (endIntentTimeoutRef.current === timeout) endIntentTimeoutRef.current = null;
-    };
-  }, [candidateLiveTranscript, liveActive, isFastMode, vivaStarted]);
+    const question = data.question;
+    setLiveQuestion(question);
+    setMessages((items) => [
+      ...items,
+      { id: crypto.randomUUID(), role: "ai", text: question },
+      ...(data.imageUsed && data.imageLink ? [{
+        id: crypto.randomUUID(),
+        role: "image" as const,
+        src: resolveExhibitSrc(data.imageLink),
+        description: data.imageDescription || undefined,
+      }] : []),
+    ]);
+    applyApiResponse(data);
+    setLiveUserTranscript("");
+    liveCandidateMsgId.current = null;
+    await speakLiveText(question);
+  }
 
-  function revealControls() {
-    setControlsVisible(true);
-    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    if (vivaStarted) {
-      controlsTimeoutRef.current = setTimeout(() => setControlsVisible(false), 4200);
+  async function submitLiveAnswer(answer: string) {
+    if (!answer.trim() || endingRef.current || liveAnswerLockRef.current) return;
+    liveAnswerLockRef.current = true;
+    const finalAnswer = answer.trim();
+    setLiveUserTranscript(finalAnswer);
+    if (liveCandidateMsgId.current) {
+      setMessages((items) => items.map((item) =>
+        item.id === liveCandidateMsgId.current ? { ...item, text: finalAnswer, live: false } : item
+      ));
+    }
+    liveHistoryRef.current.push({ question: liveQuestion || "Candidate opening response", answer: finalAnswer });
+    setThinking(true);
+    try {
+      const data = await next(finalAnswer, false, elapsedSec);
+      await presentLiveQuestion(data);
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : "Unable to continue your viva.");
+    } finally {
+      setThinking(false);
+      liveAnswerLockRef.current = false;
     }
   }
 
-  useEffect(() => {
-    if (!vivaStarted) {
-      setControlsVisible(true);
-      return;
-    }
-    controlsTimeoutRef.current = setTimeout(() => setControlsVisible(false), 4200);
-    return () => {
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    };
-  }, [vivaStarted]);
+  async function startLiveViva(firstQuestion: Awaited<ReturnType<typeof next>>) {
+    const greeting = `Hi ${candidate.name || "there"}, how are you doing today ?`;
+    setMessages([{ id: crypto.randomUUID(), role: "ai", text: greeting }]);
+    setLiveQuestion(greeting);
+    await speakLiveText(greeting);
+    await presentLiveQuestion(firstQuestion);
+  }
 
   async function handleBegin(
     cameraPref = true,
@@ -827,23 +873,20 @@ export default function VivaVoiceAi({
     setPreparingCase(true);
     setSessionError(null);
 
-    if (selectedMode === "calm") {
+    if (aiMode) {
       try {
         hasStartedRef.current = true;
-        examinerVoiceRef.current = examinerChoice;
-        setSelectedExaminer(examinerChoice);
-        setCameraEnabled(cameraPref);
-        setCameraOn(cameraPref);
-        selectedMicDeviceIdRef.current = micDeviceId;
-        await startLiveSession(examinerChoice, selectedMode, micDeviceId);
-        beginLiveViva();
+        const firstQuestion = await next("");
+        await startLiveSession();
         setReadyVisible(false);
         setVivaStarted(true);
+        setPreparingCase(false);
+        await startLiveViva(firstQuestion);
       } catch (error) {
         hasStartedRef.current = false;
-        setSessionError(error instanceof Error ? error.message : "Unable to connect the live viva.");
+        setSessionError(error instanceof Error ? error.message : "Unable to start the AI simulated viva.");
       } finally {
-        setPreparingCase(false);
+        if (!endingRef.current) setPreparingCase(false);
       }
       return;
     }
@@ -914,53 +957,14 @@ export default function VivaVoiceAi({
   async function endViva() {
     if (endingRef.current || ending) return;
 
+    const wasLiveSession = liveActive;
     endingRef.current = true;
     advanceLockRef.current = true;
     setEnding(true);
     setReportGenerationFailed(false);
     setSessionError(null);
     stopExaminerAudio();
-    if (!isFastMode) {
-      setIsListening(false);
-      stopLiveSession();
-      const liveQa = mergeCurrentCandidateAnswer(liveTurns.reduce<Array<{ question: string; answer: string }>>((rows, turn) => {
-        if (turn.role === "ai") {
-          rows.push({ question: turn.text, answer: "" });
-        } else if (rows.length) {
-          rows[rows.length - 1].answer = `${rows[rows.length - 1].answer} ${turn.text}`.trim();
-        } else {
-          rows.push({ question: "", answer: turn.text });
-        }
-        return rows;
-      }, []).filter((item) => item.question || item.answer), candidateLiveTranscript);
-      try {
-        const storedLive = localStorage.getItem("candidateInfo");
-        if (storedLive) {
-          const parsed = JSON.parse(storedLive);
-          parsed.qaHistory = liveQa;
-          parsed.conversation = liveTurns.map((turn, index) => ({
-            id: `live-${index}`,
-            role: turn.role,
-            text: turn.text,
-            live: true,
-          }));
-          localStorage.setItem("candidateInfo", JSON.stringify(parsed));
-        }
-      } catch (error) {
-        console.warn("Unable to save the live transcript locally:", error);
-      }
-      try {
-        await generateScore(liveQa, true, user?.idToken);
-      } catch (error) {
-        console.error("Unable to generate the viva report:", error);
-        setSessionError(error instanceof Error ? error.message : "The viva ended, but the report could not be generated.");
-        setReportGenerationFailed(true);
-        setEnding(false);
-        endingRef.current = false;
-        advanceLockRef.current = false;
-      }
-      return;
-    }
+    stopLiveSession();
     setIsListening(false);
     stop();
     closeSocket();
@@ -982,38 +986,29 @@ export default function VivaVoiceAi({
     setFastPauseState("idle");
     setFastTimerStarted(false);
 
-    try {
-      const stored = localStorage.getItem("candidateInfo");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const qaHistory = getHistory();
-        parsed.qaHistory = qaHistory;
-        parsed.conversation =
-          messagesRef.current.length > 0
-            ? messagesRef.current
-            : buildConversationFromQaHistory(qaHistory);
-        parsed.selectedCaseId = vivaCase.id;
-        parsed.selectedCaseTitle = vivaCase.case.title;
-        parsed.selectedCase = vivaCase;
-        parsed.selectedMode = selectedMode;
-        parsed.selectedExaminer = selectedExaminer;
-        parsed.selectedExaminerId = selectedExaminer.id;
-        localStorage.setItem("candidateInfo", JSON.stringify(parsed));
-      }
-    } catch (error) {
-      console.warn("Unable to save the viva transcript locally:", error);
+    const stored = localStorage.getItem("candidateInfo");
+    const parsed = stored ? JSON.parse(stored) : {};
+    if (candidate.name && candidate.email) {
+      parsed.name = candidate.name;
+      parsed.email = candidate.email;
+    }
+    if (candidate.name || candidate.email || stored) {
+      const qaHistory = getHistory();
+      parsed.qaHistory = wasLiveSession && liveHistoryRef.current.length ? liveHistoryRef.current : qaHistory;
+      parsed.conversation =
+        messagesRef.current.length > 0
+          ? messagesRef.current
+          : buildConversationFromQaHistory(qaHistory);
+      parsed.selectedCaseId = vivaCase.id;
+      parsed.selectedCaseTitle = vivaCase.case.title;
+      parsed.selectedCase = vivaCase;
+      parsed.selectedMode = selectedMode;
+      parsed.selectedExaminer = selectedExaminer;
+      parsed.selectedExaminerId = selectedExaminer.id;
+      localStorage.setItem("candidateInfo", JSON.stringify(parsed));
     }
 
-    try {
-      await generateScore();
-    } catch (error) {
-      console.error("Unable to generate the viva report:", error);
-      setSessionError(error instanceof Error ? error.message : "The viva ended, but the report could not be generated.");
-      setReportGenerationFailed(true);
-      setEnding(false);
-      endingRef.current = false;
-      advanceLockRef.current = false;
-    }
+    await generateScore(wasLiveSession ? liveHistoryRef.current : undefined);
   }
   endVivaRef.current = endViva;
 
@@ -1145,20 +1140,98 @@ export default function VivaVoiceAi({
         />
       </div>
 
-      <header className="absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 px-4 pt-4 sm:px-7 sm:pt-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/6 text-xs font-semibold text-white/80">U</div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-white/45">Urologics · AI Viva</p>
-            <p className="truncate text-sm font-medium text-white/90 sm:text-base">{selectedExaminer.name}</p>
+                        <div className="flex items-center gap-2">
+                      <ThemeToggle />
+            {vivaCase.isUroAiPowered && (
+              <span className="flex items-center gap-1.5 rounded-full bg-cyan-100 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[#0f7896] shadow-[0_0_12px_rgba(15,120,150,0.2)]">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500"></span>
+                </span>
+                UroAI Powered
+              </span>
+            )}
+            <span className="rounded-full border border-[#0f7896]/12 bg-cyan-50 px-3 py-1 text-xs uppercase tracking-[0.18em] text-[#071014]/65">
+
+            {isFastMode ? "Fast and Furious" : "Live Viva"}
+            </span>
+            <div className="flex items-center gap-2 rounded-full bg-[#0f7896] px-3 py-1.5 text-sm font-semibold text-white">
+              <Clock size={14} />
+              <span>{minutes}:{seconds.toString().padStart(2, "0")}</span>
+            </div>
           </div>
         </div>
-        <div className="mr-[min(35vw,280px)] hidden max-w-[35vw] truncate pt-2 text-sm text-white/55 sm:block">{vivaCase.case.title}</div>
-        <div className="flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-2 text-sm tabular-nums text-white/80 backdrop-blur-md">
-          <Clock size={14} />
-          <span>{minutes}:{seconds.toString().padStart(2, "0")}</span>
-        </div>
-      </header>
+      </div>
+
+      <div className="min-h-0 flex-1 p-3 sm:p-4 md:p-5">
+        <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-3 md:grid-cols-[minmax(0,4fr)_minmax(220px,1fr)] md:grid-rows-1 md:gap-4">
+          <section className="relative min-h-0 overflow-hidden rounded-[24px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)] md:rounded-[28px]">
+          <AiPanel
+            amplitude={amplitude}
+            speaking={examinerSpeaking}
+            thinking={thinking}
+            transcript={transcript}
+            keywordDetected={keywordDetected}
+            liveMode={aiMode || liveActive}
+            liveQuestion={liveQuestion}
+            liveUserTranscript={liveUserTranscript}
+            liveMessages={messages}
+                avatarVideo={null}
+
+            exhibit={
+                exhibit?.type === "image" ? (
+                  <div className="relative mx-auto flex h-full max-w-full items-center justify-center md:max-w-3xl">
+                    <img
+                      src={exhibit.src}
+                      alt="Viva exhibit"
+                      className="max-h-[60vh] w-auto rounded-2xl shadow-xl md:max-h-[70vh]"
+                    />
+
+                    <button
+                      onClick={clearExhibit}
+                      className="absolute right-2 top-2 rounded-full bg-black/70 px-3 py-1 text-xs text-white transition-colors hover:bg-black/90 md:right-3 md:top-3"
+                    >
+                      Close
+                    </button>
+                  </div>
+                ) : null
+              }
+            />
+          </section>
+
+          <aside className="flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)] md:rounded-[28px]">
+            <div className="hidden border-b border-[#0f7896]/10 px-4 py-3 md:block">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#0f7896]">Candidate</p>
+              <p className="mt-0.5 truncate text-sm font-semibold text-[#071014]">{candidate.name || "You"}</p>
+            </div>
+
+            <div className="aspect-video min-h-[112px] w-full overflow-hidden rounded-[24px] bg-slate-950 md:min-h-0 md:flex-1 md:aspect-auto">
+              <CandidatePanel
+                cameraOn={cameraOn}
+                listening={isListening || (liveActive && !liveConnecting)}
+                statusDot={liveActive ? "speaking" : candidateStatusDot}
+                micLevel={liveActive ? liveAmplitude : micLevel}
+              />
+            </div>
+
+            <div className="border-t border-[#0f7896]/10 bg-[#f8fcfd] p-3 md:p-4">
+              <p className="mb-3 hidden text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-[#071014]/40 md:block">Call controls</p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setCameraOn((v) => !v)}
+                  disabled={!cameraEnabled}
+                  className={`group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium transition-colors ${
+                    cameraEnabled
+                      ? "text-[#071014]/70 hover:bg-cyan-50"
+                      : "cursor-not-allowed text-[#071014]/25"
+                  }`}
+                  title={cameraEnabled ? "Toggle camera" : "Camera not enabled in system check"}
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#0f7896]/15 bg-white shadow-sm transition group-hover:border-[#0f7896]/30">
+                    {cameraOn ? <CameraOff size={17} /> : <Camera size={17} />}
+                  </span>
+                  <span>{cameraOn ? "Camera off" : "Camera on"}</span>
+                </button>
 
       <aside className="absolute right-4 top-19 z-20 w-[min(58vw,340px)] min-w-28 sm:right-7 sm:top-24">
         <div className="aspect-video overflow-hidden rounded-lg border border-white/15 bg-[#202326] shadow-2xl">
@@ -1189,47 +1262,21 @@ export default function VivaVoiceAi({
         </button>
       )}
 
-      <div className={`absolute bottom-5 left-1/2 z-40 -translate-x-1/2 transition-all duration-300 ${controlsVisible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-24 opacity-0"}`}>
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-[#242629]/90 p-2 shadow-2xl backdrop-blur-2xl sm:gap-3 sm:px-3">
-          <button
-            type="button"
-            onClick={() => setCameraOn((current) => !current)}
-            disabled={!cameraEnabled}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-35"
-            title={cameraOn ? "Turn camera off" : "Turn camera on"}
-            aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}
-          >
-            {cameraOn ? <CameraOff size={19} /> : <Camera size={19} />}
-          </button>
-          <button
-            type="button"
-            onClick={() => setHistoryOpen((open) => !open)}
-            className={`flex h-11 w-11 items-center justify-center rounded-full transition ${historyOpen ? "bg-white text-[#161819]" : "bg-white/10 text-white hover:bg-white/20"}`}
-            title={historyOpen ? "Close transcript" : "Open transcript"}
-            aria-label={historyOpen ? "Close transcript" : "Open transcript"}
-          >
-            <Captions size={20} />
-          </button>
-          <button
-            type="button"
-            onClick={() => void resumeAudioOutput().catch((error) => setSessionError(error instanceof Error ? error.message : "Unable to resume examiner audio."))}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-            title="Enable examiner audio"
-            aria-label="Enable examiner audio"
-          >
-            <Volume2 size={19} />
-          </button>
-          <div className="mx-1 hidden h-7 w-px bg-white/15 sm:block" />
-          <button
-            type="button"
-            onClick={endViva}
-            disabled={(!vivaStarted && !liveActive) || ending}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e5484d] text-white transition hover:bg-[#f05a5f] disabled:cursor-not-allowed disabled:opacity-40"
-            title="End viva"
-            aria-label="End viva"
-          >
-            <PhoneOff size={19} />
-          </button>
+                                <button
+                  onClick={endViva}
+                  disabled={(!vivaStarted && !liveActive) || ending}
+
+                  className="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 text-[10px] font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="End viva examination"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-red-600 text-white shadow-[0_6px_16px_rgba(220,38,38,0.25)] transition group-hover:bg-red-700">
+                    <PhoneOff size={17} />
+                  </span>
+                  <span>End viva</span>
+                </button>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </main>

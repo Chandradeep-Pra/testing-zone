@@ -37,6 +37,11 @@ type VivaCredit = {
 const PRICING_URL = "https://urologics.co.uk/pricing";
 const UNFILED_FOLDER_KEY = "unfiled";
 const UNFILED_FOLDER_NAME = "Unfiled Viva Cases";
+const AI_SIMULATION_EMAILS = new Set([
+  "chadnradeepp611@gmail.com",
+  "chandradeepp611@gmail.com",
+  "ankitgoel042@gmail.com",
+]);
 
 const VivaCasesPage: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -96,6 +101,11 @@ const VivaCasesPage: React.FC = () => {
     return viva.access ? Boolean(viva.access.allowed) : true;
   }
 
+  function canRunAiSimulation() {
+    const email = user?.email?.trim().toLowerCase() || "";
+    return AI_SIMULATION_EMAILS.has(email) || email.endsWith("@urologics.co.uk");
+  }
+
   function openCase(viva: VivaCaseWithAccess) {
     if (!isVivaAllowed(viva)) {
       window.open(PRICING_URL, "_blank", "noopener,noreferrer");
@@ -109,6 +119,12 @@ const VivaCasesPage: React.FC = () => {
         ? `/public-viva/${viva.id}?mode=${selectedMode}&source=ai-viva-cases`
         : `/ai-viva/session/${viva.id}?mode=${selectedMode}`
     );
+  }
+
+  function openAiSimulation(viva: VivaCaseWithAccess) {
+    if (!isVivaAllowed(viva) || !canRunAiSimulation()) return;
+    const selectedMode = getSelectedMode(viva);
+    router.push(`/ai-viva/session/${viva.id}?mode=${selectedMode}&ai=1`);
   }
 
   const levels = Array.from(new Set(cases.map((c) => c.case.level)));
@@ -459,6 +475,20 @@ const VivaCasesPage: React.FC = () => {
     </button>
   </div>
 </div>
+
+                  {canRunAiSimulation() && isVivaAllowed(viva) ? (
+                    <button
+                      type="button"
+                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--accent)]/35 bg-[var(--accent-soft)] px-5 py-2.5 text-xs font-semibold text-[var(--accent-strong)] transition hover:border-[var(--accent)] hover:bg-[var(--surface-raised)]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAiSimulation(viva);
+                      }}
+                    >
+                      <Sparkles size={14} />
+                      Run AI simulated Viva
+                    </button>
+                  ) : null}
 
                   <div className="mt-6 space-y-2.5">
                     {viva.case.objectives.slice(0, 3).map((objective, objectiveIndex) => (

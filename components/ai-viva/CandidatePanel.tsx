@@ -8,6 +8,7 @@ type Props = {
   listening: boolean;
   transcript?: string;
   statusDot?: "idle" | "speaking" | "keyword" | "silence";
+  micLevel?: number;
 };
 
 export function CandidatePanel({
@@ -15,6 +16,7 @@ export function CandidatePanel({
   listening,
   transcript = "",
   statusDot = "idle",
+  micLevel = 0,
 }: Props) {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -96,7 +98,7 @@ export function CandidatePanel({
           autoPlay
           muted
           playsInline
-          className="w-full h-full object-cover"
+          className="h-full w-full rounded-[24px] object-cover"
         />
 
       ) : (
@@ -134,6 +136,27 @@ export function CandidatePanel({
           <span className="hidden sm:inline">Listening</span>
         </div>
       )}
+
+      {listening && (
+        <div className="absolute bottom-2 left-2 right-2 h-1.5 overflow-hidden rounded-full bg-white/15 md:bottom-3 md:left-3 md:right-3">
+          <div
+            className="h-full rounded-full bg-sky-400 transition-[width] duration-75"
+            style={{ width: `${Math.round(Math.max(0, Math.min(1, micLevel)) * 100)}%` }}
+          />
+        </div>
+      )}
+
+      {/* LIVE TRANSCRIPT */}
+
+      {/* {transcript && (
+        <div
+          className="absolute bottom-1 left-1/2 -translate-x-1/2
+          bg-black/70 backdrop-blur px-2 md:px-4 py-1 md:py-2 rounded-lg
+          text-xs md:text-sm text-white max-w-[95%] md:max-w-[90%] text-center line-clamp-2"
+        >
+          {transcript}
+        </div>
+      )} */}
 
     </div>
   );

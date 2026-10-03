@@ -102,7 +102,7 @@ export default function TodayMocksPage() {
 
     if (!user) {
       toast.error("Please login to attend this mock.");
-      router.push("/login");
+      window.location.assign("https://urologics.co.uk/login");
       return;
     }
 

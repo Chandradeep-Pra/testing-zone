@@ -111,7 +111,7 @@ export default function AuthenticatedVivaSessionLoader({ id }: { id: string }) {
             Please login to access this AI Viva session.
           </p>
           <Button asChild className="mt-6 rounded-full bg-[#0f7896] text-white hover:bg-[#0b6078]">
-            <Link href="/login">Login</Link>
+            <a href="https://urologics.co.uk/login">Login</a>
           </Button>
         </section>
       </main>
