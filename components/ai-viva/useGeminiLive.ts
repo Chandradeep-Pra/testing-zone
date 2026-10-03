@@ -6,8 +6,8 @@ import { normalizeSessionStartPayload } from "@/lib/session-start";
 
 function getBackendWebSocketCandidates() {
   const configured =
-    process.env.AI_VIVA_BACKEND_WS_URL ||
-    process.env.AI_VIVA_WS_URL;
+    process.env.NEXT_PUBLIC_AI_VIVA_BACKEND_WS_URL ||
+    process.env.NEXT_PUBLIC_AI_VIVA_WS_URL;
 
   const isLocalPage = typeof window !== "undefined" &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
@@ -18,7 +18,7 @@ function getBackendWebSocketCandidates() {
       : [];
 
   if (!configuredCandidates.length) {
-    throw new Error("The AI Viva WebSocket URL is not configured for this site. Set AI_VIVA_BACKEND_WS_URL to the secure backend WSS address.");
+    throw new Error("The AI Viva WebSocket URL is not configured for this site. Set NEXT_PUBLIC_AI_VIVA_BACKEND_WS_URL to the secure backend WSS address.");
   }
 
   const baseCandidates = configuredCandidates.map((base) => {
