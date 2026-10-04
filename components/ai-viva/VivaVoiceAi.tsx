@@ -840,7 +840,7 @@ export default function VivaVoiceAi({
     setSessionError(null);
     stopExaminerAudio();
     setIsListening(false);
-    stopLiveSession();
+    const liveSessionClosed = stopLiveSession(true);
     stop();
     closeSocket();
     void setAvatarListening(false);
@@ -890,6 +890,7 @@ export default function VivaVoiceAi({
     }
 
     try {
+      await liveSessionClosed;
       await generateScore(liveQa);
     } catch (error) {
       console.error("Unable to generate the viva report:", error);

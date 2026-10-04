@@ -256,7 +256,7 @@ export function useGeminiLive(
     setSpeaking(false);
   }, []);
 
-  const stopSession = useCallback(() => {
+  const stopSession = useCallback(async (waitForClose = false) => {
     readyRef.current = false;
     initialPromptSentRef.current = false;
     if (sessionEndTimerRef.current) clearTimeout(sessionEndTimerRef.current);
@@ -265,11 +265,27 @@ export function useGeminiLive(
     silenceCheckInTimerRef.current = null;
     const socket = sessionRef.current;
     sessionRef.current = null;
-    if (socket instanceof WebSocket && socket.readyState === WebSocket.OPEN) {
-      if (backendSessionReadyRef.current) {
+    let socketClosed: Promise<void> | undefined;
+    if (socket instanceof WebSocket) {
+      if (waitForClose && socket.readyState !== WebSocket.CLOSED) {
+        socketClosed = new Promise<void>((resolve, reject) => {
+          const handleClose = () => {
+            clearTimeout(timeout);
+            resolve();
+          };
+          const timeout = setTimeout(() => {
+            socket.removeEventListener("close", handleClose);
+            reject(new Error("The live session did not close; the report was not generated."));
+          }, 10_000);
+          socket.addEventListener("close", handleClose, { once: true });
+        });
+      }
+      if (socket.readyState === WebSocket.OPEN && backendSessionReadyRef.current) {
         socket.send(JSON.stringify({ type: "session_complete" }));
       }
-      socket.close(1000, "Viva completed");
+      if (socket.readyState !== WebSocket.CLOSED) {
+        socket.close(1000, "Viva completed");
+      }
     } else {
       socket?.close?.();
     }
@@ -289,6 +305,7 @@ export function useGeminiLive(
     stopPlayback();
     clearLiveExhibit();
     setActive(false);
+    await socketClosed;
   }, [stopPlayback, clearLiveExhibit]);
 
   const playAudioChunk = useCallback((base64Data: string) => {
