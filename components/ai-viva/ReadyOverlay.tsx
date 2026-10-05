@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Volume2,
   Sparkles,
+  ArrowLeft,
 } from "lucide-react";
 import Image from "next/image";
 import { appPath } from "@/lib/app-path";
@@ -25,8 +26,11 @@ import {
 
 type ReadyOverlayProps = {
   onBegin: (cameraEnabled: boolean, examiner: ExaminerVoice, micDeviceId?: string) => void | Promise<void>;
+  onCandidateReady?: (candidate: { name: string; email: string }) => void | Promise<void>;
   vivaTitle: string;
   selectedMode: VivaMode;
+  candidate: { name: string; email: string };
+  onCandidateChange: (candidate: { name: string; email: string }) => void;
   errorMessage?: string | null;
   isStarting?: boolean;
   startupStage?: "idle" | "server" | "websocket" | "gemini" | "microphone" | "speaker" | "ready" | "error";
@@ -44,12 +48,18 @@ const STARTUP_STAGES = [
 
 export default function ReadyOverlay({
   onBegin,
+  onCandidateReady,
   vivaTitle,
   selectedMode,
+  candidate,
+  onCandidateChange,
   errorMessage,
   isStarting = false,
   startupStage = "idle",
 }: ReadyOverlayProps) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [infoError, setInfoError] = useState<string | null>(null);
+  const [savingCandidate, setSavingCandidate] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
 
@@ -108,7 +118,7 @@ export default function ReadyOverlay({
 
   useEffect(() => {
     let cancelled = false;
-    if (!cameraEnabled) {
+    if (!cameraEnabled || step !== 2) {
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       cameraStreamRef.current = null;
       setCameraStream(null);
@@ -138,14 +148,37 @@ export default function ReadyOverlay({
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       cameraStreamRef.current = null;
     };
-  }, [cameraEnabled]);
+  }, [cameraEnabled, step]);
 
   useEffect(() => {
     if (videoRef.current && cameraStream) {
       videoRef.current.srcObject = cameraStream;
       void videoRef.current.play().catch(() => {});
     }
-  }, [cameraStream]);
+  }, [cameraStream, step]);
+
+  async function goToHardwareCheck() {
+    const name = candidate.name.trim();
+    const email = candidate.email.trim();
+    if (!name) {
+      setInfoError("Please enter your name.");
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setInfoError("Please enter a valid email or leave it blank.");
+      return;
+    }
+    setInfoError(null);
+    setSavingCandidate(true);
+    try {
+      await onCandidateReady?.({ name, email });
+      setStep(2);
+    } catch (error) {
+      setInfoError(error instanceof Error ? error.message : "Unable to save candidate details. Please retry.");
+    } finally {
+      setSavingCandidate(false);
+    }
+  }
 
   const micChecked = micAllowed && micVoiceDetected;
   const speakerChecked = speakerConfirmed;
@@ -192,8 +225,8 @@ export default function ReadyOverlay({
 
   return (
     <div className="fixed inset-0 z-50 h-dvh overflow-hidden bg-[var(--background)] text-[var(--text-primary)]">
-      <div className="h-full overflow-y-auto overscroll-contain urologics-minimal-scrollbar">
-        <div className="mx-auto max-w-6xl px-4 py-4 pb-28 sm:px-7 sm:py-6 sm:pb-32">
+      <div className={`h-full overscroll-contain urologics-minimal-scrollbar ${step === 2 ? "overflow-hidden" : "overflow-y-auto lg:overflow-hidden"}`}>
+        <div className={`mx-auto max-w-6xl sm:px-7 ${step === 2 ? "flex h-full flex-col px-4 py-3 sm:py-4" : "px-4 py-4 pb-28 sm:py-6 sm:pb-28"}`}>
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
           
           <div className="flex items-center gap-3">
@@ -208,24 +241,48 @@ export default function ReadyOverlay({
           </div>
         </header>
 
-        <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:gap-0">
-          <section className="py-6 lg:pr-9">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">Session setup</p>
-                <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{vivaTitle}</h2>
+        <p className={`mt-3 shrink-0 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)] ${step === 2 ? "mb-2" : ""}`}>
+          Step {step} of 2 · {step === 1 ? "Candidate & examiner" : "Hardware check"}
+        </p>
+        <div className={`mx-auto w-full max-w-6xl ${step === 2 ? "min-h-0 flex-1" : ""}`}>
+          {step === 1 && (
+          <section className="grid gap-5 py-4 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:gap-8 lg:py-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">Candidate information</p>
+              <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{vivaTitle}</h2>
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--text-secondary)]">
+                <span className="inline-flex items-center gap-1.5"><Mic size={14} className="text-[var(--accent-strong)]" /> Live voice viva</span>
+                <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={14} className="text-[var(--accent-strong)]" /> Case-based assessment</span>
+                <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={14} className="text-[var(--accent-strong)]" /> Adaptive follow-ups</span>
               </div>
-              
+              <div className="mt-6 grid gap-4">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Full name</span>
+                <input
+                  type="text"
+                  value={candidate.name}
+                  onChange={(e) => onCandidateChange({ ...candidate, name: e.target.value })}
+                  placeholder="Enter your full name"
+                  className="urologics-input"
+                  autoComplete="name"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Email address</span>
+                <input
+                  type="email"
+                  value={candidate.email}
+                  onChange={(e) => onCandidateChange({ ...candidate, email: e.target.value })}
+                  placeholder="Enter your email"
+                  className="urologics-input"
+                  autoComplete="email"
+                />
+              </label>
+                {infoError && <p role="alert" className="text-sm text-rose-600">{infoError}</p>}
+              </div>
             </div>
 
-            <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[var(--text-secondary)]">
-              <span className="inline-flex items-center gap-1.5"><Mic size={14} className="text-[var(--accent-strong)]" /> Live voice viva</span>
-             
-              <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={14} className="text-[var(--accent-strong)]" /> Case-based assessment</span>
-              <span className="inline-flex items-center gap-1.5"><CheckCircle2 size={14} className="text-[var(--accent-strong)]" /> Adaptive follow-ups</span>
-            </div>
-
-            <div className="mt-8">
+            <div>
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div>
                   <h3 className="text-base font-semibold text-[var(--text-primary)]">Choose your examiner</h3>
@@ -233,7 +290,7 @@ export default function ReadyOverlay({
                 </div>
                 <span className="text-xs text-[var(--text-secondary)]">{examiners.length} available</span>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              <div className="grid gap-2 md:grid-cols-2">
                 {examiners.map((examiner) => {
                   const active = examiner.id === selectedExaminerId;
                   return (
@@ -260,31 +317,30 @@ export default function ReadyOverlay({
                   );
                 })}
               </div>
+              <section className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-3 sm:p-4">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                  <Sparkles size={17} className="text-[var(--accent-strong)]" />
+                  Before you begin
+                </h3>
+                {selectedMode === "calm" ? (
+                  <ul className="mt-2 space-y-1 text-xs leading-5 text-[var(--text-secondary)]">
+                    <li>If the examiner stops responding, ask: “Are you there?”</li>
+                    <li>Use headphones for clear audio; let questions finish before answering.</li>
+                  </ul>
+                ) : (
+                  <ul className="mt-2 space-y-1 text-xs leading-5 text-[var(--text-secondary)]">
+                    <li>Expect brisk follow-ups; keep answers focused and lead with the clinical decision.</li>
+                    <li>Prioritise diagnosis, investigations, and immediate management.</li>
+                  </ul>
+                )}
+              </section>
             </div>
-            <section className="mt-6 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:p-5">
-              <h3 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]">
-                <Sparkles size={17} className="text-[var(--accent-strong)]" />
-                Before you begin
-              </h3>
-              {selectedMode === "calm" ? (
-                <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
-                  <li>If the examiner stops responding, ask: “Are you there?”</li>
-                  <li>Use earphones or headphones for the clearest audio.</li>
-                  <li>Let each question finish, then answer clearly at your own pace.</li>
-                </ul>
-              ) : (
-                <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
-                  <li>Expect brisk questions and follow-ups; keep answers focused.</li>
-                  <li>Lead with the key clinical decision, then add only the essential reasoning.</li>
-                  <li>Prioritise diagnosis, investigations, and immediate management.</li>
-                  <li>Use earphones or headphones and speak clearly into your microphone.</li>
-                </ul>
-              )}
-            </section>
           </section>
+          )}
 
-          <section className="space-y-4 border-t border-[var(--border)] py-6 lg:border-l lg:border-t-0 lg:pl-8">
-            <div className="relative aspect-video overflow-hidden rounded-lg border border-[var(--border)] bg-[#162226]">
+          {step === 2 && (
+          <section className="grid h-[calc(100dvh-12rem)] min-h-0 grid-cols-1 gap-3 py-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+            <div className="relative h-24 overflow-hidden rounded-lg border border-[var(--border)] bg-[#162226] sm:h-32 lg:h-full">
               {cameraEnabled && cameraAllowed && cameraStream ? (
                 <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-cover" />
               ) : (
@@ -310,7 +366,7 @@ export default function ReadyOverlay({
               </button>
             </div>
 
-            <section className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:p-5">
+            <section className="min-h-0 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-3 sm:p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-semibold text-[var(--text-primary)]">Hardware Diagnostics</h3>
@@ -320,7 +376,7 @@ export default function ReadyOverlay({
               </div>
 
               {micAllowed ? (
-                <div className="mt-4 space-y-3">
+                <div className="mt-3 space-y-2">
                   <div>
                     <span className="mb-1.5 block text-xs font-medium text-[var(--text-secondary)]">Microphone input</span>
                     <Select
@@ -332,7 +388,7 @@ export default function ReadyOverlay({
                       }}
                       disabled={isStarting}
                     >
-                      <SelectTrigger aria-label="Select microphone" className="h-11 rounded-2xl border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] shadow-none focus-visible:border-[var(--accent)] focus-visible:ring-[var(--focus)]">
+                      <SelectTrigger aria-label="Select microphone" className="h-10 rounded-xl border-[var(--border)] bg-[var(--surface-tint)] text-[var(--text-primary)] shadow-none focus-visible:border-[var(--accent)] focus-visible:ring-[var(--focus)]">
                         <SelectValue placeholder="Choose microphone" />
                       </SelectTrigger>
                       <SelectContent>
@@ -352,7 +408,7 @@ export default function ReadyOverlay({
                     onVoiceDetected={() => setMicVoiceDetected(true)}
                     label="Input level"
                   />
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] pt-2">
                     <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
                       <Volume2 size={16} className="text-[var(--accent-strong)]" /> Speaker output
                     </span>
@@ -378,10 +434,11 @@ export default function ReadyOverlay({
             </section>
 
           </section>
+          )}
         </div>
         </div>
       </div>
-      <div className="fixed inset-x-0 bottom-0 z-[60]  bg-[var(--background)]/95 px-4 py-3 backdrop-blur sm:px-7 sm:py-4">
+      <div className="fixed inset-x-0 bottom-0 z-[60] bg-[var(--background)]/95 px-4 py-3 backdrop-blur sm:px-7 sm:py-3">
         <div className="relative mx-auto max-w-6xl">
           {showTestHint && !canStart && (
             <div
@@ -394,6 +451,27 @@ export default function ReadyOverlay({
               {!speakerChecked && <p>Please test speaker</p>}
             </div>
           )}
+          {step === 1 ? (
+            <button
+              type="button"
+              onClick={goToHardwareCheck}
+              disabled={savingCandidate}
+              className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#02C39A] px-5 py-3 text-sm font-semibold text-[#073d34] shadow-[0_8px_20px_rgba(2,195,154,0.2)] transition-colors hover:bg-[#00b88f] disabled:cursor-wait disabled:opacity-60"
+            >
+              {savingCandidate ? "Saving candidate details…" : "Continue to hardware check"}
+              {!savingCandidate && <ArrowRight size={18} />}
+            </button>
+          ) : (
+          <div className="flex gap-3">
+          <button
+            type="button"
+            disabled={isStarting}
+            onClick={() => setStep(1)}
+            className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-[var(--border)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-muted)] disabled:opacity-50"
+          >
+            <ArrowLeft size={18} />
+            Back
+          </button>
           <button
             type="button"
             disabled={isStarting}
@@ -406,15 +484,17 @@ export default function ReadyOverlay({
               }
               beginSession();
             }}
-            className={`flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition-colors ${
+            className={`flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition-colors ${
               canStart
                 ? "bg-[#02C39A] text-[#073d34] shadow-[0_8px_20px_rgba(2,195,154,0.2)] hover:bg-[#00b88f]"
-                : "cursor-not-allowed bg-[var(--surface-muted)] text-[var(--text-tertiary)]"
+                : "cursor-not-allowed bg-emerald-500/15 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200"
             }`}
           >
             {isStarting ? "Starting Viva Session…" : "Start Viva Session"}
             {!isStarting && <ArrowRight size={18} />}
           </button>
+          </div>
+          )}
         </div>
       </div>
       {showStartupOverlay && (

@@ -114,11 +114,7 @@ export default function VivaSessionClient({
   const searchParams = useSearchParams();
   const selectedModeFromUrl: VivaMode = searchParams.get("mode") === "fast" ? "fast" : "calm";
   const aiMode = searchParams.get("ai") === "1";
-  const initialState = getStoredCandidate(vivaCase, selectedModeFromUrl, initialCandidate);
-  const [candidate, setCandidate] = useState<CandidateInfo>(initialState.candidate);
-  const [submitted, setSubmitted] = useState(
-    autoStart || (initialState.submitted && initialState.selectedMode === selectedModeFromUrl)
-  );
+  const [initialState] = useState(() => getStoredCandidate(vivaCase, selectedModeFromUrl, initialCandidate));
 
   useEffect(() => {
     if (!autoStart || !initialCandidate?.name) return;
@@ -126,93 +122,14 @@ export default function VivaSessionClient({
     saveCandidateSession(vivaCase, selectedModeFromUrl, initialCandidate);
   }, [autoStart, initialCandidate, selectedModeFromUrl, vivaCase]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const name = candidate.name.trim();
-    const email = candidate.email.trim().toLowerCase();
-
-    if (!name) {
-      toast.error("Please enter your name");
-      return;
-    }
-
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error("Please enter a valid email or leave it blank");
-      return;
-    }
-
-    saveCandidateSession(vivaCase, selectedModeFromUrl, { name, email });
-    setSubmitted(true);
-    toast.success("Starting viva");
-  };
-
-  if (submitted) {
-    return (
-      <main className="min-h-screen bg-white text-[#071014]">
-        <VivaVoiceAi
-          vivaCase={vivaCase}
-          selectedMode={selectedModeFromUrl}
-          initialCandidate={candidate}
-          aiMode={aiMode}
-        />
-      </main>
-    );
-  }
-
   return (
-    <main className="flex min-h-screen items-center justify-center bg-white p-3 text-[#071014] sm:p-4">
-      <Card className="w-full max-w-md rounded-[30px] border-[#0f7896]/12 bg-white shadow-[0_16px_40px_rgba(15,120,150,0.09)] sm:rounded-[28px]">
-        <CardHeader>
-          <img
-            src={appPath("/logo.png")}
-            alt="Urologics"
-            className="mx-auto mb-3 h-16 w-16 object-contain"
-          />
-          <div className="mb-4 text-center text-xs font-semibold uppercase tracking-[0.22em] text-[#0f7896]">
-            Urologics AI
-          </div>
-          <CardTitle className="text-center text-xl text-[#071014] sm:text-2xl">Candidate Information</CardTitle>
-          <p className="text-center text-sm text-[#071014]/65">{vivaCase.case.title}</p>
-          <p className="text-center text-xs uppercase tracking-[0.22em] text-[#0f7896]">
-            {selectedModeFromUrl === "fast" ? "Fast and Furious" : "Calm and Composed"}
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="name" className="mb-1 block text-sm font-medium text-[#071014]/65">
-                Full Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={candidate.name}
-                onChange={(e) => setCandidate({ ...candidate, name: e.target.value })}
-                className="urologics-input"
-                placeholder="Enter your full name"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="mb-1 block text-sm font-medium text-[#071014]/65">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={candidate.email}
-                onChange={(e) => setCandidate({ ...candidate, email: e.target.value })}
-                className="urologics-input"
-                placeholder="Enter your email"
-              />
-            </div>
-            <Button type="submit" className="w-full rounded-full bg-[#0f7896] text-white hover:bg-[#0b6078]">
-              Start Viva
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+    <main className="min-h-screen bg-white text-[#071014]">
+      <VivaVoiceAi
+        vivaCase={vivaCase}
+        selectedMode={selectedModeFromUrl}
+        initialCandidate={initialState.candidate}
+        aiMode={aiMode}
+      />
     </main>
   );
 }

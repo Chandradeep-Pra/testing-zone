@@ -4,6 +4,8 @@ import type { ExaminerVoice, VivaMode } from "@/lib/examiner-voices";
 import { appPath } from "@/lib/app-path";
 import { normalizeSessionStartPayload } from "@/lib/session-start";
 
+const FIRST_MODEL_RESPONSE_TIMEOUT_MS = 45_000;
+
 function getBackendWebSocketCandidates() {
   const configured =
     process.env.NEXT_PUBLIC_AI_VIVA_BACKEND_WS_URL ||
@@ -108,7 +110,7 @@ async function connectToBackendWebSocket(signal?: AbortSignal) {
           cleanup();
           ws.close();
           reject(new Error(`Timed out connecting to the backend live session at ${url}.`));
-        }, 10000);
+        }, 45000);
 
         signal?.addEventListener("abort", handleAbort, { once: true });
         if (signal?.aborted) {
@@ -461,6 +463,15 @@ export function useGeminiLive(
   }, []);
 
   const startSession = useCallback(async (examiner?: ExaminerVoice, mode: VivaMode = "calm", micDeviceId?: string, signal?: AbortSignal) => {
+    const startupStartedAt = performance.now();
+    const logStartupTiming = (stage: string, stageStartedAt = startupStartedAt) => {
+      const now = performance.now();
+      console.info("[AI Viva startup timing]", {
+        stage,
+        totalMs: Math.round(now - startupStartedAt),
+        stageMs: Math.round(now - stageStartedAt),
+      });
+    };
     readyRef.current = false;
     initialPromptSentRef.current = false;
     setConnecting(true);
@@ -506,7 +517,10 @@ export function useGeminiLive(
       if (useFastApiBackend) {
         if (!playbackContext) throw new Error("Audio playback could not be initialized.");
 
+        const webSocketConnectStartedAt = performance.now();
         const { socket: ws, url: connectedUrl } = await connectToBackendWebSocket(signal);
+        const webSocketConnectedAt = performance.now();
+        logStartupTiming("websocket_open", webSocketConnectStartedAt);
         ws.binaryType = "arraybuffer";
         sessionRef.current = ws;
 
@@ -523,6 +537,7 @@ export function useGeminiLive(
         let resolveFirstModelResponse!: () => void;
         let rejectFirstModelResponse!: (error: Error) => void;
         let waitingForFirstModelResponse = false;
+        let openingPromptSentAt: number | null = null;
         const firstModelResponse = new Promise<void>((resolve, reject) => {
           resolveFirstModelResponse = resolve;
           rejectFirstModelResponse = reject;
@@ -537,6 +552,7 @@ export function useGeminiLive(
           setStartupStage("ready");
           readyRef.current = true;
           setActive(true);
+          logStartupTiming("first_model_response", openingPromptSentAt ?? startupStartedAt);
           resolveFirstModelResponse();
         };
         const readyTimeout = setTimeout(() => {
@@ -622,6 +638,7 @@ export function useGeminiLive(
               backendSessionReadyRef.current = true;
               clearTimeout(readyTimeout);
               console.info("[AI Viva backend] Session accepted", { url: connectedUrl });
+              logStartupTiming("backend_session_ready", webSocketConnectedAt);
               resolveSessionReady();
               return;
             }
@@ -810,6 +827,7 @@ export function useGeminiLive(
         }
 
         setStartupStage("microphone");
+        const microphoneSetupStartedAt = performance.now();
         micStreamRef.current = await getUserMediaForStartup({
           audio: {
             echoCancellation: true,
@@ -898,6 +916,7 @@ export function useGeminiLive(
         } finally {
           if (micFrameTimeout) clearTimeout(micFrameTimeout);
         }
+        logStartupTiming("microphone_ready", microphoneSetupStartedAt);
 
         if (ws.readyState !== WebSocket.OPEN) {
           throw new Error("Backend WebSocket closed during microphone startup.");
@@ -911,14 +930,17 @@ export function useGeminiLive(
         firstModelAudioTimeout = setTimeout(() => {
           waitingForFirstModelResponse = false;
           firstModelAudioTimeout = null;
+          logStartupTiming("first_model_response_timeout", openingPromptSentAt ?? startupStartedAt);
           rejectFirstModelResponse(new Error("Gemini Live did not return an opening response. Check backend model access and retry."));
-        }, 45000);
+        }, FIRST_MODEL_RESPONSE_TIMEOUT_MS);
         const candidateName = candidate?.name?.trim() || "there";
         initialPromptSentRef.current = true;
+        openingPromptSentAt = performance.now();
         ws.send(JSON.stringify({
           type: "text",
           text: `Please begin the viva. My name is ${candidateName}.`,
         }));
+        logStartupTiming("opening_prompt_sent", openingPromptSentAt);
         await raceWithStartupAbort(firstModelResponse, signal);
         return;
       }

@@ -105,10 +105,12 @@ export default function VivaVoiceAi({
   vivaCase,
   selectedMode = "calm",
   initialCandidate,
+  onCandidateReady,
 }: {
   vivaCase: VivaCaseRecord;
   selectedMode?: VivaMode;
   initialCandidate?: { name: string; email: string };
+  onCandidateReady?: (candidate: { name: string; email: string }) => void | Promise<void>;
   aiMode?: boolean;
 }) {
   const { user } = useAuth();
@@ -148,6 +150,14 @@ export default function VivaVoiceAi({
       }
     }
   }, [initialCandidate]);
+
+  useEffect(() => {
+    if (!user) return;
+    setCandidate((current) => ({
+      name: current.name || user.name || "",
+      email: current.email || user.email || "",
+    }));
+  }, [user]);
 
   const {
     transcript,
@@ -788,6 +798,8 @@ export default function VivaVoiceAi({
     // Persistence must not prevent the exam from starting.
     try {
       const parsed = JSON.parse(localStorage.getItem("candidateInfo") || "{}");
+      parsed.name = candidate.name.trim();
+      parsed.email = candidate.email.trim().toLowerCase();
       parsed.selectedExaminer = examinerChoice;
       parsed.selectedExaminerId = examinerChoice.id;
       parsed.selectedMicDeviceId = micDeviceId || "";
@@ -796,7 +808,7 @@ export default function VivaVoiceAi({
       console.warn("Unable to save examiner preference:", error);
     }
     const startupController = new AbortController();
-    const startupTimeout = setTimeout(() => startupController.abort(), 5000);
+    const startupTimeout = setTimeout(() => startupController.abort(), 45000);
     try {
       await startLiveSession(examinerChoice, selectedMode, micDeviceId, startupController.signal);
       beginLiveViva();
@@ -927,6 +939,9 @@ export default function VivaVoiceAi({
           onBegin={handleBegin}
           vivaTitle={vivaCase.case.title}
           selectedMode={selectedMode}
+          candidate={candidate}
+          onCandidateChange={setCandidate}
+          onCandidateReady={onCandidateReady}
           errorMessage={sessionError}
           isStarting={preparingCase}
           startupStage={liveStartupStage}
