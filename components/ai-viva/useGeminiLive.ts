@@ -44,45 +44,102 @@ function getBackendWebSocketCandidates() {
   return baseCandidates.map((base) => `${base}/ws/${userId}/${sessionId}`);
 }
 
-async function connectToBackendWebSocket() {
+function abortStartupError() {
+  return new DOMException("Viva startup was cancelled.", "AbortError");
+}
+
+function raceWithStartupAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(abortStartupError());
+
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener("abort", handleAbort);
+    const handleAbort = () => {
+      cleanup();
+      reject(abortStartupError());
+    };
+
+    signal.addEventListener("abort", handleAbort, { once: true });
+    promise.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
+
+function getUserMediaForStartup(constraints: MediaStreamConstraints, signal?: AbortSignal) {
+  const mediaPromise = navigator.mediaDevices.getUserMedia(constraints);
+  void mediaPromise.then((stream) => {
+    if (signal?.aborted) stream.getTracks().forEach((track) => track.stop());
+  }, () => {});
+  return raceWithStartupAbort(mediaPromise, signal);
+}
+
+async function connectToBackendWebSocket(signal?: AbortSignal) {
   const urls = getBackendWebSocketCandidates();
   let lastError: Error | null = null;
 
   for (const url of urls) {
+    if (signal?.aborted) throw abortStartupError();
     try {
       const socket = await new Promise<WebSocket>((resolve, reject) => {
         const ws = new WebSocket(url);
         let settled = false;
+        const cleanup = () => {
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", handleAbort);
+        };
+        const handleAbort = () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          ws.close(1000, "Viva startup cancelled");
+          reject(abortStartupError());
+        };
         const timer = setTimeout(() => {
           if (settled) return;
           settled = true;
+          cleanup();
           ws.close();
           reject(new Error(`Timed out connecting to the backend live session at ${url}.`));
         }, 10000);
 
+        signal?.addEventListener("abort", handleAbort, { once: true });
+        if (signal?.aborted) {
+          handleAbort();
+          return;
+        }
+
         ws.onopen = () => {
           if (settled) return;
           settled = true;
-          clearTimeout(timer);
+          cleanup();
           resolve(ws);
         };
 
         ws.onerror = () => {
           if (settled) return;
           settled = true;
-          clearTimeout(timer);
+          cleanup();
           reject(new Error(`Unable to connect to the backend live session at ${url}.`));
         };
 
         ws.onclose = (event) => {
           if (settled) return;
           settled = true;
-          clearTimeout(timer);
+          cleanup();
           reject(new Error(`Backend closed before connecting (${event.code}: ${event.reason || "no reason provided"}) at ${url}.`));
         };
       });
       return { socket, url };
     } catch (error) {
+      if (signal?.aborted) throw abortStartupError();
       lastError = error instanceof Error ? error : new Error("Unable to connect to the backend live session.");
     }
   }
@@ -403,7 +460,7 @@ export function useGeminiLive(
     }
   }, []);
 
-  const startSession = useCallback(async (examiner?: ExaminerVoice, mode: VivaMode = "calm", micDeviceId?: string) => {
+  const startSession = useCallback(async (examiner?: ExaminerVoice, mode: VivaMode = "calm", micDeviceId?: string, signal?: AbortSignal) => {
     readyRef.current = false;
     initialPromptSentRef.current = false;
     setConnecting(true);
@@ -439,17 +496,17 @@ export function useGeminiLive(
       );
 
       audioContextRef.current = new AudioContext({ sampleRate: 16000 });
-      await audioContextRef.current.resume();
+      await raceWithStartupAbort(audioContextRef.current.resume(), signal);
       if (audioContextRef.current.state !== "running") {
         throw new Error("Audio output is blocked by the browser. Allow sound for this site, then try again.");
       }
 
-      await audioContextRef.current.audioWorklet.addModule(appPath("/audio-processor.js"));
+      await raceWithStartupAbort(audioContextRef.current.audioWorklet.addModule(appPath("/audio-processor.js")), signal);
 
       if (useFastApiBackend) {
         if (!playbackContext) throw new Error("Audio playback could not be initialized.");
 
-        const { socket: ws, url: connectedUrl } = await connectToBackendWebSocket();
+        const { socket: ws, url: connectedUrl } = await connectToBackendWebSocket(signal);
         ws.binaryType = "arraybuffer";
         sessionRef.current = ws;
 
@@ -733,27 +790,27 @@ export function useGeminiLive(
           } : undefined,
           mode,
         }));
-        await sessionReady;
+        await raceWithStartupAbort(sessionReady, signal);
         if (ws.readyState !== WebSocket.OPEN) {
           throw new Error("Backend WebSocket closed after accepting the viva session.");
         }
 
         setStartupStage("speaker");
-        const playbackError = await playbackResume;
+        const playbackError = await raceWithStartupAbort(Promise.resolve(playbackResume), signal);
         if (playbackError) throw playbackError;
         if (playbackContext.state !== "running") {
           throw new Error("Speaker output is not ready. Play the speaker test and check your selected output device.");
         }
 
         setStartupStage("microphone");
-        micStreamRef.current = await navigator.mediaDevices.getUserMedia({
+        micStreamRef.current = await getUserMediaForStartup({
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
             ...(micDeviceId ? { deviceId: { exact: micDeviceId } } : {}),
           },
-        });
+        }, signal);
 
         const micSource = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
         const processor = new AudioWorkletNode(audioContextRef.current, "audio-processor");
@@ -825,12 +882,12 @@ export function useGeminiLive(
 
         let micFrameTimeout: ReturnType<typeof setTimeout> | undefined;
         try {
-          await Promise.race([
+          await raceWithStartupAbort(Promise.race([
             firstMicFrame,
             new Promise<never>((_, reject) => {
               micFrameTimeout = setTimeout(() => reject(new Error("Microphone audio is not reaching the backend live session.")), 5000);
             }),
-          ]);
+          ]), signal);
         } finally {
           if (micFrameTimeout) clearTimeout(micFrameTimeout);
         }
@@ -855,11 +912,11 @@ export function useGeminiLive(
           type: "text",
           text: `Please begin the viva. My name is ${candidateName}.`,
         }));
-        await firstModelAudio;
+        await raceWithStartupAbort(firstModelAudio, signal);
         return;
       }
 
-      const res = await fetch(appPath("/api/viva/live/session"), {
+      const res = await raceWithStartupAbort(fetch(appPath("/api/viva/live/session"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -875,8 +932,9 @@ export function useGeminiLive(
           examinerId: examiner?.id,
           mode,
         }),
-      });
-      const payload = (await res.json()) as {
+        signal,
+      }), signal);
+      const payload = (await raceWithStartupAbort(res.json(), signal)) as {
         token?: string;
         model?: string;
         error?: string;
@@ -905,7 +963,7 @@ export function useGeminiLive(
       });
 
       try {
-        sessionRef.current = await Promise.race([live.live.connect({
+        const liveConnectPromise = live.live.connect({
           model,
           config: {
             responseModalities: [Modality.AUDIO],
@@ -970,29 +1028,32 @@ export function useGeminiLive(
               if (!setupWasReady) rejectSetup(new Error("Gemini closed the connection before the live session was ready."));
             },
           }
-        }), connectTimedOut]);
+        });
+        void liveConnectPromise.then((session) => {
+          if (signal?.aborted) session.close();
+        }, () => {});
+        sessionRef.current = await raceWithStartupAbort(Promise.race([liveConnectPromise, connectTimedOut]), signal);
       } finally {
         if (connectTimeout) clearTimeout(connectTimeout);
       }
 
       setStartupStage((current) => current === "server" ? "websocket" : current);
-      let setupTimeout: ReturnType<typeof setTimeout> | undefined;
-      setupTimeout = setTimeout(() => rejectSetup(new Error("Timed out waiting for Gemini Live session setup.")), 20000);
+      const setupTimeout = setTimeout(() => rejectSetup(new Error("Timed out waiting for Gemini Live session setup.")), 20000);
       try {
-        await setupComplete;
+        await raceWithStartupAbort(setupComplete, signal);
       } finally {
         if (setupTimeout) clearTimeout(setupTimeout);
       }
 
       setStartupStage("microphone");
-      micStreamRef.current = await navigator.mediaDevices.getUserMedia({
+      micStreamRef.current = await getUserMediaForStartup({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
           ...(micDeviceId ? { deviceId: { exact: micDeviceId } } : {}),
         }
-      });
+      }, signal);
 
       const micSource = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
       const processor = new AudioWorkletNode(audioContextRef.current, "audio-processor");
@@ -1021,12 +1082,12 @@ export function useGeminiLive(
       silentGain.connect(audioContextRef.current.destination);
       let micFrameTimeout: ReturnType<typeof setTimeout> | undefined;
       try {
-        await Promise.race([
+        await raceWithStartupAbort(Promise.race([
           firstMicFrame,
           new Promise<never>((_, reject) => {
             micFrameTimeout = setTimeout(() => reject(new Error("Microphone audio is not reaching the live session. Check the selected input device.")), 5000);
           }),
-        ]);
+        ]), signal);
       } finally {
         if (micFrameTimeout) clearTimeout(micFrameTimeout);
       }
@@ -1035,10 +1096,12 @@ export function useGeminiLive(
       readyRef.current = true;
       setActive(true);
     } catch (err) {
-      console.error("Failed to start live session:", err);
-      setBackendError(err instanceof Error ? err.message : "Unable to start the live viva.");
+      if (!signal?.aborted) {
+        console.error("Failed to start live session:", err);
+        setBackendError(err instanceof Error ? err.message : "Unable to start the live viva.");
+      }
       setStartupStage("error");
-      stopSession();
+      await stopSession();
       throw err;
     } finally {
       setConnecting(false);

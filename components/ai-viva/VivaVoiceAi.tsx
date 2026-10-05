@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, PhoneOff, Camera, CameraOff, X, ChevronUp, Captions, Volume2 } from "lucide-react";
+import { Clock, PhoneOff, Camera, CameraOff, X, ChevronUp, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CandidatePanel } from "./CandidatePanel";
@@ -11,7 +11,6 @@ import { useSpeechInput } from "./useSpeechInput";
 import { useVivaEngine } from "./useVivaEngine";
 import ReadyOverlay from "./ReadyOverlay";
 import { useCountdown } from "./useCountdown";
-import ChatTimeline from "./ChatTimeline";
 import { useGeminiLive } from "./useGeminiLive";
 
 import { getDefaultExaminer, type ExaminerVoice } from "@/lib/examiner-voices";
@@ -201,7 +200,6 @@ export default function VivaVoiceAi({
   const [candidateTranscript, setCandidateTranscript] = useState("");
   const [fastPauseState, setFastPauseState] = useState<FastPauseState>("idle");
   const [candidateStatusDot, setCandidateStatusDot] = useState<CandidateStatusDot>("idle");
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [preparingCase, setPreparingCase] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -797,16 +795,19 @@ export default function VivaVoiceAi({
     } catch (error) {
       console.warn("Unable to save examiner preference:", error);
     }
+    const startupController = new AbortController();
+    const startupTimeout = setTimeout(() => startupController.abort(), 5000);
     try {
-      await startLiveSession(examinerChoice, selectedMode, micDeviceId);
+      await startLiveSession(examinerChoice, selectedMode, micDeviceId, startupController.signal);
       beginLiveViva();
       setReadyVisible(false);
       setVivaStarted(true);
     } catch (error) {
       hasStartedRef.current = false;
-      setSessionError(error instanceof Error ? error.message : "Unable to connect the live viva.");
+      setSessionError(startupController.signal.aborted ? "Viva startup timed out." : error instanceof Error ? error.message : "Unable to connect the live viva.");
       setReadyVisible(true);
     } finally {
+      clearTimeout(startupTimeout);
       if (!endingRef.current) setPreparingCase(false);
     }
   }
@@ -942,16 +943,6 @@ export default function VivaVoiceAi({
         </div>
       )}
 
-      {preparingCase && (
-        <div role="status" aria-live="polite" className="absolute inset-0 z-40 flex items-center justify-center bg-white/95 backdrop-blur-sm">
-          <div className="rounded-[28px] border border-[#0f7896]/12 bg-white px-8 py-7 text-center shadow-[0_24px_60px_rgba(15,120,150,0.18)]">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-cyan-100 border-t-[#0f7896]" />
-            <p className="mt-4 text-lg font-semibold text-[#071014]">Preparing your viva</p>
-            <p className="mt-1 text-sm text-[#071014]/55">Connecting your live speech-to-speech examiner.</p>
-          </div>
-        </div>
-      )}
-
       {!preparingCase && !readyVisible && !ending && (sessionError || audioError) && (
         <div role="alert" className="absolute inset-0 z-40 flex items-center justify-center bg-white/95 p-6 backdrop-blur-sm">
           <div className="max-w-md rounded-[28px] border border-[#0f7896]/12 bg-white px-8 py-7 text-center shadow-xl">
@@ -966,38 +957,6 @@ export default function VivaVoiceAi({
             >
               {reportGenerationFailed ? "Retry report" : "Retry question"}
             </button>
-          </div>
-        </div>
-      )}
-
-      {historyOpen && (
-        <div className="pointer-events-none absolute inset-y-4 right-4 z-50 flex w-full max-w-xl justify-end">
-          <div className="pointer-events-auto flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-[#1c1e20] text-white shadow-2xl">
-            <div className="flex items-center justify-between gap-4 border-b border-[#0f7896]/12 px-5 py-4">
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-white/50">
-                  Session Transcript
-                </div>
-                <div className="mt-1 text-base font-semibold text-white">
-                  Examiner questions and your spoken answers
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setHistoryOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10"
-                aria-label="Close history"
-              >
-                <X size={17} />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1">
-              <ChatTimeline
-                messages={messages}
-                micLevel={micLevel}
-                listening={isListening}
-              />
-            </div>
           </div>
         </div>
       )}
@@ -1047,18 +1006,9 @@ export default function VivaVoiceAi({
 
       <aside className="absolute right-4 top-19 z-20 w-[min(58vw,340px)] min-w-28 sm:right-7 sm:top-24">
         <div className="aspect-video overflow-hidden rounded-lg border border-white/15 bg-[#202326] shadow-2xl">
-          <CandidatePanel cameraOn={cameraOn} listening={isListening} transcript={candidateLiveTranscript} statusDot={candidateStatusDot} />
+          <CandidatePanel cameraOn={cameraOn} listening={isListening} statusDot={candidateStatusDot} />
         </div>
         <p className="mt-2 truncate text-right text-xs text-white/65">{candidate.name || "You"}</p>
-        {candidateLiveTranscript && (
-          <div
-            className="ml-auto mt-2 w-full rounded-lg border border-white/10 bg-[#242629]/95 px-3 py-2 text-left text-xs leading-5 text-white shadow-lg sm:text-sm"
-            aria-live="polite"
-            aria-label="Your live transcription"
-          >
-            {candidateLiveTranscript}
-          </div>
-        )}
       </aside>
 
       {!controlsVisible && vivaStarted && (
@@ -1085,15 +1035,6 @@ export default function VivaVoiceAi({
             aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}
           >
             {cameraOn ? <CameraOff size={19} /> : <Camera size={19} />}
-          </button>
-          <button
-            type="button"
-            onClick={() => setHistoryOpen((open) => !open)}
-            className={`flex h-11 w-11 items-center justify-center rounded-full transition ${historyOpen ? "bg-white text-[#161819]" : "bg-white/10 text-white hover:bg-white/20"}`}
-            title={historyOpen ? "Close transcript" : "Open transcript"}
-            aria-label={historyOpen ? "Close transcript" : "Open transcript"}
-          >
-            <Captions size={20} />
           </button>
           <button
             type="button"

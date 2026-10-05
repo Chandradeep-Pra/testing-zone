@@ -6,7 +6,6 @@ import { useEffect, useRef } from "react";
 type Props = {
   cameraOn: boolean;
   listening: boolean;
-  transcript?: string;
   statusDot?: "idle" | "speaking" | "keyword" | "silence";
   micLevel?: number;
 };
@@ -14,7 +13,6 @@ type Props = {
 export function CandidatePanel({
   cameraOn,
   listening,
-  transcript = "",
   statusDot = "idle",
   micLevel = 0,
 }: Props) {

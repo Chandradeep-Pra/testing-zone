@@ -213,7 +213,7 @@ const VivaCasesPage: React.FC = () => {
   return (
     <main className="urologics-shell overflow-hidden">
       <div className="mobile-native-page mx-auto max-w-7xl px-2 pb-8 sm:px-3 sm:py-4">
-        <UrologicsHeader current="AI Viva" product="Uro AI" tag="Case library" />
+        <UrologicsHeader current="AI Viva" product="Urologics AI" tag="Case library" />
 
         <section className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3 sm:mb-5 sm:p-4">
           <div className="mb-3 flex gap-2 overflow-x-auto pb-1">

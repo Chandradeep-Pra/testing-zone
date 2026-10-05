@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   ArrowRight,
-  TimerReset,
+  RefreshCw,
   Volume2,
   Sparkles,
 } from "lucide-react";
@@ -33,6 +33,14 @@ type ReadyOverlayProps = {
 };
 
 const DEFAULT_MIC_DEVICE = "__default_microphone__";
+const STARTUP_STAGES = [
+  ["server", "Preparing session"],
+  ["websocket", "Connecting to voice service"],
+  ["speaker", "Connecting examiner audio"],
+  ["microphone", "Connecting microphone"],
+  ["gemini", "Waiting for examiner"],
+  ["ready", "Connection ready"],
+] as const;
 
 export default function ReadyOverlay({
   onBegin,
@@ -56,6 +64,7 @@ export default function ReadyOverlay({
   const [speakerTonePlayed, setSpeakerTonePlayed] = useState(false);
   const [speakerConfirmed, setSpeakerConfirmed] = useState(false);
   const [speakerTesting, setSpeakerTesting] = useState(false);
+  const [showTestHint, setShowTestHint] = useState(false);
   const [selectedExaminerId, setSelectedExaminerId] = useState(
     getDefaultExaminer(selectedMode).id
   );
@@ -138,8 +147,17 @@ export default function ReadyOverlay({
     }
   }, [cameraStream]);
 
-  const audioChecksPass = selectedMode !== "calm" || (micVoiceDetected && speakerConfirmed);
-  const canStart = !checking && micAllowed && audioChecksPass && !isStarting;
+  const micChecked = micAllowed && micVoiceDetected;
+  const speakerChecked = speakerConfirmed;
+  const canStart = !checking && micChecked && speakerChecked && !isStarting;
+  const startupFailed = Boolean(errorMessage) || startupStage === "error";
+  const showStartupOverlay = isStarting || startupFailed;
+  const activeStartupStage = startupStage === "idle" ? "server" : startupStage;
+  const activeStartupIndex = STARTUP_STAGES.findIndex(([stage]) => stage === activeStartupStage);
+
+  useEffect(() => {
+    if (micChecked && speakerChecked) setShowTestHint(false);
+  }, [micChecked, speakerChecked]);
 
   async function testSpeaker() {
     setSpeakerTesting(true);
@@ -173,17 +191,18 @@ export default function ReadyOverlay({
   }
 
   return (
-    <div className="absolute inset-0 z-50 overflow-y-auto bg-[var(--background)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-7 sm:py-6">
+    <div className="fixed inset-0 z-50 h-dvh overflow-hidden bg-[var(--background)] text-[var(--text-primary)]">
+      <div className="h-full overflow-y-auto overscroll-contain urologics-minimal-scrollbar">
+        <div className="mx-auto max-w-6xl px-4 py-4 pb-28 sm:px-7 sm:py-6 sm:pb-32">
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
           
           <div className="flex items-center gap-3">
             
             <div className="flex items-center gap-2  border-[var(--border)] pl-3">
               <Image src={appPath("/logo.png")} alt="Urologics" width={36} height={36} className="h-9 w-9 object-contain" />
-              <span className="text-sm font-semibold text-[var(--text-primary)]">Uro AI</span>
+              <span className="text-sm font-semibold text-[var(--text-primary)]">Urologics AI</span>
             </div>
-            <span className="rounded-full border border-[var(--accent)]/25 bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-strong)] sm:text-sm">
+            <span className={`rounded-full border px-3 py-1.5 text-xs font-semibold sm:text-sm ${selectedMode === "fast" ? "border-[#FF6347] bg-[#FF6347] text-white shadow-[0_12px_28px_rgba(255,99,71,0.3)]" : "border-[var(--accent)]/25 bg-[var(--accent-soft)] text-[var(--accent-strong)]"}`}>
               {selectedMode === "fast" ? "Fast and Furious" : "Calm and Composed"}
             </span>
           </div>
@@ -242,6 +261,26 @@ export default function ReadyOverlay({
                 })}
               </div>
             </div>
+            <section className="mt-6 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:p-5">
+              <h3 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]">
+                <Sparkles size={17} className="text-[var(--accent-strong)]" />
+                Before you begin
+              </h3>
+              {selectedMode === "calm" ? (
+                <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
+                  <li>If the examiner stops responding, ask: “Are you there?”</li>
+                  <li>Use earphones or headphones for the clearest audio.</li>
+                  <li>Let each question finish, then answer clearly at your own pace.</li>
+                </ul>
+              ) : (
+                <ul className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-secondary)]">
+                  <li>Expect brisk questions and follow-ups; keep answers focused.</li>
+                  <li>Lead with the key clinical decision, then add only the essential reasoning.</li>
+                  <li>Prioritise diagnosis, investigations, and immediate management.</li>
+                  <li>Use earphones or headphones and speak clearly into your microphone.</li>
+                </ul>
+              )}
+            </section>
           </section>
 
           <section className="space-y-4 border-t border-[var(--border)] py-6 lg:border-l lg:border-t-0 lg:pl-8">
@@ -289,6 +328,7 @@ export default function ReadyOverlay({
                       onValueChange={(value) => {
                         setSelectedMicDeviceId(value === DEFAULT_MIC_DEVICE ? "" : value);
                         setMicVoiceDetected(false);
+                        setShowTestHint(false);
                       }}
                       disabled={isStarting}
                     >
@@ -337,51 +377,92 @@ export default function ReadyOverlay({
               )}
             </section>
 
-            {errorMessage && <div role="alert" className="rounded-md border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm leading-6 text-rose-700 dark:text-rose-300">{errorMessage}</div>}
-
-            {selectedMode === "calm" && isStarting && (
-              <div role="status" aria-live="polite" className="rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">Starting session</p>
-                <ol className="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
-                  {([
-                    ["server", "Preparing session"],
-                    ["websocket", "Backend connected"],
-                    ["speaker", "Speaker ready"],
-                    ["microphone", "Microphone ready"],
-                    ["gemini", "Waiting for examiner"],
-                    ["ready", "Ready"],
-                  ] as const).map(([stage, label]) => {
-                    const order = ["server", "websocket", "speaker", "microphone", "gemini", "ready"] as const;
-                    const currentIndex = order.indexOf(startupStage as (typeof order)[number]);
-                    const stageIndex = order.indexOf(stage);
-                    const complete = startupStage === "ready" || currentIndex > stageIndex;
-                    const current = startupStage === stage;
-                    return (
-                      <li key={stage} className={`flex items-center gap-2 ${complete || current ? "text-[var(--text-primary)]" : "text-[var(--text-tertiary)]"}`}>
-                        {complete ? <CheckCircle2 size={14} className="text-[var(--accent-strong)]" /> : current ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" /> : <span className="h-3.5 w-3.5 rounded-full border border-[var(--border)]" />}
-                        {label}{current ? "…" : ""}
-                      </li>
-                    );
-                  })}
-                </ol>
-              </div>
-            )}
-
-            <button
-              disabled={!canStart}
-              onClick={beginSession}
-              className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition-colors ${
-                canStart
-                  ? "bg-[#02C39A] text-[#073d34] shadow-[0_8px_20px_rgba(2,195,154,0.2)] hover:bg-[#00b88f]"
-                  : "cursor-not-allowed bg-[var(--surface-muted)] text-[var(--text-tertiary)]"
-              }`}
-            >
-              {isStarting ? "Starting Viva Session…" : "Start Viva Session"}
-              {!isStarting && <ArrowRight size={18} />}
-            </button>
           </section>
         </div>
+        </div>
       </div>
+      <div className="fixed inset-x-0 bottom-0 z-[60]  bg-[var(--background)]/95 px-4 py-3 backdrop-blur sm:px-7 sm:py-4">
+        <div className="relative mx-auto max-w-6xl">
+          {showTestHint && !canStart && (
+            <div
+              id="start-viva-test-hint"
+              role="status"
+              aria-live="polite"
+              className="absolute bottom-full left-1/2 mb-2 w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-2 text-sm text-[var(--text-primary)] shadow-lg"
+            >
+              {!micChecked && <p>Please test mic</p>}
+              {!speakerChecked && <p>Please test speaker</p>}
+            </div>
+          )}
+          <button
+            type="button"
+            disabled={isStarting}
+            aria-disabled={!canStart}
+            aria-describedby={showTestHint ? "start-viva-test-hint" : undefined}
+            onClick={() => {
+              if (!canStart) {
+                setShowTestHint(true);
+                return;
+              }
+              beginSession();
+            }}
+            className={`flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition-colors ${
+              canStart
+                ? "bg-[#02C39A] text-[#073d34] shadow-[0_8px_20px_rgba(2,195,154,0.2)] hover:bg-[#00b88f]"
+                : "cursor-not-allowed bg-[var(--surface-muted)] text-[var(--text-tertiary)]"
+            }`}
+          >
+            {isStarting ? "Starting Viva Session…" : "Start Viva Session"}
+            {!isStarting && <ArrowRight size={18} />}
+          </button>
+        </div>
+      </div>
+      {showStartupOverlay && (
+        <div className="absolute inset-0 z-[80] flex items-center justify-center bg-black/35 p-4 backdrop-blur-md">
+          {startupFailed ? (
+            <div role="alert" className="w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-6 text-center text-[var(--text-primary)] shadow-2xl sm:p-8">
+              <Sparkles size={28} className="mx-auto text-[var(--accent-strong)]" />
+              <h2 className="mt-4 text-xl font-semibold">Uh! Oh, we hit a snag</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                We couldn’t start your viva. Restart to try again.
+              </p>
+              <button
+                type="button"
+                onClick={beginSession}
+                disabled={isStarting}
+                className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#02C39A] px-5 py-3 text-sm font-semibold text-[#073d34] transition hover:bg-[#00b88f] disabled:cursor-wait disabled:opacity-60"
+              >
+                <RefreshCw size={17} />
+                Restart Viva
+              </button>
+            </div>
+          ) : (
+            <div role="status" aria-live="polite" className="w-full max-w-lg rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-6 text-[var(--text-primary)] shadow-2xl sm:p-8">
+              <div className="flex items-center gap-3">
+                <span className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+                <div>
+                  <h2 className="text-lg font-semibold">Preparing your viva</h2>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                    {STARTUP_STAGES.find(([stage]) => stage === activeStartupStage)?.[1] || "Connecting to your examiner"}…
+                  </p>
+                </div>
+              </div>
+              <ol className="mt-6 space-y-3 border-t border-[var(--border)] pt-5">
+                {STARTUP_STAGES.map(([stage, label], index) => {
+                  const complete = startupStage === "ready" || activeStartupIndex > index;
+                  const current = activeStartupIndex === index;
+                  return (
+                    <li key={stage} className={`flex items-center gap-3 text-sm ${complete || current ? "text-[var(--text-primary)]" : "text-[var(--text-tertiary)]"}`}>
+                      {complete ? <CheckCircle2 size={16} className="text-[var(--accent-strong)]" /> : current ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" /> : <span className="h-4 w-4 rounded-full border border-[var(--border)]" />}
+                      {label}{current ? "…" : ""}
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

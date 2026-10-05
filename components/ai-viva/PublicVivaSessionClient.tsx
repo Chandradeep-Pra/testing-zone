@@ -206,7 +206,7 @@ export default function PublicVivaSessionClient({ vivaCase }: { vivaCase: VivaCa
             </div>
             <div>
               <label htmlFor="email" className="mb-1 block text-sm font-medium text-[#071014]/65">
-                Email Address (optional)
+                Email Address
               </label>
               <input
                 id="email"

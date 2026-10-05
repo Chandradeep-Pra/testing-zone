@@ -15,7 +15,7 @@ export const EXAMINER_VOICES: Record<VivaMode, ExaminerVoice[]> = {
       id: "calm-leda",
       name: "Dr. Leda",
       title: "Measured Consultant",
-      personality: "Warm, composed, and reassuring with a steady examiner cadence.",
+      personality: "Warm, composed and experienced.",
       languageCode: "en-GB",
       voiceName: "en-GB-Chirp3-HD-Leda",
     },
