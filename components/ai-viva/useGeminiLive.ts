@@ -520,24 +520,24 @@ export function useGeminiLive(
           resolveSessionReady = resolve;
           rejectSessionReady = reject;
         });
-        let resolveFirstModelAudio!: () => void;
-        let rejectFirstModelAudio!: (error: Error) => void;
-        let waitingForFirstModelAudio = false;
-        const firstModelAudio = new Promise<void>((resolve, reject) => {
-          resolveFirstModelAudio = resolve;
-          rejectFirstModelAudio = reject;
+        let resolveFirstModelResponse!: () => void;
+        let rejectFirstModelResponse!: (error: Error) => void;
+        let waitingForFirstModelResponse = false;
+        const firstModelResponse = new Promise<void>((resolve, reject) => {
+          resolveFirstModelResponse = resolve;
+          rejectFirstModelResponse = reject;
         });
-        void firstModelAudio.catch(() => {});
+        void firstModelResponse.catch(() => {});
         let firstModelAudioTimeout: ReturnType<typeof setTimeout> | null = null;
-        const markFirstModelAudio = () => {
-          if (!waitingForFirstModelAudio) return;
-          waitingForFirstModelAudio = false;
+        const markFirstModelResponse = () => {
+          if (!waitingForFirstModelResponse) return;
+          waitingForFirstModelResponse = false;
           if (firstModelAudioTimeout) clearTimeout(firstModelAudioTimeout);
           firstModelAudioTimeout = null;
           setStartupStage("ready");
           readyRef.current = true;
           setActive(true);
-          resolveFirstModelAudio();
+          resolveFirstModelResponse();
         };
         const readyTimeout = setTimeout(() => {
           rejectSessionReady(new Error("The backend did not prepare the viva session in time. Check the backend process and retry."));
@@ -548,9 +548,9 @@ export function useGeminiLive(
           clearTimeout(readyTimeout);
           const message = new Error(`Backend WebSocket failed at ${connectedUrl}.`);
           rejectSessionReady(message);
-          if (waitingForFirstModelAudio) {
+          if (waitingForFirstModelResponse) {
             if (firstModelAudioTimeout) clearTimeout(firstModelAudioTimeout);
-            rejectFirstModelAudio(message);
+            rejectFirstModelResponse(message);
           }
         };
 
@@ -567,9 +567,9 @@ export function useGeminiLive(
           readyRef.current = false;
           if (!readyAcknowledged) {
             rejectSessionReady(new Error(`Backend closed during startup (${event.code}: ${event.reason || "no reason provided"}).`));
-          } else if (waitingForFirstModelAudio) {
+          } else if (waitingForFirstModelResponse) {
             if (firstModelAudioTimeout) clearTimeout(firstModelAudioTimeout);
-            rejectFirstModelAudio(new Error(`Gemini Live disconnected before returning audio (${event.code}: ${event.reason || "no reason provided"}).`));
+            rejectFirstModelResponse(new Error(`Gemini Live disconnected before returning an opening response (${event.code}: ${event.reason || "no reason provided"}).`));
           } else if (event.code !== 1000) {
             setBackendError(`Backend connection closed (${event.code}: ${event.reason || "no reason provided"}).`);
           }
@@ -633,7 +633,7 @@ export function useGeminiLive(
               clearTimeout(readyTimeout);
               if (firstModelAudioTimeout) clearTimeout(firstModelAudioTimeout);
               rejectSessionReady(new Error(message));
-              rejectFirstModelAudio(new Error(message));
+              rejectFirstModelResponse(new Error(message));
               return;
             }
 
@@ -644,7 +644,7 @@ export function useGeminiLive(
               void audioBuffer.arrayBuffer().then((buffer: ArrayBuffer) => {
                 if (buffer.byteLength < 2 || buffer.byteLength % 2 !== 0) return;
                 noteExaminerOutputForExhibit();
-                markFirstModelAudio();
+                markFirstModelResponse();
                 playBackendPcm(buffer);
               });
               return;
@@ -653,6 +653,13 @@ export function useGeminiLive(
             const parts = payload.content?.parts ?? payload.parts ?? [];
             const eventHasFunctionCall = parts.some((part: any) => Boolean(part.functionCall ?? part.function_call));
             const outputText = payload.outputTranscription?.text ?? payload.output_transcription?.text;
+            if (
+              payload.author !== "user" &&
+              ((typeof outputText === "string" && outputText.trim()) ||
+                parts.some((part: any) => typeof part.text === "string" && part.text.trim()))
+            ) {
+              markFirstModelResponse();
+            }
 
             for (const part of parts) {
               const inlineData = part.inlineData ?? part.inline_data;
@@ -669,7 +676,7 @@ export function useGeminiLive(
                   continue;
                 }
                 noteExaminerOutputForExhibit();
-                markFirstModelAudio();
+                markFirstModelResponse();
                 const sampleRate = Number(/rate=(\d+)/i.exec(mimeType)?.[1]) || 24000;
                 playBackendPcm(audioData, sampleRate);
               }
@@ -900,11 +907,11 @@ export function useGeminiLive(
         }
 
         setStartupStage("gemini");
-        waitingForFirstModelAudio = true;
+        waitingForFirstModelResponse = true;
         firstModelAudioTimeout = setTimeout(() => {
-          waitingForFirstModelAudio = false;
+          waitingForFirstModelResponse = false;
           firstModelAudioTimeout = null;
-          rejectFirstModelAudio(new Error("Gemini Live did not return opening audio. Check the backend model access, response audio settings, and speaker output, then retry."));
+          rejectFirstModelResponse(new Error("Gemini Live did not return an opening response. Check backend model access and retry."));
         }, 45000);
         const candidateName = candidate?.name?.trim() || "there";
         initialPromptSentRef.current = true;
@@ -912,7 +919,7 @@ export function useGeminiLive(
           type: "text",
           text: `Please begin the viva. My name is ${candidateName}.`,
         }));
-        await raceWithStartupAbort(firstModelAudio, signal);
+        await raceWithStartupAbort(firstModelResponse, signal);
         return;
       }
 

@@ -727,7 +727,7 @@ export default function VivaVoiceAi({
 
   useEffect(() => {
     if (
-      (sessionEndReason === "candidate_confirmed_early_exit" || sessionEndReason === "candidate_no_response") &&
+      sessionEndReason === "candidate_confirmed_early_exit" &&
       !endingRef.current
     ) {
       void endVivaRef.current?.();
