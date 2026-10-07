@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { GoogleGenAI, Modality } from "@google/genai";
 import type { ExaminerVoice, VivaMode } from "@/lib/examiner-voices";
 import { appPath } from "@/lib/app-path";
-import { normalizeSessionStartPayload } from "@/lib/session-start";
+import { normalizeSessionStartPayload, withBackendDurationBuffer } from "@/lib/session-start";
 
 const FIRST_MODEL_RESPONSE_TIMEOUT_MS = 45_000;
 
@@ -794,7 +794,7 @@ export function useGeminiLive(
             name: candidate?.name?.trim() || "candidate",
             email: candidate?.email?.trim() || "",
           },
-          case: vivaCase,
+          case: withBackendDurationBuffer(vivaCase),
           meta: { source: "urologics-web" },
         });
         const authoritativeCase = {
@@ -953,7 +953,7 @@ export function useGeminiLive(
         },
         body: JSON.stringify({
           caseId: vivaCase?.id,
-          case: vivaCase,
+          case: withBackendDurationBuffer(vivaCase),
           candidate: {
             name: candidate?.name?.trim() || "candidate",
             email: candidate?.email?.trim() || "",

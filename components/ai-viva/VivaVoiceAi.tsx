@@ -9,7 +9,7 @@ import { useVivaSession } from "./useVivaSession";
 import { useSpeechOutput } from "./useSpeechOutput";
 import { useSpeechInput } from "./useSpeechInput";
 import { useVivaEngine } from "./useVivaEngine";
-import ReadyOverlay from "./ReadyOverlay";
+import VivaPrepScreen from "@/components/viva-prep-screen/VivaPrepScreen";
 import { useCountdown } from "./useCountdown";
 import { useGeminiLive } from "./useGeminiLive";
 
@@ -216,7 +216,11 @@ export default function VivaVoiceAi({
   const [exitConfirmationPending, setExitConfirmationPending] = useState(false);
   const [timerClosingComplete, setTimerClosingComplete] = useState(false);
 
-  const vivaDurationSec = CALM_VIVA_TOTAL_DURATION_SEC;
+  const caseDurationMinutes = Number(vivaCase.viva_rules?.max_duration_minutes);
+  const vivaDurationSec =
+    Number.isFinite(caseDurationMinutes) && caseDurationMinutes > 0
+      ? Math.round(caseDurationMinutes * 60)
+      : CALM_VIVA_TOTAL_DURATION_SEC;
   const countdownRunning = vivaStarted && !ending;
   const countdownTotal = vivaDurationSec;
 
@@ -935,7 +939,7 @@ export default function VivaVoiceAi({
       onFocusCapture={revealControls}
     >
       {readyVisible && (
-        <ReadyOverlay
+        <VivaPrepScreen
           onBegin={handleBegin}
           vivaTitle={vivaCase.case.title}
           selectedMode={selectedMode}

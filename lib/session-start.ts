@@ -141,3 +141,15 @@ export function buildSessionStartPrompt(candidate: SessionStartCandidate, vivaCa
     `Case objectives: ${objectives.join("; ")}`,
   ].join("\n");
 }
+
+// The AI examiner gets extra time so the candidate-facing countdown ends first.
+export const VIVA_BACKEND_BUFFER_MINUTES = 2;
+
+export function withBackendDurationBuffer<T extends { viva_rules?: { max_duration_minutes?: number } }>(vivaCase: T): T {
+  if (!vivaCase) return vivaCase;
+  const minutes = positiveNumber(vivaCase.viva_rules?.max_duration_minutes, 10);
+  return {
+    ...vivaCase,
+    viva_rules: { ...vivaCase.viva_rules, max_duration_minutes: minutes + VIVA_BACKEND_BUFFER_MINUTES },
+  };
+}
