@@ -156,7 +156,7 @@ function ChecklistStep({
             onBlur={() => setTooltipVisible(false)}
             className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-[17px] font-semibold text-white transition ${
               canStart
-                ? "cursor-pointer bg-[var(--accent)] shadow-[0_8px_20px_rgba(1,136,136,0.25)] hover:bg-[var(--accent-hover)]"
+                ? "cursor-pointer bg-[var(--accent)] shadow-[0_8px_20px_color-mix(in_srgb,var(--accent)_25%,transparent)] hover:bg-[var(--accent-hover)]"
                 : "cursor-not-allowed bg-[var(--accent)] opacity-40"
             }`}
           >
@@ -172,6 +172,13 @@ function ChecklistStep({
     </>
   );
 }
+
+const FAST_THEME = {
+  "--accent": "#FF6347",
+  "--accent-strong": "#E5533A",
+  "--accent-hover": "#E5533A",
+  "--accent-soft": "#FFEDE9",
+} as React.CSSProperties;
 
 export default function VivaPrepScreen({
   onBegin,
@@ -192,7 +199,10 @@ export default function VivaPrepScreen({
   }
 
   return (
-    <div className="fixed inset-0 z-50 h-dvh overflow-y-auto bg-[var(--background)] text-[var(--text-primary)] urologics-minimal-scrollbar">
+    <div
+      // style={selectedMode === "fast" ? FAST_THEME : undefined}
+      className="fixed inset-0 z-50 h-dvh overflow-y-auto bg-[var(--background)] text-[var(--text-primary)] urologics-minimal-scrollbar"
+    >
       {step === 1 ? (
         <CandidateForm
           candidate={candidate}

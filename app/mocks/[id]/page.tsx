@@ -1,6 +1,6 @@
 "use client";
 
-import { AlarmClock, Coffee, Send, ShieldCheck } from "lucide-react";
+import { AlarmClock, Coffee, Flag, Send, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { appPath } from "@/lib/app-path";
@@ -82,6 +82,7 @@ export default function Page() {
   const [breakLeft, setBreakLeft] = useState(10 * 60);
   const [breakUsed, setBreakUsed] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [flagged, setFlagged] = useState<Record<string, boolean>>({});
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -95,6 +96,11 @@ export default function Page() {
       const saved = localStorage.getItem(`mock-${id}-answers`);
       if (saved) {
         setAnswers(JSON.parse(saved));
+      }
+
+      const savedFlags = localStorage.getItem(`mock-${id}-flagged`);
+      if (savedFlags) {
+        setFlagged(JSON.parse(savedFlags));
       }
     };
 
@@ -110,6 +116,16 @@ export default function Page() {
       setCurrentQ((value) => value + 1);
     }
   };
+
+  const toggleFlag = (qid: string) => {
+    const updated = { ...flagged };
+    if (updated[qid]) delete updated[qid];
+    else updated[qid] = true;
+    setFlagged(updated);
+    localStorage.setItem(`mock-${id}-flagged`, JSON.stringify(updated));
+  };
+
+  const flaggedCount = Object.keys(flagged).length;
 
   const submit = useCallback(() => {
     localStorage.setItem(`mock-${id}-final`, JSON.stringify(answers));
@@ -175,26 +191,35 @@ export default function Page() {
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-6 text-center shadow-[0_24px_60px_var(--shadow-medium)] sm:p-8">
-            <div className="text-2xl font-semibold text-[var(--text-primary)]">Submit mock?</div>
+            <div className="text-2xl font-semibold text-[var(--text-primary)]">
+              {flaggedCount > 0 ? "Review flagged questions?" : "Submit mock?"}
+            </div>
             <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
-              This will end the current Urologics mock session and move you to the results page.
+              {flaggedCount > 0
+                ? `You have ${flaggedCount} flagged question${flaggedCount > 1 ? "s" : ""}, do you want to review them?`
+                : "This will end the current Urologics mock session and move you to the results page."}
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <button
-                onClick={() => setShowConfirm(false)}
-                className="flex-1 rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--accent-strong)] transition hover:bg-[var(--accent)] hover:text-[var(--accent-text)]"
+                onClick={submit}
+                className="flex-1 rounded-full bg-[var(--surface-muted)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--border)]"
               >
-                Cancel
+                {flaggedCount > 0 ? "Submit Anyway" : "Submit"}
               </button>
 
               <button
-                onClick={submit}
+                onClick={() => {
+                  setShowConfirm(false);
+                  if (flaggedCount > 0) {
+                    const firstFlagged = mock.questions.findIndex((item) => flagged[item.id]);
+                    if (firstFlagged >= 0) setCurrentQ(firstFlagged);
+                  }
+                }}
                 className="flex-1 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-hover)]"
               >
-                Submit
+                Cancel
               </button>
-            </div>
-          </div>
+            </div>          </div>
         </div>
       )}
 
@@ -244,15 +269,18 @@ export default function Page() {
               <button
                 key={question.id}
                 onClick={() => setCurrentQ(index)}
-                className={`h-10 min-w-10 rounded-xl px-0 py-2 text-sm font-semibold transition sm:h-auto sm:min-w-0 ${
+                className={`relative h-10 min-w-10 rounded-xl px-0 py-2 text-sm font-semibold transition sm:h-auto sm:min-w-0 ${
                   index === currentQ
-                    ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_8px_20px_var(--shadow-brand)]"
+                    ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_8px_20px_var(--shadow-brand)] ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-[var(--surface-raised)]"
                     : answers[question.id] !== undefined
-                      ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]"
+                      ? "bg-[var(--accent)] text-[var(--accent-text)] opacity-80"
                       : "bg-[var(--surface-muted)] text-[var(--text-tertiary)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]"
                 }`}
               >
                 {index + 1}
+                {flagged[question.id] && (
+                  <Flag size={10} fill="currentColor" className="absolute right-1 top-1 text-amber-500" aria-label="Flagged" />
+                )}
               </button>
             ))}
           </div>
@@ -285,8 +313,23 @@ export default function Page() {
           <div className="flex flex-1 flex-col lg:flex-row">
             <div className="flex flex-1 flex-col justify-between p-4 sm:p-6 md:p-10">
               <div>
-                <div className="inline-flex rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)] sm:text-xs sm:tracking-[0.18em]">
-                  Question : {currentQ + 1}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="inline-flex rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)] sm:text-xs sm:tracking-[0.18em]">
+                    Question : {currentQ + 1}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleFlag(q.id)}
+                    aria-pressed={Boolean(flagged[q.id])}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      flagged[q.id]
+                        ? "border-amber-500 bg-amber-500/10 text-amber-600"
+                        : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent-strong)]"
+                    }`}
+                  >
+                    <Flag size={14} fill={flagged[q.id] ? "currentColor" : "none"} />
+                    {flagged[q.id] ? "Unflag" : "Flag"}
+                  </button>
                 </div>
 
                 <h1 className="mt-5 text-lg font-semibold leading-8 text-[var(--text-primary)] sm:mt-6 sm:text-xl">
