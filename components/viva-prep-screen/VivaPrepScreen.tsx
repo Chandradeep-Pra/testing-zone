@@ -4,8 +4,9 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { appPath } from "@/lib/app-path";
-import { getDefaultExaminer, type ExaminerVoice, type VivaMode } from "@/lib/examiner-voices";
+import { EXAMINER_VOICES, getDefaultExaminer, type ExaminerVoice, type VivaMode } from "@/lib/examiner-voices";
 import CandidateForm from "./CandidateForm";
+import ExaminerPicker from "./ExaminerPicker";
 import HardwareCheck from "./HardwareCheck";
 import SessionRequirements from "./SessionRequirements";
 import StartupOverlay, { type StartupStage } from "./StartupOverlay";
@@ -47,6 +48,7 @@ function ChecklistStep({
   const hw = useHardwareCheck(isStarting);
   const hardwareRef = useRef<HTMLElement | null>(null);
   const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [selectedExaminerId, setSelectedExaminerId] = useState(getDefaultExaminer(selectedMode).id);
 
   const canStart = hw.ready;
   const startupFailed = Boolean(errorMessage) || startupStage === "error";
@@ -57,13 +59,17 @@ function ChecklistStep({
       (hw.micAllowed ? "Your microphone is not detected. Speak to test it." : "Your microphone is not detected."),
   ].filter(Boolean) as string[];
 
+  const examiners = EXAMINER_VOICES[selectedMode];
+  const selectedExaminer =
+    examiners.find((examiner) => examiner.id === selectedExaminerId) || getDefaultExaminer(selectedMode);
+
   async function startSession() {
     // Show the preparing overlay immediately, before the parent state updates.
     setClicked(true);
     try {
       await onBegin(
         Boolean(hw.cameraEnabled && hw.cameraAllowed && hw.cameraStream),
-        getDefaultExaminer(selectedMode),
+        selectedExaminer,
         hw.selectedMicDeviceId || undefined,
       );
     } finally {
@@ -116,6 +122,11 @@ function ChecklistStep({
 
         <div className="mt-8 flex w-full flex-col gap-5">
           <SessionRequirements />
+          <ExaminerPicker
+            selectedMode={selectedMode}
+            selectedExaminerId={selectedExaminerId}
+            onSelect={setSelectedExaminerId}
+          />
           <HardwareCheck ref={hardwareRef} hw={hw} disabled={isStarting} />
         </div>
       </div>
