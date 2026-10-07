@@ -43,9 +43,19 @@ const HardwareCheck = forwardRef<HTMLElement, { hw: HardwareCheckState; disabled
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-white/65">
               {hw.cameraEnabled ? <Camera size={22} /> : <CameraOff size={22} />}
-              <span className="text-[13px]">
-                {hw.cameraEnabled ? "Camera preview unavailable (optional)" : "Camera is off"}
+              <span className="px-4 text-center text-[13px]">
+                {hw.cameraEnabled ? "Camera access is needed for the preview (optional)." : "Camera is off"}
               </span>
+              {hw.cameraEnabled && (
+                <button
+                  type="button"
+                  onClick={() => void hw.requestCamera()}
+                  disabled={disabled}
+                  className="mt-1 inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-[15px] font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:opacity-50"
+                >
+                  <Camera size={16} /> Allow camera
+                </button>
+              )}
             </div>
           )}
           <button
@@ -136,9 +146,20 @@ const HardwareCheck = forwardRef<HTMLElement, { hw: HardwareCheckState; disabled
           </div>
         ) : (
           !hw.checking && (
-            <p className="mt-4 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-[15px] text-rose-700">
-              Microphone not detected. Allow microphone access in your browser, then reload.
-            </p>
+            <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3">
+              <p className="text-[15px] text-rose-700">
+                Microphone access is needed. Click below and choose “Allow” in your browser prompt. If the prompt
+                doesn’t appear, enable the microphone from the lock icon in the address bar, then try again.
+              </p>
+              <button
+                type="button"
+                onClick={() => void hw.requestMicrophone()}
+                disabled={disabled}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2 text-[15px] font-semibold text-white transition hover:bg-[var(--accent-hover)] disabled:opacity-50"
+              >
+                <Mic size={16} /> Allow microphone
+              </button>
+            </div>
           )
         )}
         </div>

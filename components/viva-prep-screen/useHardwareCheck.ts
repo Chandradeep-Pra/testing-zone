@@ -20,66 +20,70 @@ export function useHardwareCheck(isStarting: boolean) {
   const [cameraAllowed, setCameraAllowed] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function requestMicrophone() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((track) => track.stop());
-        if (cancelled) return;
-        setMicAllowed(true);
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        if (cancelled) return;
-        const inputs = devices.filter((device) => device.kind === "audioinput");
-        setMicDevices(inputs);
-        setSelectedMicDeviceId((current) => current || inputs[0]?.deviceId || "");
-      } catch {
-        if (cancelled) return;
-        setMicAllowed(false);
-        setMicDevices([]);
-        setSelectedMicDeviceId("");
-      } finally {
-        if (!cancelled) setChecking(false);
-      }
+  const mountedRef = useRef(true);
+
+  // Triggers the browser's permission prompt if access hasn't been granted yet.
+  const requestMicrophone = useCallback(async () => {
+    setChecking(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+      if (!mountedRef.current) return;
+      setMicAllowed(true);
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      if (!mountedRef.current) return;
+      const inputs = devices.filter((device) => device.kind === "audioinput");
+      setMicDevices(inputs);
+      setSelectedMicDeviceId((current) => current || inputs[0]?.deviceId || "");
+    } catch {
+      if (!mountedRef.current) return;
+      setMicAllowed(false);
+      setMicDevices([]);
+      setSelectedMicDeviceId("");
+    } finally {
+      if (mountedRef.current) setChecking(false);
     }
-    void requestMicrophone();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    mountedRef.current = true;
+    void requestMicrophone();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [requestMicrophone]);
+
+  const startCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = stream;
+      setCameraStream(stream);
+      setCameraAllowed(true);
+    } catch {
+      if (!mountedRef.current) return;
+      setCameraAllowed(false);
+      setCameraStream(null);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!cameraEnabled) {
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       cameraStreamRef.current = null;
       setCameraStream(null);
       return;
     }
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        cameraStreamRef.current = stream;
-        setCameraStream(stream);
-        setCameraAllowed(true);
-      } catch {
-        if (!cancelled) {
-          setCameraAllowed(false);
-          setCameraStream(null);
-        }
-      }
-    }
     void startCamera();
     return () => {
-      cancelled = true;
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       cameraStreamRef.current = null;
     };
-  }, [cameraEnabled]);
+  }, [cameraEnabled, startCamera]);
 
   useEffect(() => {
     if (videoRef.current && cameraStream) {
@@ -126,6 +130,7 @@ export function useHardwareCheck(isStarting: boolean) {
     videoRef,
     checking,
     micAllowed,
+    requestMicrophone,
     micDevices,
     selectedMicDeviceId,
     selectMic,
@@ -139,6 +144,7 @@ export function useHardwareCheck(isStarting: boolean) {
     cameraEnabled,
     setCameraEnabled,
     cameraAllowed,
+    requestCamera: startCamera,
     cameraStream,
     micReady,
     speakerReady,
