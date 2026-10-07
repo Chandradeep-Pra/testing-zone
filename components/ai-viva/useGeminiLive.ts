@@ -7,9 +7,11 @@ import { normalizeSessionStartPayload, withBackendDurationBuffer } from "@/lib/s
 const FIRST_MODEL_RESPONSE_TIMEOUT_MS = 45_000;
 
 function getBackendWebSocketCandidates() {
-  const configured =
-    process.env.NEXT_PUBLIC_AI_VIVA_BACKEND_WS_URL ||
-    process.env.NEXT_PUBLIC_AI_VIVA_WS_URL;
+  // const configured =
+  //   process.env.NEXT_PUBLIC_AI_VIVA_BACKEND_WS_URL ||
+  //   process.env.NEXT_PUBLIC_AI_VIVA_WS_URL;
+
+  const configured = "wss://ai-viva-backend-917765808203.us-central1.run.app"
 
   const isLocalPage = typeof window !== "undefined" &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
