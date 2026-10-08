@@ -13,6 +13,7 @@ type MockQuestion = {
   questionText: string;
   options: string[];
   correctAnswer: number;
+  questionImage?: string;
   explanation?: {
     text?: string;
     image?: string;
@@ -48,6 +49,8 @@ function normalizeQuestion(question: unknown, index: number): MockQuestion {
         : Number.isFinite(Number(source.correctAnswer))
           ? Number(source.correctAnswer)
           : -1,
+    questionImage:
+      typeof source.questionImage === "string" && source.questionImage.trim() ? source.questionImage : undefined,
     explanation: explanation
       ? {
           text: typeof explanation.text === "string" ? explanation.text : undefined,
@@ -258,13 +261,28 @@ export default function ResultPage() {
               return (
                 <article key={question.id} className="urologics-panel p-4 sm:p-6">
                   <div className="flex items-start gap-2 sm:gap-3">
-                    <div className={`mt-1 rounded-full p-2 ${isCorrect ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]" : "bg-rose-50 text-rose-600"}`}>
+                    <div className={`mt-1 rounded-full p-2 ${isCorrect ? "bg-[var(--accent-soft)] text-[var(--accent-strong)]" : "bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"}`}>
                       {isCorrect ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
                     </div>
                     <div className="flex-1">
                       <div className="text-base font-semibold leading-7 text-[var(--text-primary)] sm:text-lg sm:leading-8">
                         {index + 1}. {question.questionText}
                       </div>
+
+                      {question.questionImage && (
+                        <button
+                          type="button"
+                          onClick={() => setPreview(question.questionImage || null)}
+                          className="mt-4 block w-full overflow-hidden rounded-[20px] border border-[var(--border)] bg-[#ffffff] p-2 sm:p-3"
+                          aria-label="Open question image"
+                        >
+                          <img
+                            src={question.questionImage}
+                            alt="Question exhibit"
+                            className="mx-auto max-h-[50vh] w-full object-contain"
+                          />
+                        </button>
+                      )}
 
                       <div className="mt-4 grid gap-2 sm:gap-3 md:grid-cols-2">
                         {question.options.map((option, optionIndex) => {
@@ -276,9 +294,9 @@ export default function ResultPage() {
                               key={`${question.id}-${optionIndex}`}
                               className={`rounded-[24px] border p-2.5 sm:rounded-[28px] sm:p-3 ${
                                 isCorrectOption
-                                  ? "border-emerald-300 bg-emerald-50"
+                                  ? "border-emerald-300 bg-emerald-50 dark:border-emerald-500/50 dark:bg-emerald-500/10"
                                   : isSelected
-                                    ? "border-rose-200 bg-rose-50"
+                                    ? "border-rose-200 bg-rose-50 dark:border-rose-500/50 dark:bg-rose-500/10"
                                     : "border-[var(--border)] bg-[var(--surface)]"
                               }`}
                             >
@@ -297,9 +315,9 @@ export default function ResultPage() {
                                 <span
                                   className={`flex-1 rounded-[22px] px-4 py-3 text-sm font-medium leading-6 ${
                                     isCorrectOption
-                                      ? "bg-white/80 text-emerald-900"
+                                      ? "bg-[#ffffff]/80 text-emerald-900 dark:bg-emerald-500/15 dark:text-emerald-100"
                                       : isSelected
-                                        ? "bg-white/80 text-rose-700"
+                                        ? "bg-[#ffffff]/80 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200"
                                         : "bg-[var(--surface-muted)] text-[var(--text-primary)]"
                                   }`}
                                 >
@@ -314,7 +332,7 @@ export default function ResultPage() {
                       <div className="mt-4 space-y-2 text-sm leading-6">
                         <p className="text-[var(--text-secondary)]">
                           Your answer:{" "}
-                          <span className={isCorrect ? "text-[var(--accent-strong)]" : "text-rose-600"}>
+                          <span className={isCorrect ? "text-[var(--accent-strong)]" : "text-rose-600 dark:text-rose-300"}>
                             {selectedAnswer ? `${getOptionLabel(selectedIndex)}. ${selectedAnswer}` : "Not answered"}
                           </span>
                         </p>

@@ -310,7 +310,7 @@ export default function Page() {
         </aside>
 
         <section className="order-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_16px_40px_var(--shadow-soft)]">
-          <div className="flex flex-1 flex-col lg:flex-row">
+          <div className="flex flex-1 flex-col">
             <div className="flex flex-1 flex-col justify-between p-4 sm:p-6 md:p-10">
               <div>
                 <div className="flex items-center justify-between gap-3">
@@ -335,6 +335,21 @@ export default function Page() {
                 <h1 className="mt-5 text-lg font-semibold leading-8 text-[var(--text-primary)] sm:mt-6 sm:text-xl">
                   {q.questionText}
                 </h1>
+
+                {q?.questionImage && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewImage(q.questionImage || null)}
+                    className="mt-5 block w-full overflow-hidden rounded-[20px] border border-[var(--border)] bg-[#ffffff] p-2 sm:mt-6 sm:rounded-[24px] sm:p-3"
+                    aria-label="Open question image"
+                  >
+                    <img
+                      src={q.questionImage}
+                      alt="Question exhibit"
+                      className="mx-auto max-h-[60vh] w-full object-contain"
+                    />
+                  </button>
+                )}
 
                 <div className="mt-5 grid gap-3 sm:mt-8 md:grid-cols-2">
                   {options.map((opt, i) => {
@@ -386,15 +401,6 @@ export default function Page() {
               </div>
             </div>
 
-            {q?.questionImage && (
-              <div className="border-t border-[var(--border)] p-4 sm:p-5 lg:w-[42%] lg:border-l lg:border-t-0 lg:p-6">
-                <div className="flex h-full min-h-[220px] items-center justify-center rounded-[24px] border border-[var(--border)] bg-[var(--surface-muted)] p-4 sm:min-h-[280px] sm:p-5">
-                  <button type="button" onClick={() => setPreviewImage(q.questionImage || null)} className="block">
-                    <img src={q.questionImage} alt="Question exhibit" className="max-h-[70vh] rounded-2xl object-contain" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </section>
       </main>
