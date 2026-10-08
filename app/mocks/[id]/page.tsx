@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { appPath } from "@/lib/app-path";
 import GlobalLoading from "@/components/ui/GlobalLoading";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 interface Question {
   id: string;
@@ -234,8 +235,8 @@ export default function Page() {
         </button>
       )}
 
-      <main className="flex min-h-screen flex-col gap-2 bg-[var(--background)] p-2 text-[var(--text-primary)] sm:gap-3 sm:p-4 lg:flex-row">
-        <aside className="order-1 flex w-full shrink-0 flex-col rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-3 shadow-[0_16px_40px_var(--shadow-soft)] sm:p-4 lg:w-[300px] lg:p-5">
+      <main className="flex min-h-screen flex-col gap-2 bg-[var(--background)] p-2 text-[var(--text-primary)] sm:gap-3 sm:p-4 lg:h-screen lg:flex-row lg:overflow-hidden">
+        <aside className="order-1 flex w-full shrink-0 flex-col rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-3 shadow-[0_16px_40px_var(--shadow-soft)] sm:p-4 lg:h-full lg:w-[300px] lg:overflow-y-auto lg:p-5 urologics-thin-scrollbar">
           <div className="flex items-start gap-3 sm:items-center">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
               <ShieldCheck size={18} />
@@ -286,18 +287,21 @@ export default function Page() {
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2 pt-0 sm:mt-6 sm:flex sm:flex-col sm:gap-3 lg:mt-auto lg:space-y-3 lg:pt-6">
-            {!breakUsed && (
+            <div className="col-span-2 flex items-center gap-2 sm:col-span-1">
+              <ThemeToggle />
+              {!breakUsed && (
               <button
                 onClick={() => {
                   setIsBreak(true);
                   setBreakUsed(true);
                 }}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--border)] px-4 py-3 text-sm font-semibold text-[var(--accent-strong)] transition hover:bg-[var(--accent)] hover:text-[var(--accent-text)] sm:px-5"
+                className="inline-flex min-w-0 flex-1 items-center justify-center gap-2 rounded-full border border-[var(--border)] px-4 py-3 text-sm font-semibold text-[var(--accent-strong)] transition hover:bg-[var(--accent)] hover:text-[var(--accent-text)] sm:px-5"
               >
                 <Coffee size={16} />
                 Take Break
               </button>
-            )}
+              )}
+            </div>
 
             <button
               onClick={() => setShowConfirm(true)}
@@ -309,8 +313,8 @@ export default function Page() {
           </div>
         </aside>
 
-        <section className="order-2 flex min-w-0 flex-1 flex-col overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_16px_40px_var(--shadow-soft)]">
-          <div className="flex flex-1 flex-col">
+        <section className="order-2 flex min-w-0 flex-1 flex-col overflow-hidden lg:min-h-0 rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_16px_40px_var(--shadow-soft)]">
+          <div className="urologics-thin-scrollbar flex flex-1 flex-col lg:min-h-0 lg:overflow-y-auto">
             <div className="flex flex-1 flex-col justify-between p-4 sm:p-6 md:p-10">
               <div>
                 <div className="flex items-center justify-between gap-3">
