@@ -4,6 +4,7 @@ import { AlarmClock, Coffee, Flag, Send, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { appPath } from "@/lib/app-path";
+import ResultsLoader from "@/components/ui/ResultsLoader";
 import GlobalLoading from "@/components/ui/GlobalLoading";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 
@@ -85,6 +86,7 @@ export default function Page() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -129,8 +131,10 @@ export default function Page() {
   const flaggedCount = Object.keys(flagged).length;
 
   const submit = useCallback(() => {
+    setShowConfirm(false);
+    setSubmitting(true);
     localStorage.setItem(`mock-${id}-final`, JSON.stringify(answers));
-    router.push(`/mocks/${id}/result`);
+    router.push(`/mocks/${id}/rank`);
   }, [answers, id, router]);
 
   useEffect(() => {
@@ -176,6 +180,10 @@ export default function Page() {
 
   const q = mock.questions[currentQ];
   const options = Array.isArray(q?.options) ? q.options : [];
+
+  if (submitting) {
+    return <ResultsLoader />;
+  }
 
   return (
     <>
