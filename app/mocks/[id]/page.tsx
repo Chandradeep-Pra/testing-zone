@@ -96,14 +96,37 @@ export default function Page() {
       setMock(nextMock);
       setTimeLeft((nextMock?.durationMinutes || 0) * 60);
 
-      const saved = localStorage.getItem(`mock-${id}-answers`);
-      if (saved) {
-        setAnswers(JSON.parse(saved));
-      }
+      // Start fresh if explicitly flagged as fresh or if previous attempt was completed
+      const isFreshSession = sessionStorage.getItem(`mock-${id}-is-fresh`) === "true";
+      const hasPreviousSubmission = Boolean(localStorage.getItem(`mock-${id}-final`));
 
-      const savedFlags = localStorage.getItem(`mock-${id}-flagged`);
-      if (savedFlags) {
-        setFlagged(JSON.parse(savedFlags));
+      if (isFreshSession || hasPreviousSubmission) {
+        sessionStorage.removeItem(`mock-${id}-is-fresh`);
+        localStorage.removeItem(`mock-${id}-answers`);
+        localStorage.removeItem(`mock-${id}-flagged`);
+        localStorage.removeItem(`mock-${id}-final`);
+        localStorage.removeItem(`mock-${id}-summary`);
+        sessionStorage.removeItem(`mock-${id}-attempt-submitted`);
+
+        const freshRunId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem(`mock-${id}-run-id`, freshRunId);
+
+        setAnswers({});
+        setFlagged({});
+      } else {
+        const saved = localStorage.getItem(`mock-${id}-answers`);
+        if (saved) {
+          try {
+            setAnswers(JSON.parse(saved));
+          } catch {}
+        }
+
+        const savedFlags = localStorage.getItem(`mock-${id}-flagged`);
+        if (savedFlags) {
+          try {
+            setFlagged(JSON.parse(savedFlags));
+          } catch {}
+        }
       }
     };
 

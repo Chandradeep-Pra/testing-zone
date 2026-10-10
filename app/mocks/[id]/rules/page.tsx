@@ -8,6 +8,8 @@ import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { appPath } from "@/lib/app-path";
 import GlobalLoading from "@/components/ui/GlobalLoading";
 
+import { startFreshMockSession } from "@/lib/mock-session";
+
 interface Mock {
   id: string;
   title: string;
@@ -20,17 +22,21 @@ interface Mock {
 }
 
 export default function MockRulesPage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [mock, setMock] = useState<Mock | null>(null);
   const [loading, setLoading] = useState(true);
 
   const startSession = () => {
-    const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    localStorage.setItem(`mock-${id}-run-id`, runId);
-    localStorage.removeItem(`mock-${id}-answers`);
-    localStorage.removeItem(`mock-${id}-final`);
-    sessionStorage.removeItem(`mock-${id}-${runId}-attempt-submitted`);
+    if (!id) return;
+    startFreshMockSession(id);
+
+    // Silently notify backend that a fresh mock session has started
+    void fetch(appPath(`/api/mocks/${id}/start`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }).catch(() => {});
+
     router.push(`/mocks/${id}`);
   };
 
