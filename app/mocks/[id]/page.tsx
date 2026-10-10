@@ -43,7 +43,7 @@ function normalizeQuestion(question: unknown, index: number): Question {
         ? source.correctAnswer
         : Number.isFinite(Number(source.correctAnswer))
           ? Number(source.correctAnswer)
-          : 0,
+          : -1,
     questionImage: typeof source.questionImage === "string" ? source.questionImage : undefined,
   };
 }
@@ -110,6 +110,15 @@ export default function Page() {
     void load();
   }, [id]);
 
+  // Silently prefetch results in background while test is ongoing (invisible to user)
+  useEffect(() => {
+    if (!id) return;
+    const timer = setTimeout(() => {
+      void fetch(appPath(`/api/public/mocks/${id}/results`), { cache: "no-store" }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [id]);
+
   const select = (qid: string, index: number) => {
     const updated = { ...answers, [qid]: index };
     setAnswers(updated);
@@ -130,12 +139,82 @@ export default function Page() {
 
   const flaggedCount = Object.keys(flagged).length;
 
-  const submit = useCallback(() => {
+  const submit = useCallback(async () => {
     setShowConfirm(false);
     setSubmitting(true);
-    localStorage.setItem(`mock-${id}-final`, JSON.stringify(answers));
+
+    if (mock) {
+      let correct = 0;
+      let skipped = 0;
+      for (const question of mock.questions) {
+        const selected = answers[question.id];
+        if (selected === undefined || selected === null) {
+          skipped += 1;
+        } else {
+          const isValidCorrect =
+            Number.isInteger(question.correctAnswer) &&
+            question.correctAnswer >= 0 &&
+            question.correctAnswer < question.options.length;
+          if (isValidCorrect && Number(selected) === question.correctAnswer) {
+            correct += 1;
+          }
+        }
+      }
+
+      const total = mock.questions.length;
+      const marks = Math.max(0, Math.min(correct, total));
+      const wrong = Math.max(0, total - correct - skipped);
+
+      localStorage.setItem(`mock-${id}-final`, JSON.stringify(answers));
+      localStorage.setItem(
+        `mock-${id}-summary`,
+        JSON.stringify({
+          total,
+          correct,
+          wrong,
+          skipped,
+          marks,
+        })
+      );
+
+      const runId =
+        localStorage.getItem(`mock-${id}-run-id`) ||
+        `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(`mock-${id}-run-id`, runId);
+
+      // Extract candidate verification info if available
+      let candidateName: string | undefined;
+      let candidateEmail: string | undefined;
+      try {
+        const savedVerification = localStorage.getItem("urologics-candidate-verification");
+        if (savedVerification) {
+          const parsed = JSON.parse(savedVerification);
+          if (parsed.name) candidateName = parsed.name;
+          if (parsed.email) candidateEmail = parsed.email;
+        }
+      } catch {}
+
+      try {
+        await fetch(appPath(`/api/mocks/${id}/attempts`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            marks,
+            correctCount: marks,
+            totalQuestions: total,
+            timeTakenSeconds: (mock.durationMinutes * 60) - timeLeft,
+            name: candidateName,
+            email: candidateEmail,
+          }),
+          cache: "no-store",
+        });
+      } catch (err) {
+        console.error("Attempt submission error:", err);
+      }
+    }
+
     router.push(`/mocks/${id}/rank`);
-  }, [answers, id, router]);
+  }, [answers, id, mock, router, timeLeft]);
 
   useEffect(() => {
     if (!mock) return;

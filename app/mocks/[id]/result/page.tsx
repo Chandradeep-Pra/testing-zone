@@ -140,55 +140,23 @@ export default function ResultPage() {
 
     const marks = Math.max(0, Math.min(score, mock.questions.length));
 
-    const submitAttempt = async () => {
-      toast.loading("Submitting mock attempt...", { id: "mock-attempt" });
-
-      try {
-        const res = await fetch(appPath(`/api/mocks/${id}/attempts`), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            marks,
-            correctCount: marks,
-            totalQuestions: mock.questions.length,
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          const message =
-            typeof data?.error === "string" ? data.error : "Failed to submit mock attempt";
-          throw new Error(message);
-        }
-
-        localStorage.setItem(
-          `mock-${id}-attempt-summary`,
-          JSON.stringify({
-            mockId: id,
-            title: mock.title || "Grand Mock",
-            marks,
-            attemptsCount: data.attemptsCount ?? null,
-            attempt: data.attempt ?? null,
-            replacedExisting: data.replacedExisting === true,
-          })
-        );
+    // Silent safety backup submission in case user navigated directly
+    void fetch(appPath(`/api/mocks/${id}/attempts`), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        marks,
+        correctCount: marks,
+        totalQuestions: mock.questions.length,
+      }),
+    })
+      .then(() => {
         sessionStorage.setItem(submittedKey, "true");
         setSubmittedAttempt(true);
-        toast.success(data.replacedExisting ? "Reattempt score updated" : "Mock submitted successfully", {
-          id: "mock-attempt",
-        });
-      } catch (error) {
-        console.error("Mock attempt submission failed:", error);
-        toast.error(
-          error instanceof Error ? error.message : "Failed to submit mock attempt",
-          { id: "mock-attempt" }
-        );
-      }
-    };
-
-    void submitAttempt();
+      })
+      .catch(() => {});
   }, [id, mock, score, submittedAttempt]);
 
   if (!mock) {

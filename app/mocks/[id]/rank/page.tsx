@@ -10,12 +10,24 @@ import ConfettiOnLoad from "@/components/ui/ConfettiOnLoad";
 import YourRankCard from "@/components/ui/YourRankCard";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { appPath } from "@/lib/app-path";
+import { formatRelativeAttended } from "@/lib/format-relative-time";
 
-type Result = { name: string; email: string; marks: number; createdAt: string | null };
+type Result = {
+  rank?: number;
+  name: string;
+  email: string;
+  userImage?: string | null;
+  marks: number;
+  maxMarks?: number | null;
+  attended?: string;
+  createdAt?: string | null;
+  submittedAt?: string | null;
+};
+
 type RankedResult = Result & { rank: number };
 type Summary = { total: number; correct: number; wrong: number; skipped: number };
 
-const MIN_LOADER_MS = 4500;
+const MIN_LOADER_MS = 2500;
 
 export default function RankPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,65 +39,108 @@ export default function RankPage() {
   useEffect(() => {
     const minDelay = new Promise((resolve) => setTimeout(resolve, MIN_LOADER_MS));
 
-    const saveAttempt = async () => {
+    const loadData = async () => {
+      // 1. Recover exam summary from local storage
       try {
-        const runId =
-          localStorage.getItem(`mock-${id}-run-id`) ||
-          `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        localStorage.setItem(`mock-${id}-run-id`, runId);
-        const submittedKey = `mock-${id}-${runId}-attempt-submitted`;
-        const res = await fetch(appPath(`/api/mocks/${id}`));
-        const data = await res.json();
-        const questions: Array<{ id?: string; correctAnswer?: unknown }> = data?.mock?.questions ?? [];
-        const saved = JSON.parse(localStorage.getItem(`mock-${id}-final`) || "{}") as Record<string, unknown>;
-        let correct = 0;
-        let skipped = 0;
-        for (const question of questions) {
-          const answer = question.id !== undefined ? saved[question.id] : undefined;
-          if (answer === undefined || answer === null || answer === "") skipped += 1;
-          else if (Number(answer) === Number(question.correctAnswer)) correct += 1;
-        }
-        const marks = correct;
-        setSummary({ total: questions.length, correct, wrong: questions.length - correct - skipped, skipped });
+        const savedSummary = localStorage.getItem(`mock-${id}-summary`);
+        if (savedSummary) {
+          const parsed = JSON.parse(savedSummary) as Summary;
+          if (parsed && typeof parsed.total === "number") {
+            setSummary(parsed);
+          }
+        } else {
+          // Fallback calculation if summary wasn't stored
+          const res = await fetch(appPath(`/api/mocks/${id}`), { cache: "no-store" });
+          const data = await res.json();
+          const questions: Array<{ id?: string; correctAnswer?: unknown; options?: unknown[] }> =
+            data?.mock?.questions ?? [];
+          const savedAnswers = JSON.parse(
+            localStorage.getItem(`mock-${id}-final`) || "{}"
+          ) as Record<string, unknown>;
 
-        if (sessionStorage.getItem(submittedKey) !== "true") {
-          const attemptRes = await fetch(appPath(`/api/mocks/${id}/attempts`), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ marks, correctCount: marks, totalQuestions: questions.length }),
+          let correct = 0;
+          let skipped = 0;
+          for (const q of questions) {
+            const ans = q.id !== undefined ? savedAnswers[q.id] : undefined;
+            if (ans === undefined || ans === null) {
+              skipped += 1;
+            } else if (
+              Number.isInteger(q.correctAnswer) &&
+              Number(ans) === Number(q.correctAnswer)
+            ) {
+              correct += 1;
+            }
+          }
+          const total = questions.length;
+          setSummary({
+            total,
+            correct,
+            wrong: Math.max(0, total - correct - skipped),
+            skipped,
           });
-          if (attemptRes.ok) sessionStorage.setItem(submittedKey, "true");
         }
-      } catch (error) {
-        console.error("Mock attempt submission failed:", error);
+      } catch (err) {
+        console.error("Summary recovery error:", err);
       }
 
+      // 2. Fetch fresh leaderboard results (cache-busted)
       try {
-        const res = await fetch(appPath(`/api/public/mocks/${id}/results`), { cache: "no-store" });
+        const res = await fetch(appPath(`/api/public/mocks/${id}/results?_t=${Date.now()}`), {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
         const data = await res.json();
-        if (Array.isArray(data?.results)) setResults(data.results);
+        if (Array.isArray(data?.results)) {
+          setResults(data.results);
+        }
       } catch (error) {
         console.error("Failed to load results:", error);
       }
     };
 
-    void Promise.all([saveAttempt(), minDelay]).then(() => setReady(true));
+    void Promise.all([loadData(), minDelay]).then(() => setReady(true));
   }, [id]);
 
   if (!ready) {
-    return <ResultsLoader />;
+    return <ResultsLoader title="Ranking Candidate Performance" />;
   }
 
-  const sorted = [...results].sort((a, b) => b.marks - a.marks);
-  const ranked: RankedResult[] = sorted.map((item) => ({
+  // Deduplicate and rank
+  const sorted = [...results].sort((a, b) => {
+    if (b.marks !== a.marks) return b.marks - a.marks;
+    const timeA = Date.parse(a.submittedAt || a.createdAt || "") || 0;
+    const timeB = Date.parse(b.submittedAt || b.createdAt || "") || 0;
+    return timeB - timeA;
+  });
+
+  const ranked: RankedResult[] = sorted.map((item, idx) => ({
     ...item,
-    rank: sorted.findIndex((other) => other.marks === item.marks) + 1,
+    rank: item.rank || idx + 1,
   }));
+
   const userEmail = user?.email?.trim().toLowerCase() || "";
   const userName = user?.name?.trim().toLowerCase() || "";
-  const isMe = (row: Result) =>
-    Boolean(userEmail && row.email === userEmail) ||
-    Boolean(!row.email && userName && row.name.trim().toLowerCase() === userName);
+  let verifiedCandidateEmail = "";
+  let verifiedCandidateName = "";
+  try {
+    const verified = JSON.parse(localStorage.getItem("urologics-candidate-verification") || "{}");
+    verifiedCandidateEmail = String(verified.email || "").trim().toLowerCase();
+    verifiedCandidateName = String(verified.name || "").trim().toLowerCase();
+  } catch {}
+
+  const isMe = (row: Result) => {
+    const rowEmail = (row.email || "").trim().toLowerCase();
+    const rowName = (row.name || "").trim().toLowerCase();
+    if (userEmail && rowEmail === userEmail) return true;
+    if (verifiedCandidateEmail && rowEmail === verifiedCandidateEmail) return true;
+    if (!rowEmail && userName && rowName === userName) return true;
+    if (!rowEmail && verifiedCandidateName && rowName === verifiedCandidateName) return true;
+    return false;
+  };
+
   const me = ranked.find(isMe);
   const [first, second, third] = ranked;
   const podium = [
@@ -93,9 +148,8 @@ export default function RankPage() {
     { entry: first, height: "h-44", color: "text-yellow-300" },
     { entry: third, height: "h-24", color: "text-amber-600" },
   ].filter((item): item is { entry: RankedResult; height: string; color: string } => Boolean(item.entry));
-  const latest = [...ranked]
-    .sort((a, b) => (Date.parse(b.createdAt ?? "") || 0) - (Date.parse(a.createdAt ?? "") || 0))
-    .slice(0, 10);
+
+  const latest = [...ranked].slice(0, 10);
 
   return (
     <main className="urologics-shell min-h-screen px-4 py-10">
@@ -120,32 +174,45 @@ export default function RankPage() {
           />
         )}
 
-        <section className="flex items-end justify-center gap-3">
-          {podium.map(({ entry, height, color }) => (
-            <div key={entry.rank} className="w-1/3 text-center">
-              <Trophy className={`mx-auto h-8 w-8 ${color}`} />
-              <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{entry.name}</div>
-              <div className="text-xs text-[var(--text-secondary)]">{entry.marks} marks</div>
-              <div
-                className={`${height} mt-2 flex items-start justify-center rounded-t-2xl border border-[var(--border)] bg-[var(--surface-raised)] pt-3 text-2xl font-bold ${color}`}
-              >
-                #{entry.rank}
+        {podium.length > 0 && (
+          <section className="flex items-end justify-center gap-3">
+            {podium.map(({ entry, height, color }) => (
+              <div key={entry.rank} className="w-1/3 text-center">
+                <Trophy className={`mx-auto h-8 w-8 ${color}`} />
+                <div className="mt-2 flex items-center justify-center gap-1.5">
+                  {entry.userImage ? (
+                    <img
+                      src={entry.userImage}
+                      alt=""
+                      className="h-5 w-5 rounded-full object-cover border border-[var(--border)]"
+                    />
+                  ) : null}
+                  <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                    {entry.name}
+                  </span>
+                </div>
+                <div className="text-xs text-[var(--text-secondary)]">{entry.marks} marks</div>
+                <div
+                  className={`${height} mt-2 flex items-start justify-center rounded-t-2xl border border-[var(--border)] bg-[var(--surface-raised)] pt-3 text-2xl font-bold ${color}`}
+                >
+                  #{entry.rank}
+                </div>
               </div>
-            </div>
-          ))}
-        </section>
+            ))}
+          </section>
+        )}
 
-        <section className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface-raised)]">
+        <section className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_16px_40px_var(--shadow-soft)]">
           <div className="border-b border-[var(--border)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)]">
             Last 10 attendees
           </div>
           <table className="w-full text-left text-sm">
             <thead className="text-[var(--text-secondary)]">
               <tr>
-                <th className="px-5 py-2 font-medium">Rank</th>
-                <th className="px-5 py-2 font-medium">Name</th>
-                <th className="px-5 py-2 font-medium">Marks</th>
-                <th className="px-5 py-2 font-medium">Attempted</th>
+                <th className="px-5 py-2.5 font-medium">Rank</th>
+                <th className="px-5 py-2.5 font-medium">Candidate</th>
+                <th className="px-5 py-2.5 font-medium">Marks</th>
+                <th className="px-5 py-2.5 font-medium">Attended</th>
               </tr>
             </thead>
             <tbody className="text-[var(--text-primary)]">
@@ -158,17 +225,36 @@ export default function RankPage() {
               )}
               {latest.map((row) => (
                 <tr
-                  key={`${row.email}-${row.createdAt}`}
-                  className={`border-t border-[var(--border)] ${isMe(row) ? "bg-[var(--accent-soft)] font-semibold" : ""}`}
+                  key={`${row.email}-${row.submittedAt || row.createdAt || row.rank}`}
+                  className={`border-t border-[var(--border)] transition hover:bg-[var(--surface-tint)] ${
+                    isMe(row) ? "bg-[var(--accent-soft)] font-semibold" : ""
+                  }`}
                 >
-                  <td className="px-5 py-2">#{row.rank}</td>
-                  <td className="px-5 py-2">
-                    {row.name}
-                    {isMe(row) ? " (You)" : ""}
+                  <td className="px-5 py-3">#{row.rank}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2.5">
+                      {row.userImage ? (
+                        <img
+                          src={row.userImage}
+                          alt=""
+                          className="h-7 w-7 rounded-full object-cover border border-[var(--border)]"
+                        />
+                      ) : (
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-muted)] text-[11px] font-semibold text-[var(--text-secondary)]">
+                          {(row.name || "A").slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <span className="truncate">{row.name}</span>
+                      {isMe(row) && (
+                        <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-text)]">
+                          You
+                        </span>
+                      )}
+                    </div>
                   </td>
-                  <td className="px-5 py-2">{row.marks}</td>
-                  <td className="px-5 py-2">
-                    {row.createdAt ? new Date(row.createdAt).toLocaleString() : "-"}
+                  <td className="px-5 py-3 font-semibold">{row.marks}</td>
+                  <td className="px-5 py-3 text-[var(--text-secondary)]">
+                    {row.attended || formatRelativeAttended(row.submittedAt || row.createdAt)}
                   </td>
                 </tr>
               ))}

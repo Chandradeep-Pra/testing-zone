@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUrologicsApiUrl } from "@/lib/urologics-api";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type AttemptPayload = {
   marks?: number;
   correctCount?: number;
   totalQuestions?: number;
   timeTakenSeconds?: number;
+  name?: string;
+  email?: string;
+  userImage?: string;
 };
 
 export async function POST(
@@ -13,10 +19,6 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const idToken = req.cookies.get("__session")?.value;
-
-  if (!idToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   try {
     const { id } = await params;
@@ -27,6 +29,31 @@ export async function POST(
         { success: false, error: "Invalid attempt payload" },
         { status: 400 },
       );
+    }
+
+    if (!idToken) {
+      // Support public candidate submission if name and email are present
+      if (body.name && body.email) {
+        const pubResponse = await fetch(
+          getUrologicsApiUrl(`/api/public/mocks/${encodeURIComponent(id)}/attempts`),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: body.name,
+              email: body.email,
+              marks: body.marks,
+              userImage: body.userImage,
+              totalQuestions: body.totalQuestions,
+            }),
+            cache: "no-store",
+          }
+        );
+        const pubPayload = await pubResponse.json().catch(() => ({}));
+        return NextResponse.json(pubPayload, { status: pubResponse.status });
+      }
+
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const response = await fetch(
@@ -43,7 +70,14 @@ export async function POST(
     );
     const payload = await response.json().catch(() => ({}));
 
-    return NextResponse.json(payload, { status: response.status });
+    return NextResponse.json(payload, {
+      status: response.status,
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
   } catch (error) {
     console.error("Mock attempt proxy error:", error);
     return NextResponse.json(
