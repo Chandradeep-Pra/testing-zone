@@ -7,6 +7,7 @@ import { appPath } from "@/lib/app-path";
 import ResultsLoader from "@/components/ui/ResultsLoader";
 import GlobalLoading from "@/components/ui/GlobalLoading";
 import ThemeToggle from "@/components/theme/ThemeToggle";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface Question {
   id: string;
@@ -76,6 +77,7 @@ function getOptionLabel(index: number) {
 export default function Page() {
   const { id } = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [mock, setMock] = useState<Mock | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [currentQ, setCurrentQ] = useState(0);
@@ -208,12 +210,15 @@ export default function Page() {
       // Extract candidate verification info if available
       let candidateName: string | undefined;
       let candidateEmail: string | undefined;
+      let candidateImage = user?.profileImageUrl || undefined;
       try {
         const savedVerification = localStorage.getItem("urologics-candidate-verification");
         if (savedVerification) {
           const parsed = JSON.parse(savedVerification);
           if (parsed.name) candidateName = parsed.name;
           if (parsed.email) candidateEmail = parsed.email;
+          if (!candidateImage && typeof parsed.userImage === "string") candidateImage = parsed.userImage;
+          if (!candidateImage && typeof parsed.profileImageUrl === "string") candidateImage = parsed.profileImageUrl;
         }
       } catch {}
 
@@ -228,6 +233,7 @@ export default function Page() {
             timeTakenSeconds: (mock.durationMinutes * 60) - timeLeft,
             name: candidateName,
             email: candidateEmail,
+            userImage: candidateImage,
           }),
           cache: "no-store",
         });
@@ -237,7 +243,7 @@ export default function Page() {
     }
 
     router.push(`/mocks/${id}/rank`);
-  }, [answers, id, mock, router, timeLeft]);
+  }, [answers, id, mock, router, timeLeft, user?.profileImageUrl]);
 
   useEffect(() => {
     if (!mock) return;

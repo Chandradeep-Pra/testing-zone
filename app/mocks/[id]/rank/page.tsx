@@ -108,17 +108,10 @@ export default function RankPage() {
     return <ResultsLoader title="Ranking Candidate Performance" />;
   }
 
-  // Deduplicate and rank
-  const sorted = [...results].sort((a, b) => {
-    if (b.marks !== a.marks) return b.marks - a.marks;
-    const timeA = Date.parse(a.submittedAt || a.createdAt || "") || 0;
-    const timeB = Date.parse(b.submittedAt || b.createdAt || "") || 0;
-    return timeB - timeA;
-  });
-
-  const ranked: RankedResult[] = sorted.map((item, idx) => ({
+  // The API is the source of truth for ordering and rank.
+  const ranked: RankedResult[] = results.map((item, idx) => ({
     ...item,
-    rank: item.rank || idx + 1,
+    rank: typeof item.rank === "number" && item.rank > 0 ? item.rank : idx + 1,
   }));
 
   const userEmail = user?.email?.trim().toLowerCase() || "";
@@ -143,13 +136,21 @@ export default function RankPage() {
 
   const me = ranked.find(isMe);
   const [first, second, third] = ranked;
-  const podium = [
-    { entry: second, height: "h-32", color: "text-slate-300" },
-    { entry: first, height: "h-44", color: "text-yellow-300" },
-    { entry: third, height: "h-24", color: "text-amber-600" },
-  ].filter((item): item is { entry: RankedResult; height: string; color: string } => Boolean(item.entry));
+  const podium = [second, first, third]
+    .filter((entry): entry is RankedResult => Boolean(entry))
+    .map((entry) => {
+      if (entry.rank === 1) return { entry, height: "h-44", color: "text-yellow-300" };
+      if (entry.rank === 2) return { entry, height: "h-32", color: "text-slate-300" };
+      return { entry, height: "h-24", color: "text-amber-600" };
+    });
 
-  const latest = [...ranked].slice(0, 10);
+  const latest = [...ranked]
+    .sort((a, b) => {
+      const timeA = Date.parse(a.submittedAt || a.createdAt || "") || 0;
+      const timeB = Date.parse(b.submittedAt || b.createdAt || "") || 0;
+      return timeB - timeA;
+    })
+    .slice(0, 10);
 
   return (
     <main className="urologics-shell min-h-screen px-4 py-10">
@@ -177,7 +178,7 @@ export default function RankPage() {
         {podium.length > 0 && (
           <section className="flex items-end justify-center gap-3">
             {podium.map(({ entry, height, color }) => (
-              <div key={entry.rank} className="w-1/3 text-center">
+              <div key={`${entry.email}-${entry.submittedAt || entry.rank}`} className="w-1/3 text-center">
                 <Trophy className={`mx-auto h-8 w-8 ${color}`} />
                 <div className="mt-2 flex items-center justify-center gap-1.5">
                   {entry.userImage ? (

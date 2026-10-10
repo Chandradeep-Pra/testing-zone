@@ -4,6 +4,7 @@ type AttemptPayload = {
   name?: string;
   email?: string;
   marks?: number;
+  userImage?: string;
 };
 
 export async function POST(
@@ -33,6 +34,10 @@ export async function POST(
         name: body.name,
         email: normalizedEmail,
         marks: body.marks,
+        userImage:
+          typeof body.userImage === "string" && body.userImage.trim()
+            ? body.userImage.trim()
+            : undefined,
       }),
       cache: "no-store",
     });

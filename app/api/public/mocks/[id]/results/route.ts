@@ -20,6 +20,7 @@ type UpstreamResult = {
     email?: string;
     image?: string | null;
     userImage?: string | null;
+    profileImageUrl?: string | null;
   };
 };
 
@@ -100,8 +101,11 @@ export async function GET(
       if (marksB !== marksA) return marksB - marksA;
       const timeA = Date.parse(a.submittedAt || a.createdAt || "") || 0;
       const timeB = Date.parse(b.submittedAt || b.createdAt || "") || 0;
-      return timeB - timeA;
+      return timeA - timeB;
     });
+
+    let previousMarks: number | null = null;
+    let previousRank = 0;
 
     const results = deduplicated.map((entry, index) => {
       const name = entry.candidate?.name || entry.name || "Anonymous";
@@ -109,14 +113,19 @@ export async function GET(
       const userImage =
         entry.candidate?.image ||
         entry.candidate?.userImage ||
+        entry.candidate?.profileImageUrl ||
         entry.userImage ||
         null;
       const marks = Number(entry.marks) || 0;
       const submittedAt = entry.submittedAt || entry.createdAt || null;
       const attended = entry.attended || formatRelativeAttended(submittedAt);
+      const rank = previousMarks === marks ? previousRank : index + 1;
+
+      previousMarks = marks;
+      previousRank = rank;
 
       return {
-        rank: index + 1,
+        rank,
         name,
         email,
         userImage: typeof userImage === "string" && userImage.trim() ? userImage.trim() : null,
