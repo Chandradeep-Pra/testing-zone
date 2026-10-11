@@ -88,9 +88,7 @@ export default function MockRulesPage() {
         <section className="urologics-panel p-5 sm:p-8 md:p-10">
           <div className="urologics-chip">Session Rules</div>
           <h1 className="mobile-native-title mt-5 max-w-3xl font-semibold text-[var(--text-primary)] sm:mt-6 sm:text-4xl sm:tracking-[-0.04em] md:text-5xl">{mock.title || "Grand Mock"}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-orange-600/65 sm:mt-4">
-            No Part of this mock test is intended for copying.
-          </p>
+          
 
           {mock.hasAttempted ? (
             <div className="mt-7 rounded-[26px] border border-emerald-200 bg-emerald-50 p-6 text-center">
@@ -120,6 +118,9 @@ export default function MockRulesPage() {
               <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">Exam conditions</div>
               <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                 The timer continues once started, so use a stable connection and a distraction-free environment.
+              </p>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-orange-600/65 sm:mt-4">
+                No Part of this mock test is intended for copying.
               </p>
             </div>
           </div>

@@ -43,9 +43,14 @@ const getTimestamp = (value?: string | number | TimestampLike): number => {
 };
 
 const isUserEntitledToMock = (mock: Mock): boolean => {
+  // Public mocks are always accessible to everyone
   if (mock.accessType === "public") return true;
-  if (mock.access) return Boolean(mock.access.allowed);
-  return true;
+  // When access metadata is present, trust it — locked = not entitled
+  if (mock.access) {
+    return mock.access.allowed === true && mock.access.mode !== "locked";
+  }
+  // No access metadata on a non-public mock = not entitled (don't guess)
+  return false;
 };
 
 const getMockKindLabel = (mock: Mock): string =>
@@ -566,11 +571,7 @@ export default function TodayMocksPage() {
                         </h2>
 
                         {/* Timing Stem */}
-                        <p className="mt-3 line-clamp-1 min-w-0 break-words text-sm font-semibold leading-6 text-[var(--text-secondary)]">
-                          {isLive && end
-                            ? `Live session · Window closes ${new Date(end).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                            : `${mock.durationMinutes} min timed mock exam simulation`}
-                        </p>
+                      
 
                         {/* Duration and Format strip (matching AI Viva mode selector container) */}
                         <div
@@ -583,8 +584,8 @@ export default function TodayMocksPage() {
                               <span className="truncate">{mock.durationMinutes} Minutes</span>
                             </div>
                             <div className="flex min-w-0 items-center justify-center gap-1.5 rounded-[18px] bg-[var(--surface-raised)] px-3 py-2 text-xs font-semibold text-[var(--accent-strong)]">
-                              <TimerReset size={14} className="shrink-0" />
-                              <span className="truncate">10m Break</span>
+                              <Clock3 size={14} className="shrink-0" />
+                              <span className="truncate">{mock.durationMinutes} Minutes</span>
                             </div>
                           </div>
                         </div>

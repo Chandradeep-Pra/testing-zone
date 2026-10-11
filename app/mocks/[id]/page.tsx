@@ -360,7 +360,7 @@ export default function Page() {
 
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--accent-strong)]">
-                Urologics Grand Mocks
+                Urologics Mock Exams
               </div>
               <div className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{mock.title}</div>
             </div>
