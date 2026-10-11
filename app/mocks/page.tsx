@@ -6,6 +6,7 @@ import {
   Clock3,
   CircleDot,
   Filter,
+  ListOrdered,
   LockKeyhole,
   Search,
   ShieldCheck,
@@ -570,22 +571,28 @@ export default function TodayMocksPage() {
                           {mock.title || "Grand Mock"}
                         </h2>
 
-                        {/* Timing Stem */}
-                      
+                        {/* Description — only shown when provided */}
+                        {mock.description ? (
+                          <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+                            {mock.description}
+                          </p>
+                        ) : null}
 
-                        {/* Duration and Format strip (matching AI Viva mode selector container) */}
+                        {/* Stats strip: question count + duration */}
                         <div
                           className="mt-3 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--accent-soft)] p-1.5"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="grid min-w-0 grid-cols-2 gap-2 text-center">
                             <div className="flex min-w-0 items-center justify-center gap-1.5 rounded-[18px] bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-[var(--accent-text)] shadow-[0_12px_28px_var(--shadow-brand)]">
-                              <Clock3 size={14} className="shrink-0" />
-                              <span className="truncate">{mock.durationMinutes} Minutes</span>
+                              <ListOrdered size={14} className="shrink-0" />
+                              <span className="truncate">
+                                {mock.questionCount ?? mock.totalQuestions ?? "—"} Qs
+                              </span>
                             </div>
                             <div className="flex min-w-0 items-center justify-center gap-1.5 rounded-[18px] bg-[var(--surface-raised)] px-3 py-2 text-xs font-semibold text-[var(--accent-strong)]">
                               <Clock3 size={14} className="shrink-0" />
-                              <span className="truncate">{mock.durationMinutes} Minutes</span>
+                              <span className="truncate">{mock.durationMinutes} min</span>
                             </div>
                           </div>
                         </div>

@@ -6,6 +6,9 @@ export interface Mock {
   id: string;
   quizId?: string;
   title: string;
+  description?: string;
+  questionCount?: number;
+  totalQuestions?: number;
   type?: "mock" | "grand-mock" | string;
   accessType?: "private" | "public" | string;
   startTime?: string | number | TimestampLike;
