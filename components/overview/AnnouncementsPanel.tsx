@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Image as ImageIcon, Megaphone } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Megaphone } from "lucide-react";
 import { useState } from "react";
 
 export type Announcement = {
@@ -12,10 +12,6 @@ export type Announcement = {
   media?: { type?: "image" | "youtube"; src?: string } | null;
 };
 
-function getAnnouncementBadge(kind?: Announcement["kind"]): string {
-  return kind === "grand-mock" ? "Grand Mock" : "Announcement";
-}
-
 interface Props {
   announcements: Announcement[];
   onImagePreview: (src: string) => void;
@@ -23,134 +19,41 @@ interface Props {
 
 export default function AnnouncementsPanel({ announcements, onImagePreview }: Props) {
   const [active, setActive] = useState(0);
-
-  const move = (dir: 1 | -1) => {
-    if (!announcements.length) return;
-    setActive((c) => (c + dir + announcements.length) % announcements.length);
-  };
-
-  const item = announcements[active] ?? null;
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const index = announcements.length ? active % announcements.length : 0;
+  const item = announcements[index];
+  const expanded = expandedId === item?.id;
+  const move = (direction: number) => setActive((current) => (current + direction + announcements.length) % announcements.length);
 
   return (
-    <section className="urologics-panel overflow-hidden p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-            <Megaphone size={18} />
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
-              Announcements
-            </p>
-            <p className="text-xs text-[var(--text-tertiary)]">
-              {announcements.length
-                ? `${active + 1} of ${announcements.length}`
-                : "Latest updates"}
-            </p>
-          </div>
-        </div>
-
-        {announcements.length > 1 && (
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => move(-1)}
-              aria-label="Previous"
-              className="grid h-8 w-8 place-items-center rounded-full border border-[var(--border)] text-[var(--accent-strong)] transition hover:bg-[var(--accent-soft)]"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => move(1)}
-              aria-label="Next"
-              className="grid h-8 w-8 place-items-center rounded-full border border-[var(--border)] text-[var(--accent-strong)] transition hover:bg-[var(--accent-soft)]"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        )}
+    <section className="overview-card overview-announcements" aria-labelledby="announcements-heading">
+      <div className="overview-card-heading">
+        <span className="overview-section-icon"><Megaphone size={20} aria-hidden="true" /></span>
+        <h2 id="announcements-heading">Announcements</h2>
+        {announcements.length > 0 && <span className="overview-announcement-counter">{String(index + 1).padStart(2, "0")} / {String(announcements.length).padStart(2, "0")}</span>}
+        {announcements.length > 1 && <div className="overview-carousel-controls">
+          <button type="button" onClick={() => move(-1)} aria-label="Previous announcement"><ChevronLeft size={17} /></button>
+          <button type="button" onClick={() => move(1)} aria-label="Next announcement"><ChevronRight size={17} /></button>
+        </div>}
       </div>
-
-      {/* Content */}
-      {item ? (
-        <div className="mt-4 space-y-4">
-          {/* Media */}
-          <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]">
-            {item.media?.type === "image" && item.media.src ? (
-              <button
-                type="button"
-                onClick={() => onImagePreview(item.media!.src!)}
-                className="block w-full"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={item.media.src}
-                  alt={item.title}
-                  className="max-h-60 w-full object-contain"
-                />
-              </button>
-            ) : item.media?.type === "youtube" && item.media.src ? (
-              <iframe
-                src={`https://www.youtube.com/embed/${item.media.src}`}
-                title={item.title}
-                className="aspect-video w-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            ) : (
-              <div className="flex min-h-32 items-center justify-center text-[var(--accent-soft)]">
-                <Megaphone size={38} />
-              </div>
-            )}
-          </div>
-
-          {/* Text */}
-          <div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-strong)]">
-              {getAnnouncementBadge(item.kind)}
-            </span>
-            <h2 className="mt-3 text-lg font-semibold tracking-[-0.02em] text-[var(--text-primary)] sm:text-xl">
-              {item.title}
-            </h2>
-            {item.subtitle && (
-              <p className="mt-1 text-sm font-semibold text-[var(--accent-strong)]">
-                {item.subtitle}
-              </p>
-            )}
-            {item.description && (
-              <div className="urologics-minimal-scrollbar mt-3 max-h-40 overflow-y-auto pr-1">
-                <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--text-secondary)]">
-                  {item.description}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Dots pagination */}
-          {announcements.length > 1 && (
-            <div className="flex justify-center gap-1.5 pt-1">
-              {announcements.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setActive(i)}
-                  aria-label={`Announcement ${i + 1}`}
-                  className={`h-1.5 rounded-full transition-all ${
-                    i === active ? "w-6 bg-[var(--accent)]" : "w-1.5 bg-[var(--accent-muted)]"
-                  }`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <p className="mt-5 text-sm leading-7 text-[var(--text-secondary)]">
-          No active announcements right now.
-        </p>
-      )}
+      {item ? <div className="overview-announcement-content" aria-live="polite">
+        {item.media?.src && <div className="overview-announcement-media">
+          {item.media.type === "image" ? <button type="button" onClick={() => onImagePreview(item.media!.src!)} aria-label={`Enlarge image for ${item.title}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={item.media.src} alt={item.title} />
+          </button> : item.media.type === "youtube" ? <iframe src={`https://www.youtube.com/embed/${item.media.src}`} title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /> : null}
+        </div>}
+        <span className="overview-announcement-tag">{item.kind === "grand-mock" ? "Grand Mock" : "Latest update"}</span>
+        <h3>{item.title}</h3>
+        {item.subtitle && <p className="overview-announcement-subtitle">{item.subtitle}</p>}
+        {item.description && <p className={`overview-announcement-description ${expanded ? "is-expanded" : ""}`}>{item.description}</p>}
+        {(item.description || item.media?.type === "image") && <button type="button" className="overview-text-link" onClick={() => item.media?.type === "image" && item.media.src ? onImagePreview(item.media.src) : setExpandedId(expanded ? null : item.id)} aria-expanded={item.media?.type === "image" ? undefined : expanded}>
+          {expanded ? "Show less" : "View announcement"} <ArrowUpRight size={16} aria-hidden="true" />
+        </button>}
+        {announcements.length > 1 && <div className="overview-carousel-dots" aria-label="Choose announcement">
+          {announcements.map((announcement, position) => <button key={announcement.id} type="button" onClick={() => setActive(position)} aria-label={`Show announcement ${position + 1}`} aria-current={position === index ? "true" : undefined}><span /></button>)}
+        </div>}
+      </div> : <div className="overview-empty"><Megaphone size={28} aria-hidden="true" /><h3>You&apos;re all caught up</h3><p>New announcements and upcoming events will appear here.</p></div>}
     </section>
   );
 }
-

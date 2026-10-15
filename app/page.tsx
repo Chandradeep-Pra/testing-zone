@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { ArrowUpRight, Mic, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import "./overview.css";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
@@ -32,6 +34,16 @@ export default function Home() {
     () => getFirstName(user?.name, user?.email),
     [user?.name, user?.email],
   );
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const update = () => setNow(new Date());
+    update();
+    const timer = window.setInterval(update, 60000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const greeting = !now ? "Welcome back" : now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening";
 
   // ── Data state ────────────────────────────────────────────────────────────
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -185,32 +197,24 @@ export default function Home() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <main className="urologics-shell overflow-hidden">
-      <div className="mobile-native-page mx-auto flex min-h-screen w-full max-w-7xl flex-col sm:px-6 sm:py-4">
-        <UrologicsHeader current="Overview" product="Platform" tag="AI Viva, Mocks, and Grand Mocks" />
-
-        <section className="py-4 sm:py-8">
-          {/* Greeting */}
-          <div className="mb-5 rounded-[30px] border border-[var(--border)] bg-[var(--surface-raised)] p-5 shadow-[0_12px_30px_var(--shadow-soft)] sm:mb-6 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
-              Overview
-            </p>
-            <h1 className="mobile-native-title mt-2 font-semibold text-[var(--text-primary)] sm:text-4xl sm:tracking-[-0.04em] md:text-5xl">
-              Hi, {firstName}
-            </h1>
-          </div>
-
-          <CompleteProfilePrompt />
-
-          {/* ── Part 1: Exam Countdown Banner (full-width) ─────────────────── */}
+    <main className="urologics-shell overview-experience">
+      <div className="overview-container">
+        <UrologicsHeader current="Overview" product="Platform" tag="AI Viva, Mocks, and Grand Mocks" variant="overview" mobileApp />
+        <section className="overview-content" aria-label="Your learning overview">
           <ExamScheduleBanner />
-
-          {/* ── Part 2: Announcements + Daily Quiz (side-by-side on md+) ──── */}
-          <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
-            <AnnouncementsPanel
-              announcements={announcements}
-              onImagePreview={(src) => setPreviewImage(src)}
-            />
+          <div className="overview-greeting">
+            <div>
+              <p className="overview-eyebrow">Overview</p>
+              <h1>{greeting}, {firstName}</h1>
+              <p className="overview-intro">Pick up where you left off, or try today&apos;s question.</p>
+            </div>
+            {now && <time dateTime={now.toISOString()} className="overview-date">
+              {now.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+            </time>}
+          </div>
+          <CompleteProfilePrompt />
+          <div className="overview-feature-grid">
+            <AnnouncementsPanel announcements={announcements} onImagePreview={setPreviewImage} />
             <DailyQuizPanel
               quiz={dailyQuiz}
               selectedOption={selectedOption}
@@ -220,21 +224,13 @@ export default function Home() {
               isLoggedIn={Boolean(user)}
               onSelect={setSelectedOption}
               onSubmit={submitQuiz}
-              onImagePreview={(src) => setPreviewImage(src)}
+              onImagePreview={setPreviewImage}
             />
           </div>
-
-          {/* ── Part 3: Lesson History (full-width) ───────────────────────── */}
-          <div className="mt-4 sm:mt-5">
-            <LessonHistorySection
-              lessons={lessons}
-              loading={lessonsLoading}
-              isLoggedIn={Boolean(user)}
-            />
+          <div className="overview-section-gap">
+            <LessonHistorySection lessons={lessons} loading={lessonsLoading} isLoggedIn={Boolean(user)} />
           </div>
-
-          {/* ── Part 4: Tests Tab (Mocks + AI Vivas) ─────────────────────── */}
-          <div className="mt-4 sm:mt-5">
+          <div className="overview-section-gap">
             <TestsTabSection
               mocks={mocks}
               vivaCases={vivaCases}
@@ -243,26 +239,24 @@ export default function Home() {
               isLoggedIn={Boolean(user)}
             />
           </div>
+          <aside className="overview-viva-callout">
+            <span className="overview-viva-icon"><Mic size={21} aria-hidden="true" /></span>
+            <div>
+              <h2>Prefer speaking it through?</h2>
+              <p>Practice a case with AI Viva.</p>
+            </div>
+            <Link href="/ai-viva/cases" className="overview-viva-link">Explore cases <ArrowUpRight size={16} aria-hidden="true" /></Link>
+          </aside>
+          <p className="overview-footer-note">A little progress, every day. Your next step starts here.</p>
         </section>
       </div>
-
-      {/* Image lightbox */}
       {previewImage && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4">
-          <button
-            type="button"
-            onClick={() => setPreviewImage(null)}
-            aria-label="Close preview"
-            className="absolute right-5 top-5 grid h-11 w-11 place-items-center rounded-full bg-[var(--surface-raised)] text-[var(--text-primary)] shadow-lg"
-          >
+        <div role="dialog" aria-modal="true" aria-label="Image preview" className="overview-lightbox" onClick={(event) => { if (event.target === event.currentTarget) setPreviewImage(null); }} onKeyDown={(event) => { if (event.key === "Escape") setPreviewImage(null); }}>
+          <button type="button" onClick={() => setPreviewImage(null)} aria-label="Close preview" className="overview-lightbox-close" autoFocus>
             <X size={20} />
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewImage}
-            alt="Preview"
-            className="max-h-[86vh] max-w-[92vw] rounded-[24px] object-contain shadow-2xl"
-          />
+          <img src={previewImage} alt="Preview" className="max-h-[86vh] max-w-[92vw] rounded-2xl object-contain" />
         </div>
       )}
     </main>

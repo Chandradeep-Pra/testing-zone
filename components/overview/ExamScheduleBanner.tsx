@@ -1,84 +1,48 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays } from "lucide-react";
+import { ArrowUpRight, CalendarDays, ChevronUp } from "lucide-react";
 import { appPath } from "@/lib/app-path";
 
-type ExamSchedule = {
-  id: string;
-  examName: string;
-  examDate: string; // "YYYY-MM-DD"
-};
+type ExamSchedule = { id: string; examName: string; examDate: string };
 
 function getDaysLeft(examDate: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const target = new Date(examDate);
-  target.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function formatDaysLeft(days: number): string {
-  if (days === 0) return "Today";
-  if (days === 1) return "Tomorrow";
-  if (days < 0) return `${Math.abs(days)}d ago`;
-  return `${days} days`;
-}
-
-function urgencyClass(days: number): string {
-  if (days <= 7) return "text-red-600 dark:text-red-400";
-  if (days <= 30) return "text-amber-600 dark:text-amber-400";
-  return "text-[var(--accent-strong)]";
+  const target = new Date(`${examDate.slice(0, 10)}T00:00:00`);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
 export default function ExamScheduleBanner() {
   const [schedules, setSchedules] = useState<ExamSchedule[]>([]);
-
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => {
+    let active = true;
     fetch(appPath("/api/exam-schedules"), { cache: "no-store" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data?.schedules)) setSchedules(data.schedules);
-      })
+      .then((response) => response.json())
+      .then((data) => { if (active && Array.isArray(data?.schedules)) setSchedules(data.schedules); })
       .catch(() => {});
+    return () => { active = false; };
   }, []);
 
-  if (!schedules.length) return null;
+  const upcoming = schedules.filter((schedule) => Number.isFinite(getDaysLeft(schedule.examDate)) && getDaysLeft(schedule.examDate) >= 0).sort((a, b) => a.examDate.localeCompare(b.examDate));
+  if (!upcoming.length) return null;
 
   return (
-    <div className="mb-4 w-full overflow-x-auto sm:mb-5">
-      <div className="flex min-w-0 gap-3 sm:gap-4">
-        {schedules.map((s) => {
-          const days = getDaysLeft(s.examDate);
-          return (
-            <div
-              key={s.id}
-              className="flex min-w-[200px] flex-1 items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-4 py-3 shadow-[0_4px_14px_var(--shadow-soft)] sm:min-w-[220px]"
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-                <CalendarDays size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[var(--text-primary)]">
-                  {s.examName}
-                </p>
-                <p className={`text-xs font-semibold ${urgencyClass(days)}`}>
-                  {formatDaysLeft(days)}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className={`text-2xl font-bold tabular-nums leading-none ${urgencyClass(days)}`}>
-                  {days >= 0 ? days : "—"}
-                </p>
-                <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
-                  days left
-                </p>
-              </div>
-            </div>
-          );
-        })}
+    <section className="overview-exams" aria-label="Upcoming exams">
+      <div className="overview-exams-strip">
+        <div className="overview-exams-label"><span><CalendarDays size={19} aria-hidden="true" /></span><h2>Upcoming exams</h2></div>
+        <div className="overview-exam-countdowns">
+          {upcoming.slice(0, 2).map((schedule) => {
+            const days = getDaysLeft(schedule.examDate);
+            return <p key={schedule.id}>{schedule.examName} <span aria-hidden="true">?</span> <strong>{days === 0 ? "Today" : days === 1 ? "1 day left" : `${days} days left`}</strong></p>;
+          })}
+        </div>
+        <button type="button" className="overview-text-link overview-schedule-toggle" onClick={() => setExpanded(!expanded)} aria-expanded={expanded} aria-controls="overview-exam-dates">{expanded ? "Hide schedule" : "View schedule"}{expanded ? <ChevronUp size={16} /> : <ArrowUpRight size={16} />}</button>
       </div>
-    </div>
+      {expanded && <div id="overview-exam-dates" className="overview-exam-dates">
+        {upcoming.map((schedule) => <div key={schedule.id}><span>{schedule.examName}</span><time dateTime={schedule.examDate}>{new Date(`${schedule.examDate.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}</time></div>)}
+      </div>}
+    </section>
   );
 }
-

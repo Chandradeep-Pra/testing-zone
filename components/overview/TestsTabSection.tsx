@@ -1,15 +1,8 @@
 "use client";
 
-import {
-  ArrowRight,
-  BrainCircuit,
-  ClipboardCheck,
-  ListOrdered,
-  LockKeyhole,
-  Clock3,
-  Trophy,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight, BrainCircuit, ClipboardList, Clock3, LockKeyhole, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 
 export type MockItem = {
@@ -32,8 +25,6 @@ export type VivaCase = {
   difficulty?: string;
 };
 
-type Tab = "mocks" | "viva";
-
 interface Props {
   mocks: MockItem[];
   vivaCases: VivaCase[];
@@ -42,196 +33,58 @@ interface Props {
   isLoggedIn: boolean;
 }
 
-function MockCard({ mock, onClick }: { mock: MockItem; onClick: () => void }) {
-  const entitled =
-    mock.accessType === "public" ||
-    (mock.access?.allowed === true && mock.access?.mode !== "locked");
-  const qCount = mock.questionCount ?? mock.totalQuestions;
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
-      className={`flex cursor-pointer items-start justify-between gap-4 rounded-xl border bg-[var(--surface)] px-4 py-3.5 transition hover:-translate-y-0.5 hover:shadow-[0_6px_18px_var(--shadow-soft)] ${
-        entitled ? "border-[var(--border)] hover:border-[var(--accent)]" : "border-[var(--border)] opacity-70"
-      }`}
-    >
-      <div className="min-w-0 flex-1">
-        <p className="line-clamp-1 font-semibold text-[var(--text-primary)]">{mock.title}</p>
-        {mock.description && (
-          <p className="mt-0.5 line-clamp-1 text-xs text-[var(--text-secondary)]">
-            {mock.description}
-          </p>
-        )}
-        <div className="mt-2 flex flex-wrap gap-2">
-          {qCount !== undefined && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-strong)]">
-              <ListOrdered size={11} /> {qCount} Qs
-            </span>
-          )}
-          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]">
-            <Clock3 size={11} /> {mock.durationMinutes} min
-          </span>
-          {mock.hasAttempted && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-              <Trophy size={11} /> Review answers · Score: {mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="shrink-0 pt-0.5 text-[var(--accent-strong)]">
-        {entitled ? <ArrowRight size={18} /> : <LockKeyhole size={16} />}
-      </div>
-    </div>
-  );
-}
-
-function VivaCard({ viva, onClick }: { viva: VivaCase; onClick: () => void }) {
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
-      className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 transition hover:-translate-y-0.5 hover:border-[var(--accent)] hover:shadow-[0_6px_18px_var(--shadow-soft)]"
-    >
-      <div className="min-w-0 flex-1">
-        <p className="line-clamp-1 font-semibold text-[var(--text-primary)]">{viva.title}</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {viva.specialty && (
-            <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-strong)]">
-              {viva.specialty}
-            </span>
-          )}
-          {viva.difficulty && (
-            <span className="rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]">
-              {viva.difficulty}
-            </span>
-          )}
-        </div>
-      </div>
-      <ArrowRight size={18} className="shrink-0 text-[var(--accent-strong)]" />
-    </div>
-  );
-}
-
-function TabSkeleton() {
-  return (
-    <div className="space-y-2">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5">
-          <div className="h-3.5 w-2/3 rounded-full bg-[var(--accent-soft)]" />
-          <div className="mt-2 h-2.5 w-1/3 rounded-full bg-[var(--accent-soft)]" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export default function TestsTabSection({
-  mocks,
-  vivaCases,
-  mocksLoading,
-  vivaLoading,
-  isLoggedIn,
-}: Props) {
-  const [tab, setTab] = useState<Tab>("mocks");
+export default function TestsTabSection({ mocks, vivaCases, mocksLoading, vivaLoading, isLoggedIn }: Props) {
+  const [filter, setFilter] = useState("all");
   const router = useRouter();
+  const vivaMode = filter === "viva";
+  const filtered = mocks.filter((mock) => filter === "public" ? mock.accessType === "public" : filter === "attended" ? mock.hasAttempted : true);
+  const loading = vivaMode ? vivaLoading : mocksLoading;
+  const items = vivaMode ? vivaCases : filtered;
+
+  function openMock(mock: MockItem, reattempt = false) {
+    const entitled = mock.accessType === "public" || (mock.access?.allowed === true && mock.access?.mode !== "locked");
+    if (!entitled) { window.location.assign("https://urologics.co.uk/pricing"); return; }
+    if (!isLoggedIn && mock.accessType === "public") { router.push(`/public-mocks/${mock.id}`); return; }
+    router.push(`/mocks/${mock.id}/${mock.hasAttempted && !reattempt ? "result" : "rules"}`);
+  }
 
   return (
-    <section className="urologics-panel p-4 sm:p-5">
-      {/* Header + tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent-strong)]">
-            {tab === "mocks" ? <ClipboardCheck size={18} /> : <BrainCircuit size={18} />}
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent-strong)]">
-              Tests
-            </p>
-            <p className="text-xs text-[var(--text-tertiary)]">
-              {tab === "mocks" ? "Timed mock sessions" : "AI-powered oral cases"}
-            </p>
-          </div>
-        </div>
-
-        {/* Tab pills */}
-        <div className="flex rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-1">
-          {(["mocks", "viva"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition ${
-                tab === t
-                  ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-sm"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              {t === "mocks" ? "Mocks" : "AI Vivas"}
-            </button>
-          ))}
+    <section className="overview-card overview-tests" aria-labelledby="available-tests-heading">
+      <div className="overview-card-heading">
+        <span className="overview-section-icon">{vivaMode ? <BrainCircuit size={20} aria-hidden="true" /> : <ClipboardList size={20} aria-hidden="true" />}</span>
+        <h2 id="available-tests-heading">{vivaMode ? "AI viva cases" : "Available mock tests"}</h2>
+        <div className="overview-test-controls">
+          <select aria-label="Filter available tests" value={filter} onChange={(event) => setFilter(event.target.value)}>
+            <option value="all">All mocks</option>
+            <option value="public">Public mocks</option>
+            <option value="attended">Attended</option>
+            <option value="viva">AI Viva</option>
+          </select>
+          <Link href={vivaMode ? "/ai-viva/cases" : "/mocks"} className="overview-text-link">View all <ArrowUpRight size={16} aria-hidden="true" /></Link>
         </div>
       </div>
-
-      {/* Content */}
-      <div className="mt-4">
-        {tab === "mocks" ? (
-          mocksLoading ? (
-            <TabSkeleton />
-          ) : mocks.length === 0 ? (
-            <p className="text-sm text-[var(--text-secondary)]">No mocks available right now.</p>
-          ) : (
-            <div className="space-y-2">
-              {mocks.slice(0, 5).map((m) => (
-                <MockCard
-                  key={m.id}
-                  mock={m}
-                  onClick={() => router.push(`/mocks/${m.id}/${m.hasAttempted ? "result" : "rules"}`)}
-                />
-              ))}
-              {mocks.length > 5 && (
-                <button
-                  type="button"
-                  onClick={() => router.push("/mocks")}
-                  className="mt-1 w-full rounded-xl border border-[var(--border)] py-2 text-sm font-semibold text-[var(--accent-strong)] transition hover:bg-[var(--accent-soft)]"
-                >
-                  View all {mocks.length} mocks →
-                </button>
-              )}
+      {loading ? <div className="overview-tests-loading" aria-label="Loading tests" aria-busy="true">{[1, 2, 3].map((key) => <div key={key} className="overview-skeleton" />)}</div>
+      : !items.length ? <div className="overview-empty-inline"><p>{vivaMode ? isLoggedIn ? "New viva cases will appear here when available." : "Sign in to access your AI viva cases." : filter === "attended" ? "Your completed mocks will appear here for review." : "New mock tests will appear here when available."}</p></div>
+      : <div className="overview-test-list">
+        <div className="overview-test-table-heading" aria-hidden="true"><span>{vivaMode ? "Case" : "Test"}</span><span>{vivaMode ? "Specialty" : "Questions"}</span><span>{vivaMode ? "Difficulty" : "Duration"}</span><span /></div>
+        {vivaMode ? vivaCases.slice(0, 3).map((viva) => <article key={viva.id} className="overview-test-row">
+          <div className="overview-test-name"><span className="overview-test-icon"><BrainCircuit size={17} aria-hidden="true" /></span><div><h3>{viva.title}</h3><p className="overview-test-mobile-meta">{viva.specialty}{viva.difficulty && ` ? ${viva.difficulty}`}</p></div></div>
+          <span className="overview-test-detail">{viva.specialty || "Urology"}</span><span className="overview-test-detail">{viva.difficulty || "All levels"}</span>
+          <Link href={`/ai-viva/session/${viva.id}`} className="overview-test-start">Start case <ArrowRight size={15} aria-hidden="true" /></Link>
+        </article>) : filtered.slice(0, 3).map((mock) => {
+          const entitled = mock.accessType === "public" || (mock.access?.allowed === true && mock.access?.mode !== "locked");
+          const count = mock.questionCount ?? mock.totalQuestions;
+          return <article key={mock.id} className="overview-test-row">
+            <div className="overview-test-name"><span className="overview-test-icon"><ClipboardList size={17} aria-hidden="true" /></span><div><h3>{mock.title}</h3>{mock.description && <p className="overview-test-description">{mock.description}</p>}<p className="overview-test-mobile-meta"><Clock3 size={12} aria-hidden="true" />{mock.durationMinutes} min{mock.hasAttempted && ` ? Score: ${mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}`}</p></div></div>
+            <span className="overview-test-detail">{count !== undefined ? `${count} questions` : "?"}</span>
+            <span className="overview-test-detail">{mock.durationMinutes} min</span>
+            <div className="overview-test-actions">
+              <button type="button" className="overview-test-start" onClick={() => openMock(mock)}>{!entitled ? "Unlock" : mock.hasAttempted ? "Review Answers" : "Start mock"}{!entitled ? <LockKeyhole size={14} /> : <ArrowRight size={14} />}</button>
+              {mock.hasAttempted && entitled && <button type="button" className="overview-test-reattempt" onClick={() => openMock(mock, true)} aria-label={`Reattempt ${mock.title}`}><RotateCcw size={14} aria-hidden="true" /><span>Reattempt</span></button>}
             </div>
-          )
-        ) : vivaLoading ? (
-          <TabSkeleton />
-        ) : vivaCases.length === 0 ? (
-          <p className="text-sm text-[var(--text-secondary)]">
-            {isLoggedIn ? "No viva cases available." : "Sign in to access AI viva cases."}
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {vivaCases.slice(0, 5).map((v) => (
-              <VivaCard
-                key={v.id}
-                viva={v}
-                onClick={() => router.push(`/ai-viva/session/${v.id}`)}
-              />
-            ))}
-            {vivaCases.length > 5 && (
-              <button
-                type="button"
-                onClick={() => router.push("/ai-viva/cases")}
-                className="mt-1 w-full rounded-xl border border-[var(--border)] py-2 text-sm font-semibold text-[var(--accent-strong)] transition hover:bg-[var(--accent-soft)]"
-              >
-                View all {vivaCases.length} cases →
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+          </article>;
+        })}
+      </div>}
     </section>
   );
 }
-
