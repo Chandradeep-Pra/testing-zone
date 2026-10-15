@@ -2,7 +2,6 @@
 
 import {
   CircleHelp,
-  Clock3,
   CheckCircle2,
   Image as ImageIcon,
   LockKeyhole,
@@ -88,9 +87,9 @@ export default function DailyQuizPanel({
       <div className="overview-card-heading">
         <span className="overview-section-icon overview-quiz-icon"><CircleHelp size={21} aria-hidden="true" /></span>
         <h2 id="daily-quiz-heading">Question of the day</h2>
-       
       </div>
-      {quiz ? <div className="overview-quiz-content">
+      {quiz ? <>
+      <div className="overview-quiz-content" role="region" aria-label="Daily question and answers" tabIndex={0}>
         {quiz.image && <button type="button" className="overview-quiz-exhibit" onClick={() => onImagePreview(quiz.image!)}>
           <ImageIcon size={15} aria-hidden="true" /> View question image
         </button>}
@@ -117,11 +116,14 @@ export default function DailyQuizPanel({
           </div>}
           {quizResult && quiz.explanation && <div className="overview-quiz-explanation">{renderMarkdown(quiz.explanation)}</div>}
         </div>
+      </div>
+      <div className="overview-quiz-actions">
         <button type="button" onClick={onSubmit} disabled={submitting || Boolean(quizResult)} className="overview-submit">
           {submitting ? "Submitting..." : quizResult ? "Answer submitted" : isLoggedIn ? "Submit answer" : "Sign in to answer"}
         </button>
         <p className="overview-quiz-footnote">One question. A daily learning habit.</p>
-      </div> : <div className="overview-empty"><CircleHelp size={28} aria-hidden="true" /><h3>A new question is on its way</h3><p>Check back soon for your daily urology challenge.</p></div>}
+      </div>
+      </> : <div className="overview-empty"><CircleHelp size={28} aria-hidden="true" /><h3>A new question is on its way</h3><p>Check back soon for your daily urology challenge.</p></div>}
     </section>
   );
 }

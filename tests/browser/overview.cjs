@@ -12,7 +12,7 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
   const artifacts = path.resolve('.viva-test-artifacts/overview');
   fs.mkdirSync(artifacts, { recursive: true });
   const errors = [], submissions = [], progressAuth = [];
-  let empty = false;
+  let empty = false, longQuestion = false;
   const candidate = { uid: 'overview-fixture', email: 'candidate@example.test', name: 'Chandradeep', idToken: 'fixture-token', refreshToken: 'fixture-refresh', expiresAt: Date.now() + 3600000, tier: 'paid', activeCourseIds: ['course1'] };
   let currentCandidate = candidate;
   const liveWindow = { startTime: new Date(Date.now() - 60000).toISOString(), endTime: new Date(Date.now() + 3600000).toISOString() };
@@ -23,6 +23,8 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
   ];
   const schedules = ['FRCS Section 1', 'FRCS Section 2', 'European Board of Urology', 'Urology specialty assessment', 'Clinical viva preparation'].map((examName, index) => ({ id: `s${index + 1}`, examName, examDate: new Date(Date.now() + (80 + index * 20) * 86400000).toISOString().slice(0, 10) }));
   const longAnnouncement = Array.from({ length: 30 }, (_, index) => `Learning update ${index + 1}: practise a clinical topic, review your reasoning, and prepare for your next Urologics mock session.`).join('\n\n');
+  const longQuizExplanation = '**Correct.** Extension into perinephric fat indicates invasion beyond the kidney.\n\n' + Array.from({ length: 18 }, (_, index) => `Clinical reasoning ${index + 1}: review the anatomical boundaries, compare the pathological findings with each answer, and use the explanation to prepare for a future clinical case.`).join('\n\n');
+  const longQuizQuestion = 'Extended clinical case. ' + Array.from({ length: 18 }, (_, index) => `Case detail ${index + 1}: a patient undergoes radical nephrectomy for renal cell carcinoma, and the pathological report describes tumour extension into the surrounding tissue.`).join(' ') + ' Which pathological feature indicates invasion beyond the kidney?';
   const lessons = [
     { id: 'l1', videoId: 'l1', title: 'Bladder cancer: staging', sectionTitle: 'Urology Core Curriculum', percentComplete: 45, watchedSeconds: 588, lastPositionSeconds: 588, durationSeconds: 1308, completed: false, lastWatchedAt: '2026-10-16T10:00:00Z', thumbnailUrl: '/web/exhibits/LUTS-01.jpeg' },
     { id: 'l2', videoId: 'l2', title: 'Upper tract imaging', sectionTitle: 'Uro-oncology', percentComplete: 60, watchedSeconds: 720, lastPositionSeconds: 720, durationSeconds: 1200, completed: false, lastWatchedAt: '2026-10-16T09:00:00Z', thumbnailUrl: '/web/exhibits/img-ct-001.png' },
@@ -50,7 +52,7 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
           { id: 'a2', title: 'Your next grand mock is here', kind: 'grand-mock', description: longAnnouncement },
           { id: 'a3', title: 'Clinical teaching update', description: 'Explore the latest learning resources.', media: { type: 'image', src: '/web/overview-missing-image.png' } }
         ] };
-        else if (url.pathname.endsWith('/daily-quiz')) body = { quiz: empty ? null : { id: 'q1', question: 'A patient undergoes radical nephrectomy for renal cell carcinoma. Which pathological feature indicates invasion beyond the kidney?', topic: 'Renal oncology', options: ['Tumour confined to the renal cortex', 'Invasion into perinephric fat', 'Tumour size greater than 4 cm', 'Low nuclear grade'], correctIndex: 1, explanation: '**Correct.** Extension into perinephric fat indicates invasion beyond the kidney.' } };
+        else if (url.pathname.endsWith('/daily-quiz')) body = { quiz: empty ? null : { id: 'q1', question: longQuestion ? longQuizQuestion : 'A patient undergoes radical nephrectomy for renal cell carcinoma. Which pathological feature indicates invasion beyond the kidney?', topic: 'Renal oncology', options: ['Tumour confined to the renal cortex', 'Invasion into perinephric fat', 'Tumour size greater than 4 cm', 'Low nuclear grade'], correctIndex: 1, explanation: longQuizExplanation } };
         else if (url.pathname.endsWith('/exam-schedules')) body = { schedules: empty ? [] : schedules };
         else if (url.pathname.endsWith('/api/mocks')) body = { mocks: empty ? [] : mocks };
         else if (url.pathname.endsWith('/api/mocks/bladder')) body = { mock: mocks[1] };
@@ -73,6 +75,32 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
       const dimensions = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: innerWidth }));
       assert.ok(dimensions.scroll <= dimensions.viewport, `No horizontal overflow at ${width}: ${JSON.stringify(dimensions)}`);
     }
+    async function assertFeatureCardHeights(width, state = 'initial') {
+      const expected = width < 768 ? 616 : 644;
+      const cards = await page.evaluate(() => {
+        const announcement = document.querySelector('.overview-announcements').getBoundingClientRect();
+        const quiz = document.querySelector('.overview-quiz').getBoundingClientRect();
+        return { announcement: { height: announcement.height, bottom: announcement.bottom }, quiz: { height: quiz.height, bottom: quiz.bottom } };
+      });
+      assert.ok(Math.abs(cards.announcement.height - expected) < 1, `Announcement is ${expected}px at ${width} (${state}): ${JSON.stringify(cards)}`);
+      assert.ok(Math.abs(cards.quiz.height - expected) < 1, `Question card is ${expected}px at ${width} (${state}): ${JSON.stringify(cards)}`);
+      if (width >= 768) assert.ok(Math.abs(cards.announcement.bottom - cards.quiz.bottom) < 1, `Desktop cards share a bottom edge at ${width} (${state}): ${JSON.stringify(cards)}`);
+      return cards;
+    }
+    async function assertQuizScrollsInsideCard(width) {
+      const dimensions = await page.$eval('.overview-quiz-content', node => {
+        const previous = node.scrollTop;
+        node.scrollTop = node.scrollHeight;
+        const scrolled = node.scrollTop;
+        node.scrollTop = previous;
+        const card = node.closest('.overview-quiz');
+        return { total: node.scrollHeight, visible: node.clientHeight, scrolled, overflow: getComputedStyle(node).overflowY, scrollbar: getComputedStyle(node).scrollbarWidth, cardTotal: card.scrollHeight, cardVisible: card.clientHeight };
+      });
+      assert.ok(dimensions.total > dimensions.visible && dimensions.scrolled > 0, `Long quiz feedback scrolls within its body at ${width}: ${JSON.stringify(dimensions)}`);
+      assert.equal(dimensions.overflow, 'auto');
+      assert.equal(dimensions.scrollbar, 'thin');
+      assert.ok(dimensions.cardTotal <= dimensions.cardVisible + 1, `The question card itself does not overflow at ${width}: ${JSON.stringify(dimensions)}`);
+    }
     async function loadOverview() {
       await page.goto(`${origin}/web`, { waitUntil: 'networkidle0', timeout: 120000 });
       await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
@@ -82,11 +110,14 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
     await page.setViewport({ width: 1295, height: 1214 });
     await loadOverview();
     await page.waitForFunction(() => document.body.innerText.includes('Bladder cancer: staging'));
+    await assertFeatureCardHeights(1295);
     assert.ok(progressAuth.length > 0 && progressAuth.every(value => value === 'Bearer fixture-token'), 'Learning history uses the signed-in account');
     assert.equal(await page.$$eval('.overview-lesson', nodes => nodes.length), 3, 'Backend continueWatching entries are normalized');
     assert.match(await page.$eval('#available-tests-heading', node => node.textContent), /^Mocks$/);
     assert.equal(await page.$$('.overview-test-row').then(nodes => nodes.length), 3);
     assert.equal(await page.$('.overview-test-table-heading, .overview-test-detail, .overview-test-mobile-meta, .overview-test-reattempt'), null);
+    assert.equal(await page.$('[aria-label="Filter available tests"], .overview-test-controls select'), null, 'Overview mocks have no filter');
+    assert.deepEqual(await page.$$eval('.overview-test-row', nodes => nodes.map(node => node.querySelectorAll('button').length)), [1, 1, 1], 'Each mock has a single action');
     assert.deepEqual(await page.$$eval('.overview-test-row button', nodes => nodes.map(node => node.textContent.trim())), ['Start Mock', 'Start Mock', 'Start Mock']);
     assert.match(await page.$eval('.overview-viva-callout h2', node => node.textContent), /Practice with Urologics AI/);
     assert.equal(await page.$eval('.overview-viva-link', node => new URL(node.href).pathname), '/web/ai-viva/cases');
@@ -123,6 +154,7 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
     await page.waitForFunction(previous => document.querySelector('.overview-announcement-content h3').textContent !== previous, { timeout: 4200 }, hoveredTitle);
 
     await page.setViewport({ width: 390, height: 844 });
+    await assertFeatureCardHeights(390);
     await page.tap('#announcements-heading');
     await page.waitForSelector('[aria-label="Resume announcements"]');
     const tappedTitle = await page.$eval('.overview-announcement-content h3', node => node.textContent);
@@ -132,6 +164,7 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
     const cardHeights = [];
     for (const position of [1, 2, 3]) {
       await page.click(`[aria-label="Show announcement ${position}"]`);
+      await page.waitForFunction(position => document.querySelector(`[aria-label="Show announcement ${position}"]`)?.getAttribute('aria-current') === 'true', {}, position);
       cardHeights.push(await page.$eval('.overview-announcements', node => node.getBoundingClientRect().height));
       if (position === 2) {
         assert.equal(await page.$('.overview-announcement-media'), null, 'Missing images render no media block');
@@ -163,6 +196,7 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
     for (const width of [320, 375, 390, 768, 1024, 1295]) {
       await page.setViewport({ width, height: width < 768 ? 844 : 1000 });
       await assertNoOverflow(width);
+      await assertFeatureCardHeights(width, 'announcement navigation');
       await page.waitForFunction(() => Math.abs(document.querySelector('header').getBoundingClientRect().top - (innerWidth < 640 ? 8 : 12)) < .25);
       const headerLayout = await page.evaluate(() => ({ bottom: document.querySelector('header').getBoundingClientRect().bottom, examTop: document.querySelector('.overview-exams').getBoundingClientRect().top }));
       assert.ok(headerLayout.bottom <= headerLayout.examTop + 1, `Header does not cover the exam strip at ${width}: ${JSON.stringify(headerLayout)}`);
@@ -172,22 +206,25 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
 
     await page.setViewport({ width: 390, height: 844 });
     assert.equal(await page.$$eval('.overview-bottom-nav a', nodes => nodes.length), 5);
-    await page.select('[aria-label="Filter available tests"]', 'attended');
-    assert.equal(await page.$$eval('.overview-test-row', nodes => nodes.length), 1);
-    assert.equal(await page.$eval('.overview-test-row button', node => node.textContent.trim()), 'Start Mock');
-    assert.doesNotMatch(await page.$eval('.overview-test-row', node => node.textContent), /Review Answers|Reattempt|questions| min/);
-    await page.click('.overview-test-start');
+    const attendedRow = (await page.evaluateHandle(() => Array.from(document.querySelectorAll('.overview-test-row')).find(row => row.querySelector('h3').textContent.includes('Bladder cancer')))).asElement();
+    assert.ok(attendedRow, 'The attended mock remains visible with the other live mocks');
+    assert.equal(await attendedRow.$eval('button', node => node.textContent.trim()), 'Start Mock');
+    assert.doesNotMatch(await attendedRow.evaluate(node => node.textContent), /Review Answers|Reattempt|questions| min/);
+    await (await attendedRow.$('.overview-test-start')).click();
     await page.waitForFunction(() => location.pathname.endsWith('/mocks/bladder/rules'));
     assert.ok(!page.url().includes('/result'), 'Start Mock opens a new attempt briefing, not review');
     await loadOverview();
-    await page.select('[aria-label="Filter available tests"]', 'viva');
-    await page.waitForFunction(() => document.querySelector('.overview-test-row')?.textContent.includes('Renal oncology viva'));
-    await page.select('[aria-label="Filter available tests"]', 'all');
+    assert.equal(await page.$('[aria-label="Filter available tests"], .overview-test-controls select'), null);
+    const beforeFeedback = await assertFeatureCardHeights(390, 'before quiz feedback');
     await page.click('input[name="overview-daily-quiz"][value="1"]');
     await page.click('.overview-submit');
     await page.waitForFunction(() => document.body.innerText.includes('Correct answer.'));
     assert.deepEqual(submissions, [{ selectedIndex: 1 }]);
     assert.equal(await page.$eval('.overview-submit', node => node.disabled), true);
+    const afterFeedback = await assertFeatureCardHeights(390, 'long quiz feedback');
+    assert.equal(afterFeedback.quiz.height, beforeFeedback.quiz.height, 'Feedback never grows the question card');
+    assert.equal(afterFeedback.announcement.height, beforeFeedback.announcement.height, 'Feedback never grows the announcement card');
+    await assertQuizScrollsInsideCard(390);
     await page.screenshot({ path: path.join(artifacts, 'mobile-quiz-result.png'), fullPage: true });
 
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -202,12 +239,29 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
     for (const width of [320, 390, 1295]) {
       await page.setViewport({ width, height: width < 768 ? 844 : 1214 });
       await assertNoOverflow(`dark ${width}`);
+      await assertFeatureCardHeights(width, 'dark quiz feedback');
+      await assertQuizScrollsInsideCard(width);
       await page.screenshot({ path: path.join(artifacts, `${width < 768 ? `mobile-${width}` : 'desktop'}-dark.png`), fullPage: true });
     }
 
+    longQuestion = true;
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForFunction(() => document.querySelector('.overview-quiz-question')?.textContent.startsWith('Extended clinical case.'));
+    for (const width of [1295, 390]) {
+      await page.setViewport({ width, height: width < 768 ? 844 : 1214 });
+      await assertFeatureCardHeights(width, 'long question');
+      await assertQuizScrollsInsideCard(width);
+      await assertNoOverflow(`long question ${width}`);
+      await page.screenshot({ path: path.join(artifacts, `long-question-${width < 768 ? 'mobile' : 'desktop'}.png`), fullPage: true });
+    }
+    await page.setViewport({ width: 1295, height: 1214 });
     empty = true;
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForFunction(() => document.body.innerText.includes("You're all caught up"));
+    await assertFeatureCardHeights(1295, 'empty cards');
+    await page.setViewport({ width: 390, height: 844 });
+    await assertFeatureCardHeights(390, 'empty mobile cards');
+    await page.setViewport({ width: 1295, height: 1214 });
     assert.equal(await page.$$('.overview-test-row').then(nodes => nodes.length), 0);
     await page.waitForSelector('.overview-learning-empty[data-learning-state="not-started"]');
     assert.equal(await page.$eval('.overview-learning-empty-action', node => node.textContent.trim()), 'Your courses');
@@ -241,6 +295,6 @@ const origin = process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023';
     assert.equal(await page.$eval('[aria-label="Search courses and lessons"]', node => node.value), '');
     assert.equal(await page.$('[aria-label="Clear course search"]'), null);
     assert.deepEqual(errors, []);
-    console.log('Overview checks passed: responsive layouts and themes; announcement autoplay, pause/resume, fixed height, scrolling, missing/broken images and preview; paired exam rotation and all dates; simplified mocks and new attempt route; quiz; account learning and purchased/free empty states; branded AI link; full-width courses search.');
+    console.log('Overview checks passed: responsive layouts and themes; matched fixed-height announcement and question cards before and after long quiz feedback, inner scrolling and empty states; announcement autoplay, pause/resume, missing/broken images and preview; paired exam rotation and all dates; filter-free mocks with single Start Mock action and new attempt route; account learning and purchased/free empty states; branded AI link; full-width courses search.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
