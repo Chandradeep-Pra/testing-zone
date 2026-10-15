@@ -78,8 +78,9 @@ function fixture(t, options = {}) {
   const bin = join(dir, 'bin');
   const tmp = join(dir, 'tmp');
   const elsewhere = join(dir, 'elsewhere');
-  for (const path of [repo, bin, tmp, elsewhere, join(repo, 'data')]) mkdirSync(path, {recursive: true});
+  for (const path of [repo, bin, tmp, elsewhere, join(repo, 'data'), join(repo, 'scripts')]) mkdirSync(path, {recursive: true});
   copyFileSync(join(root, 'deploy.sh'), join(repo, 'deploy.sh'));
+  copyFileSync(join(root, 'scripts/npm-ci-with-retry.sh'), join(repo, 'scripts/npm-ci-with-retry.sh'));
   for (const file of ['Dockerfile', '.dockerignore', 'package.json', 'package-lock.json', 'data/sample-mocks.ts']) {
     writeFileSync(join(repo, file), file.endsWith('.json') ? '{}' : 'fixture');
   }

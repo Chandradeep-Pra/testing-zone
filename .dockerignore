@@ -6,6 +6,8 @@
 !next-env.d.ts
 !tsconfig.json
 !postcss.config.mjs
+!scripts/
+!scripts/npm-ci-with-retry.sh
 !app/
 !app/**
 !components/

@@ -22,7 +22,7 @@ cd -- "$repo_root"
 for tool in docker gcloud node mktemp; do
   command -v "$tool" >/dev/null || fail "Install $tool or run this script in Google Cloud Shell."
 done
-for file in Dockerfile .dockerignore package.json package-lock.json data/sample-mocks.ts; do
+for file in Dockerfile .dockerignore package.json package-lock.json data/sample-mocks.ts scripts/npm-ci-with-retry.sh; do
   [[ -f "$file" ]] || fail "Missing $file in $repo_root. Sync the complete project first."
 done
 node --input-type=module -e 'import {parseEnv} from "node:util"; if (typeof parseEnv !== "function") process.exit(1)' \

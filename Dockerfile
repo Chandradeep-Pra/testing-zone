@@ -1,15 +1,17 @@
 # syntax=docker/dockerfile:1
 FROM node:22-bookworm-slim AS dependencies
 WORKDIR /app
-COPY package.json package-lock.json ./
 # Native dependencies such as better-sqlite3 need node-gyp's build tools.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
     python3 \
     make \
     g++ \
-    && npm ci --no-audit --no-fund \
-    && npm cache clean --force \
     && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+COPY scripts/npm-ci-with-retry.sh /usr/local/bin/npm-ci-with-retry
+# The download cache survives a failed build, but is not stored in the image.
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    sh /usr/local/bin/npm-ci-with-retry
 
 FROM dependencies AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
