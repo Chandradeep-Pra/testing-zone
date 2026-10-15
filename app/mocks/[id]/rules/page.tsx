@@ -131,6 +131,7 @@ export default function MockRulesPage() {
               `You may take one break of 10 minutes during the session.`,
               `Total available time including the break is ${totalTime} minutes.`,
               `Do not refresh or close the browser while the mock is active.`,
+              `Only 1st mock attempt would be counted for ranking.`,
             ].map((text, index) => (
               <div
                 key={index}
