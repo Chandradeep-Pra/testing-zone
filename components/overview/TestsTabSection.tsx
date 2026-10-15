@@ -1,11 +1,10 @@
 "use client";
 
-import { ArrowRight, ArrowUpRight, BrainCircuit, ClipboardList, Clock3, LockKeyhole, RotateCcw } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BrainCircuit, ClipboardList, LockKeyhole } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { latestLiveTests, type OverviewTest } from "@/lib/overview-tests";
-import DescriptionBullets from "@/components/ui/DescriptionBullets";
 
 export type MockItem = OverviewTest & {
   id: string;
@@ -45,18 +44,18 @@ export default function TestsTabSection({ mocks, vivaCases, mocksLoading, vivaLo
   const loading = vivaMode ? vivaLoading : mocksLoading;
   const items = vivaMode ? vivaCases : filtered;
 
-  function openMock(mock: MockItem, reattempt = false) {
+  function openMock(mock: MockItem) {
     const entitled = mock.accessType === "public" || (mock.access?.allowed === true && mock.access?.mode !== "locked");
     if (!entitled) { window.location.assign("https://urologics.co.uk/pricing"); return; }
     if (!isLoggedIn && mock.accessType === "public") { router.push(`/public-mocks/${mock.id}`); return; }
-    router.push(`/mocks/${mock.id}/${mock.hasAttempted && !reattempt ? "result" : "rules"}`);
+    router.push(`/mocks/${mock.id}/rules`);
   }
 
   return (
-    <section className="overview-card overview-tests" aria-labelledby="available-tests-heading">
+    <section className="overview-card overview-tests overview-mocks" aria-labelledby="available-tests-heading">
       <div className="overview-card-heading">
         <span className="overview-section-icon">{vivaMode ? <BrainCircuit size={20} aria-hidden="true" /> : <ClipboardList size={20} aria-hidden="true" />}</span>
-        <h2 id="available-tests-heading">{vivaMode ? "AI viva cases" : "Latest live tests"}</h2>
+        <h2 id="available-tests-heading">{vivaMode ? "AI viva cases" : "Mocks"}</h2>
         <div className="overview-test-controls">
           <select aria-label="Filter available tests" value={filter} onChange={(event) => setFilter(event.target.value)}>
             <option value="all">All mocks</option>
@@ -68,23 +67,17 @@ export default function TestsTabSection({ mocks, vivaCases, mocksLoading, vivaLo
         </div>
       </div>
       {loading ? <div className="overview-tests-loading" aria-label="Loading tests" aria-busy="true">{[1, 2, 3].map((key) => <div key={key} className="overview-skeleton" />)}</div>
-      : !items.length ? <div className="overview-empty-inline"><p>{vivaMode ? isLoggedIn ? "New viva cases will appear here when available." : "Sign in to access your AI viva cases." : filter === "attended" ? "Your completed mocks will appear here for review." : "No tests are live right now. View all tests for upcoming sessions."}</p></div>
+      : !items.length ? <div className="overview-empty-inline"><p>{vivaMode ? isLoggedIn ? "New viva cases will appear here when available." : "Sign in to access your AI viva cases." : filter === "attended" ? "Your completed mocks will appear here to practise again." : "No mocks are live right now. View all mocks for upcoming sessions."}</p></div>
       : <div className="overview-test-list">
-        <div className="overview-test-table-heading" aria-hidden="true"><span>{vivaMode ? "Case" : "Test"}</span><span>{vivaMode ? "Specialty" : "Questions"}</span><span>{vivaMode ? "Difficulty" : "Duration"}</span><span /></div>
         {vivaMode ? vivaCases.slice(0, 3).map((viva) => <article key={viva.id} className="overview-test-row">
-          <div className="overview-test-name"><span className="overview-test-icon"><BrainCircuit size={17} aria-hidden="true" /></span><div><h3>{viva.title}</h3><p className="overview-test-mobile-meta">{viva.specialty}{viva.difficulty && ` \u00b7 ${viva.difficulty}`}</p></div></div>
-          <span className="overview-test-detail">{viva.specialty || "Urology"}</span><span className="overview-test-detail">{viva.difficulty || "All levels"}</span>
+          <div className="overview-test-name"><span className="overview-test-icon"><BrainCircuit size={17} aria-hidden="true" /></span><h3>{viva.title}</h3></div>
           <Link href={`/ai-viva/session/${viva.id}`} className="overview-test-start">Start case <ArrowRight size={15} aria-hidden="true" /></Link>
         </article>) : filtered.slice(0, 3).map((mock) => {
           const entitled = mock.accessType === "public" || (mock.access?.allowed === true && mock.access?.mode !== "locked");
-          const count = mock.questionCount ?? mock.totalQuestions;
           return <article key={mock.id} className="overview-test-row">
-            <div className="overview-test-name"><span className="overview-test-icon"><ClipboardList size={17} aria-hidden="true" /></span><div><h3>{mock.title}</h3>{mock.description && <DescriptionBullets value={mock.description} className="!text-xs" />}<p className="overview-test-mobile-meta"><Clock3 size={12} aria-hidden="true" />{mock.durationMinutes} min{mock.hasAttempted && ` \u00b7 Score: ${mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}`}</p></div></div>
-            <span className="overview-test-detail">{count !== undefined ? `${count} questions` : "Not set"}</span>
-            <span className="overview-test-detail">{mock.durationMinutes} min</span>
+            <div className="overview-test-name"><span className="overview-test-icon"><ClipboardList size={17} aria-hidden="true" /></span><h3>{mock.title}</h3></div>
             <div className="overview-test-actions">
-              <button type="button" className="overview-test-start" onClick={() => openMock(mock)}>{!entitled ? "Unlock" : mock.hasAttempted ? "Review Answers" : "Start mock"}{!entitled ? <LockKeyhole size={14} /> : <ArrowRight size={14} />}</button>
-              {mock.hasAttempted && entitled && <button type="button" className="overview-test-reattempt" onClick={() => openMock(mock, true)} aria-label={`Reattempt ${mock.title}`}><RotateCcw size={14} aria-hidden="true" /><span>Reattempt</span></button>}
+              <button type="button" className="overview-test-start" onClick={() => openMock(mock)}>Start Mock{!entitled ? <LockKeyhole size={14} aria-hidden="true" /> : <ArrowRight size={14} aria-hidden="true" />}</button>
             </div>
           </article>;
         })}

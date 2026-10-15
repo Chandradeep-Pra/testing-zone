@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Mic, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ArrowUpRight, Mic, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import "./overview.css";
 import OverviewMobileNav from "@/components/overview/OverviewMobileNav";
@@ -11,6 +10,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
 import CompleteProfilePrompt from "@/components/profile/CompleteProfilePrompt";
 import { appPath } from "@/lib/app-path";
+import { loadLessonHistory } from "@/lib/lesson-history";
+import { readUrologicsJson } from "@/lib/client/urologicsQuery";
 
 // Modular overview sections
 import ExamScheduleBanner from "@/components/overview/ExamScheduleBanner";
@@ -29,8 +30,7 @@ function getFirstName(name?: string | null, email?: string | null) {
 // ─── page ───────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const firstName = useMemo(
     () => getFirstName(user?.name, user?.email),
     [user?.name, user?.email],
@@ -51,6 +51,8 @@ export default function Home() {
   const [dailyQuiz, setDailyQuiz] = useState<DailyQuiz | null>(null);
   const [lessons, setLessons] = useState<LessonEntry[]>([]);
   const [lessonsLoading, setLessonsLoading] = useState(false);
+  const [lessonsError, setLessonsError] = useState("");
+  const [lessonsUserId, setLessonsUserId] = useState<string | null>(null);
   const [mocks, setMocks] = useState<MockItem[]>([]);
   const [mocksLoading, setMocksLoading] = useState(true);
   const [vivaCases, setVivaCases] = useState<VivaCase[]>([]);
@@ -118,29 +120,29 @@ export default function Home() {
 
   // ── Fetch: lesson history + viva cases (auth-gated) ───────────────────────
   useEffect(() => {
-    if (!user?.idToken) return;
+    if (!user?.idToken) {
+      setLessons([]);
+      setLessonsError("");
+      setLessonsLoading(false);
+      setLessonsUserId(null);
+      return;
+    }
 
     let active = true;
+    const historyController = new AbortController();
+    setLessons([]);
+    setLessonsError("");
+    setLessonsUserId(user.uid);
     setLessonsLoading(true);
     setVivaLoading(true);
 
-    // Lesson history via progress endpoint
-    fetch(appPath("/api/urologics/me/progress"), {
-      headers: { Authorization: `Bearer ${user.idToken}` },
-      cache: "no-store",
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!active) return;
-        // Progress API returns { recentLessons?: LessonEntry[] } or similar
-        const raw: LessonEntry[] = Array.isArray(data?.recentLessons)
-          ? data.recentLessons
-          : Array.isArray(data?.history)
-            ? data.history
-            : [];
-        setLessons(raw);
+    void loadLessonHistory(path => readUrologicsJson(path, user, historyController.signal))
+      .then((history) => {
+        if (active) setLessons(history);
       })
-      .catch(() => { if (active) setLessons([]); })
+      .catch(() => {
+        if (active) setLessonsError("Your learning history is temporarily unavailable.");
+      })
       .finally(() => { if (active) setLessonsLoading(false); });
 
     // Viva cases
@@ -161,13 +163,16 @@ export default function Home() {
       .catch(() => { if (active) setVivaCases([]); })
       .finally(() => { if (active) setVivaLoading(false); });
 
-    return () => { active = false; };
-  }, [user?.idToken]);
+    return () => {
+      active = false;
+      historyController.abort();
+    };
+  }, [user]);
 
   // ── Quiz submit ───────────────────────────────────────────────────────────
   async function submitQuiz() {
     if (!user?.idToken) {
-      router.push("/login");
+      window.location.assign("/login?redirect=%2Fweb");
       return;
     }
     if (selectedOption === null) {
@@ -237,9 +242,15 @@ export default function Home() {
               onImagePreview={setPreviewImage}
             />
           </div>
-          {Boolean(user) && (lessonsLoading || lessons.length > 0) && <div className="overview-section-gap">
-            <LessonHistorySection lessons={lessons} loading={lessonsLoading} isLoggedIn={Boolean(user)} />
-          </div>}
+          <div className="overview-section-gap">
+            <LessonHistorySection
+              lessons={user?.uid === lessonsUserId ? lessons : []}
+              loading={authLoading || Boolean(user && (lessonsLoading || user.uid !== lessonsUserId))}
+              isLoggedIn={Boolean(user)}
+              hasPurchasedCourses={Boolean(user?.activeCourseIds?.length)}
+              error={user?.uid === lessonsUserId ? lessonsError : ""}
+            />
+          </div>
           <div className="overview-section-gap">
             <TestsTabSection
               mocks={mocks}
@@ -249,13 +260,13 @@ export default function Home() {
               isLoggedIn={Boolean(user)}
             />
           </div>
-          <aside className="overview-viva-callout">
-            <span className="overview-viva-icon"><Mic size={21} aria-hidden="true" /></span>
-            <div>
-              <h2>Prefer speaking it through?</h2>
-              <p>Practice a case with AI Viva.</p>
+          <aside className="overview-viva-callout" aria-labelledby="urologics-ai-heading">
+            <span className="overview-viva-icon" aria-hidden="true"><Mic size={27} /></span>
+            <div className="overview-viva-copy">
+              <h2 id="urologics-ai-heading">Practice with <span>Urologics AI</span></h2>
+              <p>Speak your thinking. Sharpen your clinical reasoning.</p>
             </div>
-            <Link href="/ai-viva/cases" className="overview-viva-link">Explore cases <ArrowUpRight size={16} aria-hidden="true" /></Link>
+            <Link href="/ai-viva/cases" className="overview-viva-link">Start practice <ArrowUpRight size={17} aria-hidden="true" /></Link>
           </aside>
           <p className="overview-footer-note">A little progress, every day. Your next step starts here.</p>
         </section>

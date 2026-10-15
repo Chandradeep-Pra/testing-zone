@@ -32,7 +32,9 @@ if (tool === 'gcloud' && args[0] === 'builds' && args[1] === 'submit') {
   record.config = JSON.parse(fs.readFileSync(value('--config'), 'utf8'));
 }
 fs.appendFileSync(process.env.DEPLOY_TEST_LOG, JSON.stringify(record) + '\n');
-if (tool === 'docker') {
+if (tool === 'sleep') {
+  process.exit(0);
+} else if (tool === 'docker') {
   if (args[0] === 'info') process.stdout.write('linux\n');
   else if (args[0] === 'build') { if (scenario === 'build-fail') fail(); }
   else if (args[0] === 'save') {
@@ -63,10 +65,29 @@ if (tool === 'docker') {
   } else if (args[0] === 'run' && args[1] === 'services' && args[2] === 'update-traffic') {
     if (scenario === 'traffic-fail') fail();
     const state = JSON.parse(fs.readFileSync(process.env.DEPLOY_TEST_STATE, 'utf8'));
-    output({status: {url: 'https://fixture-service.run.app', traffic: [{
-      revisionName: scenario === 'wrong-traffic' ? 'old-revision' : state.revision,
-      percent: scenario === 'partial-traffic' ? 50 : 100,
-    }]}});
+    // The real command returns TrafficTargetPair[], not the Service resource.
+    output([{revisionName: state.revision, specPercent: '100', statusPercent: '100',
+      latestRevision: false, serviceUrl: 'https://update-response-must-not-be-used.run.app'}]);
+  } else if (args[0] === 'run' && args[1] === 'services' && args[2] === 'describe') {
+    const state = JSON.parse(fs.readFileSync(process.env.DEPLOY_TEST_STATE, 'utf8'));
+    state.describeCount = (state.describeCount || 0) + 1;
+    fs.writeFileSync(process.env.DEPLOY_TEST_STATE, JSON.stringify(state));
+    let traffic = [{revisionName: state.revision, percent: scenario === 'string-percent' ? '100' : 100}];
+    if (scenario === 'wrong-traffic' || (scenario === 'delayed-traffic' && state.describeCount === 1)) {
+      traffic = [{revisionName: 'old-revision', percent: 100}];
+    } else if (scenario === 'partial-traffic') traffic[0].percent = 50;
+    else if (scenario === 'delayed-traffic' && state.describeCount === 2) {
+      traffic = [{revisionName: state.revision, percent: 80}, {revisionName: 'old-revision', percent: 20}];
+    } else if (scenario === 'tagged-old') traffic.push({revisionName: 'old-revision', tag: 'old', percent: 0});
+    else if (scenario === 'extra-positive-traffic') traffic.push({revisionName: 'old-revision', percent: 10});
+    else if (scenario === 'latest-target' || scenario === 'wrong-latest-target') traffic = [{latestRevision: true, percent: '100'}];
+    output({metadata: {generation: 5}, spec: {traffic: [{revisionName: state.revision, percent: 100}]}, status: {
+      observedGeneration: scenario === 'reconciling-traffic' && state.describeCount === 1 ? 4 : 5,
+      conditions: [{type: 'Ready', status: scenario === 'reconciling-traffic' && state.describeCount === 2 ? 'Unknown' : 'True'}],
+      latestReadyRevisionName: scenario === 'wrong-latest-target' ? 'other-latest-revision' : state.revision,
+      url: 'https://fixture-service.run.app',
+      ...(scenario === 'missing-traffic' ? {} : {traffic}),
+    }});
   } else throw new Error('Unexpected gcloud command: ' + args.join(' '));
 } else throw new Error('Unexpected executable ' + tool);
 `;
@@ -95,7 +116,11 @@ function fixture(t, options = {}) {
   ].join('\n'));
   const mockFile = join(dir, 'mock.cjs');
   writeFileSync(mockFile, mock);
-  for (const tool of ['docker', 'gcloud']) {
+  // Git Bash prepends /usr/bin during startup, which would otherwise select
+  // its real sleep before the fixture. Reset the fixture prefix after startup.
+  const bashEnv = join(dir, 'bash-env.sh');
+  writeFileSync(bashEnv, `export PATH=${quote(shellPath(bin))}:"$PATH"\n`);
+  for (const tool of ['docker', 'gcloud', 'sleep']) {
     writeFileSync(join(bin, tool), `#!/usr/bin/env bash\nexec ${quote(shellPath(process.execPath))} ${quote(shellPath(mockFile))} ${tool} "$@"\n`, {mode: 0o755});
   }
   const env = {...process.env};
@@ -104,6 +129,7 @@ function fixture(t, options = {}) {
   }
   Object.assign(env, {
     PATH: `${bin}${delimiter}${env.PATH || env.Path || ''}`,
+    BASH_ENV: shellPath(bashEnv),
     TMPDIR: shellPath(tmp),
     DEPLOY_TEST_LOG: join(dir, 'calls.jsonl'),
     DEPLOY_TEST_STATE: join(dir, 'state.json'),
@@ -115,8 +141,8 @@ function fixture(t, options = {}) {
     assert.ok(target.startsWith(resolve(artifacts) + sep), 'cleanup stays inside test artifacts');
     rmSync(target, {recursive: true, force: true});
   });
-  const run = (overrides = {}) => {
-    const result = spawnSync(bash, [shellPath(join(repo, 'deploy.sh'))], {
+  const run = (overrides = {}, args = []) => {
+    const result = spawnSync(bash, [shellPath(join(repo, 'deploy.sh')), ...args], {
       cwd: elsewhere, env: {...env, ...overrides}, encoding: 'utf8', timeout: 120_000,
       windowsHide: true, input: '',
     });
@@ -166,6 +192,9 @@ test('builds current repository and publishes only its archive, then deploys the
   const traffic = command(result.calls, 'gcloud', 'run', 'services', 'update-traffic');
   assert.ok(traffic.args.includes(`--to-revisions=${revision}=100`));
   assert.ok(result.calls.indexOf(describe) < result.calls.indexOf(traffic));
+  const observed = command(result.calls, 'gcloud', 'run', 'services', 'describe');
+  assert.ok(observed, 'fetches fresh Service state instead of parsing the update-traffic pair array');
+  assert.ok(result.calls.indexOf(traffic) < result.calls.indexOf(observed));
   for (const call of result.calls.filter(call => call.tool === 'gcloud' && call.args[0] === 'run')) {
     assert.ok(call.args.every(arg => !/--(?:set-env-vars|clear-env-vars|set-secrets|clear-secrets|allow-unauthenticated|service-account)/.test(arg)), 'preserves existing runtime settings and IAM');
   }
@@ -188,6 +217,7 @@ for (const [scenario, last, forbidden] of [
   ['traffic-fail', ['gcloud', 'run', 'services', 'update-traffic'], null],
   ['wrong-traffic', ['gcloud', 'run', 'services', 'update-traffic'], null],
   ['partial-traffic', ['gcloud', 'run', 'services', 'update-traffic'], null],
+  ['missing-traffic', ['gcloud', 'run', 'services', 'update-traffic'], null],
 ]) {
   test(`stops safely for ${scenario}`, t => {
     const context = fixture(t);
@@ -196,6 +226,7 @@ for (const [scenario, last, forbidden] of [
     assert.ok(command(result.calls, ...last), `expected ${last.join(' ')}`);
     if (forbidden) assert.equal(command(result.calls, ...forbidden), undefined, `must not run ${forbidden.join(' ')}`);
     assert.doesNotMatch(result.output, /Deployment successful\./);
+    assert.equal((result.output.match(/Deployment stopped/g) || []).length, 1, 'prints exactly one deployment failure notice');
     assert.deepEqual(readdirSync(context.tmp), []);
   });
 }
@@ -208,6 +239,49 @@ test('missing Firebase key fails before building or deploying an old image', t =
   assert.equal(command(result.calls, 'docker', 'build'), undefined);
   assert.equal(command(result.calls, 'gcloud', 'run', 'deploy'), undefined);
 });
+
+test('polls fresh observed traffic until the exact deployed revision receives all traffic', t => {
+  const context = fixture(t);
+  const result = context.run({DEPLOY_TEST_SCENARIO: 'delayed-traffic'});
+  assert.equal(result.status, 0, result.output);
+  const descriptions = result.calls.filter(call => call.tool === 'gcloud' && call.args.slice(0, 3).join(' ') === 'run services describe');
+  assert.equal(descriptions.length, 3, 'desired spec is already 100% but observed old and split traffic must keep polling');
+  assert.deepEqual(result.calls.filter(call => call.tool === 'sleep').map(call => call.args), [['5'], ['5']]);
+  assert.equal(result.calls.filter(call => call.tool === 'gcloud' && call.args.slice(0, 3).join(' ') === 'run services update-traffic').length, 1);
+});
+
+for (const scenario of ['', 'string-percent', 'tagged-old', 'latest-target', 'reconciling-traffic']) {
+  test(`verification-only checks existing revision without rebuilding or changing traffic${scenario ? ` (${scenario})` : ''}`, t => {
+    const context = fixture(t, {envFile: false});
+    const revision = 'urologics-web-app-already-deployed';
+    writeFileSync(context.env.DEPLOY_TEST_STATE, JSON.stringify({revision}));
+    const result = context.run({DEPLOY_TEST_SCENARIO: scenario}, ['--verify-only', revision]);
+    assert.equal(result.status, 0, result.output);
+    assert.ok(command(result.calls, 'gcloud', 'run', 'services', 'describe'));
+    assert.equal(result.calls.find(call => call.tool === 'docker'), undefined);
+    assert.equal(command(result.calls, 'gcloud', 'builds', 'submit'), undefined);
+    assert.equal(command(result.calls, 'gcloud', 'run', 'deploy'), undefined);
+    assert.equal(command(result.calls, 'gcloud', 'run', 'services', 'update-traffic'), undefined);
+    assert.match(result.output, /https:\/\/fixture-service\.run\.app\/web/);
+    if (scenario === 'reconciling-traffic') {
+      assert.equal(result.calls.filter(call => call.tool === 'gcloud' && call.args.slice(0, 3).join(' ') === 'run services describe').length, 3);
+    }
+    assert.deepEqual(readdirSync(context.tmp), []);
+  });
+}
+
+for (const scenario of ['wrong-latest-target', 'extra-positive-traffic']) {
+  test(`verification-only rejects ${scenario} without changing the service`, t => {
+    const context = fixture(t, {envFile: false});
+    const revision = 'urologics-web-app-already-deployed';
+    writeFileSync(context.env.DEPLOY_TEST_STATE, JSON.stringify({revision}));
+    const result = context.run({DEPLOY_TEST_SCENARIO: scenario}, ['--verify-only', revision]);
+    assert.notEqual(result.status, 0, result.output);
+    assert.ok(result.calls.every(call => call.tool !== 'docker'));
+    assert.equal(command(result.calls, 'gcloud', 'run', 'services', 'update-traffic'), undefined);
+    assert.equal((result.output.match(/Deployment stopped/g) || []).length, 1);
+  });
+}
 
 test('accepts an OCI index resolved to a platform digest when the exact requested image matches', t => {
   const context = fixture(t);

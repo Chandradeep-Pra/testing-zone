@@ -88,8 +88,7 @@ export default function DailyQuizPanel({
       <div className="overview-card-heading">
         <span className="overview-section-icon overview-quiz-icon"><CircleHelp size={21} aria-hidden="true" /></span>
         <h2 id="daily-quiz-heading">Question of the day</h2>
-        {quiz && <span className="overview-quiz-time"><Clock3 size={12} aria-hidden="true" />{quiz.estimatedMinutes ?? 3} min</span>}
-        {quiz?.topic && <span className="overview-quiz-topic">{quiz.topic}</span>}
+       
       </div>
       {quiz ? <div className="overview-quiz-content">
         {quiz.image && <button type="button" className="overview-quiz-exhibit" onClick={() => onImagePreview(quiz.image!)}>

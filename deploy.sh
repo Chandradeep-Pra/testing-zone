@@ -10,8 +10,16 @@ cleanup() {
     "$temp_root"/urologics-deploy.*) rm -rf -- "$transfer_dir" ;;
   esac
 }
-trap cleanup EXIT
-trap 'printf "\nDeployment stopped while %s. No later steps were run.\n" "$stage" >&2' ERR
+on_exit() {
+  local exit_status=$?
+  trap - EXIT
+  cleanup
+  if [[ "$exit_status" -ne 0 ]]; then
+    printf '\nDeployment stopped while %s. No later steps were run.\n' "$stage" >&2
+  fi
+  exit "$exit_status"
+}
+trap on_exit EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 fail() { printf 'Error: %s\n' "$*" >&2; exit 1; }
@@ -19,22 +27,86 @@ fail() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd -- "$repo_root"
 
-for tool in docker gcloud node mktemp; do
-  command -v "$tool" >/dev/null || fail "Install $tool or run this script in Google Cloud Shell."
-done
-for file in Dockerfile .dockerignore package.json package-lock.json data/sample-mocks.ts scripts/npm-ci-with-retry.sh; do
-  [[ -f "$file" ]] || fail "Missing $file in $repo_root. Sync the complete project first."
-done
-node --input-type=module -e 'import {parseEnv} from "node:util"; if (typeof parseEnv !== "function") process.exit(1)' \
-  || fail "Use Node.js 22 or newer in Cloud Shell."
-[[ "$(docker info --format '{{.OSType}}')" == linux ]] || fail "Docker must be running with Linux containers."
-[[ -n "$(gcloud auth list --filter=status:ACTIVE --format='value(account)')" ]] \
-  || fail "Sign in with gcloud auth login first."
-
 project="${VIVA_PROJECT_ID:-proud-woods-489814-s6}"
 region="${VIVA_REGION:-asia-south1}"
 service="${VIVA_SERVICE:-urologics-web-app}"
 repository="${VIVA_REPOSITORY:-cloud-run-source-deploy}"
+verify_only=false
+if [[ $# -ne 0 ]]; then
+  [[ $# -eq 2 && "$1" == --verify-only ]] || fail 'Usage: bash deploy.sh [--verify-only REVISION]'
+  revision="$2"
+  [[ "$revision" == "$service"-* && "$revision" =~ ^[a-z][a-z0-9-]*[a-z0-9]$ ]] \
+    || fail 'Supply the exact revision name for this service.'
+  verify_only=true
+fi
+
+for tool in gcloud node mktemp; do
+  command -v "$tool" >/dev/null || fail "Install $tool or run this script in Google Cloud Shell."
+done
+node --input-type=module -e 'import {parseEnv} from "node:util"; if (typeof parseEnv !== "function") process.exit(1)' \
+  || fail "Use Node.js 22 or newer in Cloud Shell."
+[[ -n "$(gcloud auth list --filter=status:ACTIVE --format='value(account)')" ]] \
+  || fail "Sign in with gcloud auth login first."
+
+verify_traffic() {
+  stage="verifying observed Cloud Run traffic"
+  for ((check=1; check<=12; check++)); do
+    gcloud run services describe "$service" \
+      --project="$project" --region="$region" --format=json > "$transfer_dir/service.json"
+    if node --input-type=module - "$transfer_dir/service.json" "$revision" \
+      > "$transfer_dir/app-url.txt" 2> "$transfer_dir/traffic-check.log" <<'NODE'
+import {readFileSync} from 'node:fs';
+const [file, revision] = process.argv.slice(2);
+const service = JSON.parse(readFileSync(file, 'utf8'));
+const status = service.status;
+const traffic = status?.traffic;
+const ready = status?.conditions?.find(c => c.type === 'Ready');
+const generation = service.metadata?.generation;
+if ((ready && ready.status !== 'True') ||
+    (generation != null && status?.observedGeneration != null &&
+      String(generation) !== String(status.observedGeneration))) {
+  throw new Error('Cloud Run has not finished reconciling the service.');
+}
+// Inspect observed status, not the requested spec or update-traffic output.
+const assignments = Array.isArray(traffic) ? traffic.map(target => ({
+  revision: target.revisionName || (target.latestRevision === true ? status.latestReadyRevisionName : ''),
+  percent: Number(target.percent ?? 0),
+})) : [];
+const valid = assignments.every(t => Number.isInteger(t.percent) && t.percent >= 0 && t.percent <= 100);
+const serving = assignments.filter(t => t.percent > 0);
+if (!valid || !serving.length || serving.some(t => t.revision !== revision) ||
+    serving.reduce((sum, t) => sum + t.percent, 0) !== 100) {
+  throw new Error(`Expected 100% traffic on ${revision}; observed ${JSON.stringify(assignments)}.`);
+}
+if (!status.url) throw new Error('Cloud Run did not return a service URL.');
+process.stdout.write(status.url.replace(/\/$/, '') + '/web');
+NODE
+    then
+      app_url="$(cat "$transfer_dir/app-url.txt")"
+      return 0
+    fi
+    if [[ "$check" -lt 12 ]]; then
+      printf 'Waiting for observed traffic on %s (check %s/12)...\n' "$revision" "$check"
+      sleep 5
+    fi
+  done
+  cat "$transfer_dir/traffic-check.log" >&2
+  printf 'Check again without rebuilding: bash deploy.sh --verify-only %s\n' "$revision" >&2
+  fail 'Traffic verification is still pending. The build and deployment have already completed.'
+}
+
+if [[ "$verify_only" == true ]]; then
+  transfer_dir="$(mktemp -d "$temp_root/urologics-deploy.XXXXXXXX")"
+  verify_traffic
+  printf '\nTraffic verified: 100%% on %s\nApp URL: %s\n' "$revision" "$app_url"
+  exit 0
+fi
+
+command -v docker >/dev/null || fail 'Install Docker or run this script in Google Cloud Shell.'
+for file in Dockerfile .dockerignore package.json package-lock.json data/sample-mocks.ts scripts/npm-ci-with-retry.sh; do
+  [[ -f "$file" ]] || fail "Missing $file in $repo_root. Sync the complete project first."
+done
+[[ "$(docker info --format '{{.OSType}}')" == linux ]] || fail "Docker must be running with Linux containers."
 
 # Parse dotenv as data; never execute an environment file as shell code.
 # Read only public build settings. Server settings stay on the existing service.
@@ -153,16 +225,6 @@ NODE
 printf '\n[5/5] Routing 100%% of traffic to this revision...\n'
 stage="routing traffic to the new revision"
 gcloud run services update-traffic "$service" --to-revisions="$revision=100" \
-  --project="$project" --region="$region" --quiet --format=json > "$transfer_dir/service.json"
-app_url="$(node --input-type=module - "$transfer_dir/service.json" "$revision" <<'NODE'
-import {readFileSync} from 'node:fs';
-const [file, revision] = process.argv.slice(2);
-const service = JSON.parse(readFileSync(file, 'utf8'));
-if (!service.status?.traffic?.some(t => t.revisionName === revision && t.percent === 100)) {
-  throw new Error('Cloud Run did not confirm 100% traffic on the new revision. Check the service.');
-}
-if (!service.status.url) throw new Error('Cloud Run did not return a service URL.');
-process.stdout.write(service.status.url.replace(/\/$/, '') + '/web');
-NODE
-)"
+  --project="$project" --region="$region" --quiet --format=json > "$transfer_dir/traffic-update.json"
+verify_traffic
 printf '\nDeployment successful.\nRevision: %s\nImage: %s\nApp URL: %s\n' "$revision" "$exact_image" "$app_url"
