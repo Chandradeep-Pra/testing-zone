@@ -424,7 +424,7 @@ const VivaCasesPage: React.FC = () => {
                 <button
                   className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                     isVivaAllowed(viva)
-                      ? "bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+                      ? getSelectedMode(viva) === "fast" ? "bg-orange-600 text-white hover:bg-orange-700" : "bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
                       : "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
                   }`}
                   onClick={(e) => {

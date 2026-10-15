@@ -114,7 +114,7 @@ export default function Home() {
       .finally(() => { if (active) setMocksLoading(false); });
 
     return () => { active = false; };
-  }, []);
+  }, [user?.uid]);
 
   // ── Fetch: lesson history + viva cases (auth-gated) ───────────────────────
   useEffect(() => {
@@ -237,9 +237,9 @@ export default function Home() {
               onImagePreview={setPreviewImage}
             />
           </div>
-          <div className="overview-section-gap">
+          {Boolean(user) && (lessonsLoading || lessons.length > 0) && <div className="overview-section-gap">
             <LessonHistorySection lessons={lessons} loading={lessonsLoading} isLoggedIn={Boolean(user)} />
-          </div>
+          </div>}
           <div className="overview-section-gap">
             <TestsTabSection
               mocks={mocks}

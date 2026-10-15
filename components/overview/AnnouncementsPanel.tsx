@@ -20,9 +20,13 @@ interface Props {
 export default function AnnouncementsPanel({ announcements, onImagePreview }: Props) {
   const [active, setActive] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [failedImages, setFailedImages] = useState<Set<string>>(() => new Set());
   const index = announcements.length ? active % announcements.length : 0;
   const item = announcements[index];
   const expanded = expandedId === item?.id;
+  const mediaSrc = item?.media?.src?.trim() || "";
+  const hasImage = item?.media?.type === "image" && Boolean(mediaSrc) && !failedImages.has(mediaSrc);
+  const hasVideo = item?.media?.type === "youtube" && Boolean(mediaSrc);
   const move = (direction: number) => setActive((current) => (current + direction + announcements.length) % announcements.length);
 
   return (
@@ -37,23 +41,23 @@ export default function AnnouncementsPanel({ announcements, onImagePreview }: Pr
         </div>}
       </div>
       {item ? <div className="overview-announcement-content" aria-live="polite">
-        {item.media?.src && <div className="overview-announcement-media">
-          {item.media.type === "image" ? <button type="button" onClick={() => onImagePreview(item.media!.src!)} aria-label={`Enlarge image for ${item.title}`}>
+        {(hasImage || hasVideo) && <div className="overview-announcement-media">
+          {hasImage ? <button type="button" onClick={() => onImagePreview(mediaSrc)} aria-label={`Enlarge image for ${item.title}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.media.src} alt={item.title} />
-          </button> : item.media.type === "youtube" ? <iframe src={`https://www.youtube.com/embed/${item.media.src}`} title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /> : null}
+            <img src={mediaSrc} alt={item.title} onError={() => setFailedImages((current) => new Set(current).add(mediaSrc))} />
+          </button> : <iframe src={`https://www.youtube.com/embed/${mediaSrc}`} title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />}
         </div>}
         <span className="overview-announcement-tag">{item.kind === "grand-mock" ? "Grand Mock" : "Latest update"}</span>
         <h3>{item.title}</h3>
         {item.subtitle && <p className="overview-announcement-subtitle">{item.subtitle}</p>}
         {item.description && <p className={`overview-announcement-description ${expanded ? "is-expanded" : ""}`}>{item.description}</p>}
-        {(item.description || item.media?.type === "image") && <button type="button" className="overview-text-link" onClick={() => item.media?.type === "image" && item.media.src ? onImagePreview(item.media.src) : setExpandedId(expanded ? null : item.id)} aria-expanded={item.media?.type === "image" ? undefined : expanded}>
+        {(item.description || hasImage) && <button type="button" className="overview-text-link" onClick={() => hasImage ? onImagePreview(mediaSrc) : setExpandedId(expanded ? null : item.id)} aria-expanded={hasImage ? undefined : expanded}>
           {expanded ? "Show less" : "View announcement"} <ArrowUpRight size={16} aria-hidden="true" />
         </button>}
-        {announcements.length > 1 && <div className="overview-carousel-dots" aria-label="Choose announcement">
-          {announcements.map((announcement, position) => <button key={announcement.id} type="button" onClick={() => setActive(position)} aria-label={`Show announcement ${position + 1}`} aria-current={position === index ? "true" : undefined}><span /></button>)}
-        </div>}
       </div> : <div className="overview-empty"><Megaphone size={28} aria-hidden="true" /><h3>You&apos;re all caught up</h3><p>New announcements and upcoming events will appear here.</p></div>}
+      {announcements.length > 1 && <div className="overview-carousel-dots" role="group" aria-label="Choose announcement">
+        {announcements.map((announcement, position) => <button key={announcement.id} type="button" onClick={() => setActive(position)} aria-label={`Show announcement ${position + 1}`} aria-current={position === index ? "true" : undefined}><span /></button>)}
+      </div>}
     </section>
   );
 }

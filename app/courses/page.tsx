@@ -7,6 +7,8 @@ import {
   LockKeyhole,
   Mail,
   PlayCircle,
+  Search,
+  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -186,6 +188,7 @@ export default function CoursesPage() {
                 </div>
               </div>
 
+              <div className="relative mt-5 sm:max-w-md"><Search size={18} aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--accent-strong)]" /><input type="search" aria-label="Search courses and lessons" placeholder="Search courses and lessons" value={query} onChange={event => setQuery(event.target.value)} className="urologics-input h-12 pl-11 pr-11" />{query && <button type="button" aria-label="Clear course search" onClick={() => setQuery("")} className="absolute right-0 top-0 grid h-12 w-11 place-items-center text-[var(--text-secondary)]"><X size={16} /></button>}</div>
               <div className="mt-5 grid gap-4 sm:mt-7 md:grid-cols-2 xl:grid-cols-3">
                 {authLoading || libraryLoading ? (
                   <CourseTilesSkeleton />
@@ -193,12 +196,12 @@ export default function CoursesPage() {
                   <div className="rounded-[26px] border border-red-100 bg-red-50 p-6 text-sm text-red-700">
                     {error}
                   </div>
-                ) : sections.length === 0 ? (
+                ) : filteredSections.length === 0 ? (
                   <div className="rounded-[26px] border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--text-secondary)]">
-                    No video folders found.
+                    {query ? `No courses or lessons match "${query}".` : "No video folders found."}
                   </div>
                 ) : (
-                  sections.map((section) => {
+                  filteredSections.map((section) => {
                     const unlockedCount =
                       section.videos.filter(isUnlocked).length;
                     const firstThumbnail =

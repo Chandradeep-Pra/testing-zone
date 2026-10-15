@@ -7,6 +7,8 @@ import { useParams } from "next/navigation";
 
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { appPath } from "@/lib/app-path";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { getMockCandidateEmail, readCompletedMockAttempt, resolveMockAttempt } from "@/lib/mock-session";
 
 type MockQuestion = {
   id: string;
@@ -78,6 +80,7 @@ function getOptionLabel(index: number) {
 
 export default function ResultPage() {
   const { id } = useParams<{ id: string }>();
+  const { user, loading: authLoading } = useAuth();
   const [mock, setMock] = useState<MockDetail | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [preview, setPreview] = useState<string | null>(null);
@@ -86,28 +89,34 @@ export default function ResultPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (authLoading) return;
+    let active = true;
     const load = async () => {
       try {
         let res = await fetch(appPath(`/api/mocks/${id}`), { cache: "no-store" });
         if (res.status === 401) res = await fetch(appPath(`/api/public/mocks/${id}`), { cache: "no-store" });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Unable to load this review");
+        if (!active) return;
         setMock(normalizeMock(data.mock));
-        const attempt = data.mock?.userAttempt;
-        if (attempt) setRecordedScore(Number(attempt.score ?? attempt.marks ?? 0));
-        const saved = localStorage.getItem(`mock-${id}-first-final`) || localStorage.getItem(`mock-${id}-final`);
-        const parsed = attempt?.answers ?? (saved ? JSON.parse(saved) : null);
+        const candidateEmail = getMockCandidateEmail(user?.email);
+        const attempt = resolveMockAttempt(data.mock, readCompletedMockAttempt(id, candidateEmail), candidateEmail);
+        setRecordedScore(attempt?.marks ?? null);
+        const parsed = attempt?.answers;
+        setAnswers({});
+        setHasSavedAnswers(false);
         if (parsed && typeof parsed === "object") {
           setAnswers(Object.fromEntries(Object.entries(parsed).filter(([, value]) => Number.isInteger(value) && Number(value) >= 0).map(([key, value]) => [key, Number(value)])));
           setHasSavedAnswers(true);
         }
       } catch (error) {
-        setError(error instanceof Error ? error.message : "Unable to load this review");
+        if (active) setError(error instanceof Error ? error.message : "Unable to load this review");
       }
     };
 
     void load();
-  }, [id]);
+    return () => { active = false; };
+  }, [authLoading, id, user?.email]);
 
   const score = useMemo(() => {
     if (!mock) {
@@ -179,7 +188,7 @@ export default function ResultPage() {
               <div className="mt-4 text-4xl font-semibold text-[var(--accent-strong)] sm:text-5xl">
                 {recordedScore ?? score}/{mock.questions.length}
               </div>
-              <div className="mt-2 text-sm text-[var(--text-secondary)]">Final mock score</div>
+              <div className="mt-2 text-sm text-[var(--text-secondary)]">Current attempt score</div>
             </div>
           </section>
 

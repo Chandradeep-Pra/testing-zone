@@ -32,7 +32,7 @@ export default function UrologicsBrand({
           Urologics
         </div> */}
         <div className={`${compact ? "text-sm" : "text-sm sm:text-base"} truncate font-semibold text-[var(--text-primary)]`}>
-          Urologics {product}
+          {/Urologics/i.test(product) ? product : `Urologics ${product}`}
         </div>
         {!compact && (
           <div className="hidden text-xs text-[var(--text-secondary)] sm:block">

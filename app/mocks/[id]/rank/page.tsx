@@ -11,57 +11,56 @@ import YourRankCard from "@/components/ui/YourRankCard";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { appPath } from "@/lib/app-path";
 import { formatRelativeAttended } from "@/lib/format-relative-time";
+import { firstAttemptRankings, mockPercentile, type MockRankResult } from "@/lib/mock-ranking";
+import { getMockCandidateEmail, readCompletedMockAttempt, resolveMockAttempt, type MockAttemptView } from "@/lib/mock-session";
 
-type Result = {
-  rank?: number;
-  name: string;
-  email: string;
-  userImage?: string | null;
-  marks: number;
-  maxMarks?: number | null;
-  attended?: string;
-  createdAt?: string | null;
-  submittedAt?: string | null;
-};
-
-type RankedResult = Result & { rank: number };
+type Result = MockRankResult;
+type RankedResult = MockRankResult;
 
 const MIN_LOADER_MS = 2500;
 
 export default function RankPage() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [ready, setReady] = useState(false);
   const [results, setResults] = useState<Result[]>([]);
   const [title, setTitle] = useState("Mock leaderboard");
   const [error, setError] = useState("");
+  const [currentAttempt, setCurrentAttempt] = useState<MockAttemptView | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
+    let active = true;
+    setReady(false);
+    setError("");
+    const candidateEmail = getMockCandidateEmail(user?.email);
+    const cached = readCompletedMockAttempt(id, candidateEmail);
+    setCurrentAttempt(cached);
     const minDelay = new Promise((resolve) => setTimeout(resolve, MIN_LOADER_MS));
 
     const loadData = async () => {
-      // 2. Fetch fresh leaderboard results (cache-busted)
       try {
-        const res = await fetch(appPath(`/api/mocks/${id}/results?_t=${Date.now()}`), {
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-          },
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Unable to load rankings");
-        if (data.mock?.title) setTitle(data.mock.title);
-        if (Array.isArray(data?.results)) {
-          setResults(data.results);
-        }
+        const detailRequest = fetch(appPath(`/api/mocks/${id}`), { cache: "no-store" })
+          .then((response) => response.status === 401 ? fetch(appPath(`/api/public/mocks/${id}`), { cache: "no-store" }) : response)
+          .then((response) => response.ok ? response.json() : null).catch(() => null);
+        const [response, detail] = await Promise.all([
+          fetch(appPath(`/api/mocks/${id}/results?_t=${Date.now()}`), { cache: "no-store", headers: { "Cache-Control": "no-cache", Pragma: "no-cache" } }),
+          detailRequest,
+        ]);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Unable to load rankings");
+        if (!active) return;
+        if (data.mock?.title || detail?.mock?.title) setTitle(data.mock?.title || detail.mock.title);
+        setResults(firstAttemptRankings(data));
+        setCurrentAttempt(resolveMockAttempt(detail?.mock, cached, candidateEmail));
       } catch (error) {
-        setError(error instanceof Error ? error.message : "Unable to load rankings");
+        if (active) setError(error instanceof Error ? error.message : "Unable to load rankings");
       }
     };
 
-    void Promise.all([loadData(), minDelay]).then(() => setReady(true));
-  }, [id]);
+    void Promise.all([loadData(), minDelay]).then(() => { if (active) setReady(true); });
+    return () => { active = false; };
+  }, [authLoading, id, user?.email]);
 
   if (!ready) {
     return <ResultsLoader title="Ranking Candidate Performance" />;
@@ -73,24 +72,18 @@ export default function RankPage() {
     rank: typeof item.rank === "number" && item.rank > 0 ? item.rank : idx + 1,
   })).sort((a, b) => a.rank - b.rank);
 
-  const userEmail = user?.email?.trim().toLowerCase() || "";
-  const userName = user?.name?.trim().toLowerCase() || "";
-  let verifiedCandidateEmail = "";
-  let verifiedCandidateName = "";
-  try {
-    const verified = JSON.parse(localStorage.getItem("urologics-candidate-verification") || localStorage.getItem("mockUser") || "{}");
-    verifiedCandidateEmail = String(verified.email || "").trim().toLowerCase();
-    verifiedCandidateName = String(verified.name || "").trim().toLowerCase();
-  } catch {}
-
+  const candidateEmail = getMockCandidateEmail(user?.email);
+  let candidateName = user?.name?.trim().toLowerCase() || "";
+  if (!candidateName) {
+    try {
+      const verified = JSON.parse(localStorage.getItem("urologics-candidate-verification") || localStorage.getItem("mockUser") || "{}");
+      candidateName = String(verified.name || "").trim().toLowerCase();
+    } catch {}
+  }
   const isMe = (row: Result) => {
-    const rowEmail = (row.email || "").trim().toLowerCase();
-    const rowName = (row.name || "").trim().toLowerCase();
-    if (userEmail && rowEmail === userEmail) return true;
-    if (verifiedCandidateEmail && rowEmail === verifiedCandidateEmail) return true;
-    if (!rowEmail && userName && rowName === userName) return true;
-    if (!rowEmail && verifiedCandidateName && rowName === verifiedCandidateName) return true;
-    return false;
+    const rowEmail = row.email.trim().toLowerCase();
+    if (candidateEmail && rowEmail) return rowEmail === candidateEmail;
+    return !rowEmail && Boolean(candidateName) && row.name.trim().toLowerCase() === candidateName;
   };
 
   const me = ranked.find(isMe);
@@ -128,8 +121,11 @@ export default function RankPage() {
             stats={{
               rank: me.rank,
               totalAttendees: ranked.length,
-              marks: me.marks,
-              totalQuestions: me.maxMarks ?? 0,
+              marks: currentAttempt?.marks ?? me.marks,
+              totalQuestions: currentAttempt?.totalQuestions || me.maxMarks || 0,
+              firstAttemptMarks: me.marks,
+              firstAttemptTotalQuestions: me.maxMarks ?? 0,
+              percentile: mockPercentile(me.marks, ranked),
             }}
           />
         )}

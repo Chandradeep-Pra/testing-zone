@@ -152,7 +152,7 @@ export default function CompleteProfilePrompt() {
       return;
     }
 
-    if (!selectedCountry.name.trim()) {
+    if (!countryValue || !selectedCountry.name.trim()) {
       toast.error("Please enter your country.");
       return;
     }
@@ -161,6 +161,10 @@ export default function CompleteProfilePrompt() {
       toast.error("Phone number should be exactly 10 digits.");
       return;
     }
+
+    if (!medicalInstitution.trim()) { toast.error("Please enter your medical institution."); return; }
+
+    if (!confirmPassword) { toast.error("Please confirm your password."); return; }
 
     if (!password) {
       toast.error("Please create a password.");
@@ -270,7 +274,7 @@ export default function CompleteProfilePrompt() {
 
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-                Full name
+                Full name <span aria-hidden="true" className="text-red-500">*</span>
               </span>
               <input
                 value={name}
@@ -282,7 +286,7 @@ export default function CompleteProfilePrompt() {
 
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-                Country
+                Country <span aria-hidden="true" className="text-red-500">*</span>
               </span>
               <select
                 value={countryValue}
@@ -304,7 +308,7 @@ export default function CompleteProfilePrompt() {
 
             <div>
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-                Phone number
+                Phone number <span aria-hidden="true" className="text-red-500">*</span>
               </span>
               <div className="mt-2 flex gap-2">
                 <div className="w-24 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)]">
@@ -321,7 +325,7 @@ export default function CompleteProfilePrompt() {
 
             <label className="block sm:col-span-2">
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-                Medical Institution
+                Medical Institution <span aria-hidden="true" className="text-red-500">*</span>
               </span>
               <input
                 value={medicalInstitution}
@@ -333,7 +337,7 @@ export default function CompleteProfilePrompt() {
 
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-                Password
+                Password <span aria-hidden="true" className="text-red-500">*</span>
               </span>
               <input
                 type="password"
@@ -346,7 +350,7 @@ export default function CompleteProfilePrompt() {
 
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">
-                Confirm Password
+                Confirm Password <span aria-hidden="true" className="text-red-500">*</span>
               </span>
               <input
                 type="password"

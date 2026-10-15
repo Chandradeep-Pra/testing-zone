@@ -5,11 +5,11 @@ import {
   ArrowRight,
   BookOpenCheck,
   Camera,
+  ChevronDown,
   Clock3,
   KeyRound,
   LogOut,
   Pencil,
-  ReceiptText,
   ShieldCheck,
   TrendingUp,
   UserRound,
@@ -19,6 +19,7 @@ import Link from "next/link";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
+import PurchaseHistory, { type Purchase } from "@/components/profile/PurchaseHistory";
 import GlobalLoading from "@/components/ui/GlobalLoading";
 import { appPath } from "@/lib/app-path";
 
@@ -31,6 +32,7 @@ type AccessPayload = {
     phone?: string | null;
     medicalInstitution?: string | null;
     activeCourseIds?: string[];
+    activeCourses?: { id: string; title: string }[];
     activePlanStatus?: string | null;
     planExpiresAt?: string | null;
   };
@@ -63,7 +65,7 @@ type ProgressPayload = {
   };
 };
 
-type Purchase = { id: string; courseNameSnapshot?: string; planNameSnapshot?: string; paidAmount?: number; currency?: string; status?: string; paypalOrderId?: string; purchasedAt?: string | null; accessEndsAt?: string | null; createdAt?: string | null };
+
 
 const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
@@ -84,6 +86,8 @@ export default function UserPage() {
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState("");
   const [medicalInstitutionDraft, setMedicalInstitutionDraft] = useState("");
+  const [phoneDraft, setPhoneDraft] = useState("");
+  useEffect(() => () => { if (profileImagePreview.startsWith("blob:")) URL.revokeObjectURL(profileImagePreview); }, [profileImagePreview]);
 
   useEffect(() => {
     const idToken = user?.idToken;
@@ -152,11 +156,12 @@ export default function UserPage() {
   const profilePhone = access?.profile?.phone || user?.phone || "";
   const profileMedicalInstitution =
     access?.profile?.medicalInstitution || user?.medicalInstitution || "";
-  const profileImagePreviewSrc = profileImagePreview || user?.profileImageUrl || "";
+  const profileImagePreviewSrc = profileImagePreview || access?.profile?.profileImageUrl || user?.profileImageUrl || "";
 
   useEffect(() => {
     setMedicalInstitutionDraft(profileMedicalInstitution || "");
-  }, [profileMedicalInstitution]);
+    setPhoneDraft(profilePhone);
+  }, [profileMedicalInstitution, profilePhone]);
 
   async function sendPasswordReset() {
     if (!user?.email) {
@@ -200,6 +205,7 @@ export default function UserPage() {
     setProfileImageFile(null);
     setProfileImagePreview("");
     setMedicalInstitutionDraft(profileMedicalInstitution || "");
+    setPhoneDraft(profilePhone);
     setEditingProfile(true);
   }
 
@@ -218,6 +224,7 @@ export default function UserPage() {
       return;
     }
 
+    if (file.size > 5 * 1024 * 1024) { toast.error("Choose an image smaller than 5 MB."); return; }
     setProfileImageFile(file);
     setProfileImagePreview(URL.createObjectURL(file));
   }
@@ -230,7 +237,7 @@ export default function UserPage() {
 
     try {
       setSavingProfile(true);
-      let profileImageUrl = user.profileImageUrl || null;
+      let profileImageUrl = access?.profile?.profileImageUrl || user.profileImageUrl || null;
 
       if (profileImageFile) {
         const formData = new FormData();
@@ -239,6 +246,7 @@ export default function UserPage() {
 
         const uploadResponse = await fetch(appPath("/api/urologics/cloudinary-upload"), {
           method: "POST",
+          headers: { Authorization: `Bearer ${user.idToken}` },
           body: formData,
         });
         const uploadPayload = await uploadResponse.json().catch(() => ({}));
@@ -257,6 +265,7 @@ export default function UserPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          phone: phoneDraft.trim(),
           medicalInstitution: medicalInstitutionDraft.trim(),
           profileImageUrl,
         }),
@@ -275,6 +284,7 @@ export default function UserPage() {
               profile: {
                 ...current.profile,
                 profileImageUrl,
+                phone: phoneDraft.trim() || null,
                 medicalInstitution: medicalInstitutionDraft.trim() || null,
               },
             }
@@ -330,6 +340,7 @@ export default function UserPage() {
                   </div>
                   <button
                     type="button"
+                    disabled={savingProfile}
                     onClick={editingProfile ? cancelProfileEdit : startProfileEdit}
                     className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-[var(--accent-soft)]"
                   >
@@ -353,7 +364,9 @@ export default function UserPage() {
                         </span>
                         <input
                           type="file"
-                          accept="image/*"
+                          aria-label="Profile photo"
+                          disabled={savingProfile}
+                          accept="image/jpeg,image/png,image/webp,image/gif"
                           className="sr-only"
                           onChange={(event) => handleProfileImageChange(event.target.files?.[0])}
                         />
@@ -370,6 +383,7 @@ export default function UserPage() {
                         />
                       </label>
                     </div>
+                    <label className="mt-4 block"><span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-tertiary)]">Phone number</span><input type="tel" aria-label="Phone number" disabled={savingProfile} value={phoneDraft} onChange={event => setPhoneDraft(event.target.value)} placeholder="+44 7700900123" className="urologics-input mt-2" /><span className="mt-1 block text-xs text-[var(--text-tertiary)]">Use a space after the country code, e.g. +44 7700900123.</span></label>
                     <button
                       type="button"
                       onClick={saveProfile}
@@ -411,12 +425,7 @@ export default function UserPage() {
                 </div>
               </div>
 
-              <div className="urologics-panel p-5 sm:p-6">
-                <div className="flex items-center gap-3"><ReceiptText className="h-5 w-5 text-[var(--accent-strong)]" /><h2 className="text-xl font-semibold text-[var(--text-primary)]">Purchase history</h2></div>
-                <div className="mt-5 space-y-3">
-                  {purchases.length ? purchases.map((purchase) => <div key={purchase.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold text-[var(--text-primary)]">{purchase.courseNameSnapshot || "Course purchase"}</p><p className="mt-1 text-sm text-[var(--text-secondary)]">{purchase.planNameSnapshot || "Plan"}</p></div><span className="rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent-strong)]">{purchase.status || "CREATED"}</span></div><div className="mt-3 grid gap-1 text-xs text-[var(--text-secondary)] sm:grid-cols-2"><p>{new Intl.NumberFormat("en-GB", { style: "currency", currency: purchase.currency || "GBP" }).format(Number(purchase.paidAmount || 0))}</p><p>Order: {purchase.paypalOrderId || "Pending"}</p><p>Purchased: {purchase.purchasedAt ? new Date(purchase.purchasedAt).toLocaleDateString("en-GB") : "Pending"}</p><p>Access expires: {purchase.accessEndsAt ? new Date(purchase.accessEndsAt).toLocaleDateString("en-GB") : "Pending"}</p></div></div>) : <p className="text-sm text-[var(--text-secondary)]">No purchases yet.</p>}
-                </div>
-              </div>
+              <PurchaseHistory purchases={purchases} />
 
               <div className="urologics-panel p-5 sm:p-6">
                 <div className="flex items-center gap-3">
@@ -425,7 +434,7 @@ export default function UserPage() {
                 </div>
                 <div className="mt-5 grid gap-3">
                   <InfoRow label="Tier" value={access?.tier || user.tier} />
-                  <InfoRow label="Courses" value={`${access?.profile?.activeCourseIds?.length || 0} active`} />
+                  <details className="group rounded-2xl bg-[var(--surface-muted)]"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm [&::-webkit-details-marker]:hidden"><span className="text-[var(--text-secondary)]">Courses</span><span className="ml-auto font-semibold text-[var(--text-primary)]">{access?.profile?.activeCourses?.length || 0} active</span><ChevronDown size={16} className="text-[var(--accent-strong)] transition group-open:rotate-180" /></summary><div className="border-t border-[var(--border)] px-4 py-3">{access?.profile?.activeCourses?.length ? <ul className="space-y-2">{access.profile.activeCourses.map(course => <li key={course.id}><Link href="/courses" className="flex items-center justify-between gap-2 text-sm font-medium text-[var(--accent-strong)]">{course.title}<ArrowRight size={14} /></Link></li>)}</ul> : <p className="text-sm text-[var(--text-secondary)]">No active courses.</p>}</div></details>
                   <InfoRow label="Plan status" value={access?.profile?.activePlanStatus || "None"} />
                 </div>
               </div>

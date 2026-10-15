@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUrologicsApiUrl } from "@/lib/urologics-api";
+import { firstAttemptRankings } from "@/lib/mock-ranking";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const response = await fetch(getUrologicsApiUrl(`/api/${token ? "app" : "public"}/mocks/${encodeURIComponent(id)}/results`), {
       headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: "no-store",
     });
-    return NextResponse.json(await response.json(), { status: response.status, headers: { "Cache-Control": "private, no-store" } });
+    const payload = await response.json();
+    return NextResponse.json(response.ok ? { ...payload, results: firstAttemptRankings(payload) } : payload, { status: response.status, headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("Mock results proxy error:", error);
     return NextResponse.json({ error: "Unable to load rankings" }, { status: 500 });

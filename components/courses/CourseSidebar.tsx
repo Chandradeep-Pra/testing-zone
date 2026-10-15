@@ -64,7 +64,8 @@ export default function CourseSidebar({
         <input
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search lessons"
+          aria-label="Search courses and lessons"
+          placeholder="Search courses and lessons"
           className="urologics-input h-11 pl-11 text-sm"
         />
       </div>

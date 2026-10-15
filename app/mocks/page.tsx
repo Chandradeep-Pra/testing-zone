@@ -17,6 +17,7 @@ import toast from "react-hot-toast";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
+import DescriptionBullets from "@/components/ui/DescriptionBullets";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import GlobalLoading from "@/components/ui/GlobalLoading";
@@ -337,7 +338,7 @@ export default function TodayMocksPage() {
   return (
     <main className="urologics-shell overflow-hidden">
       <div className="mobile-native-page mx-auto max-w-7xl px-2 pb-8 sm:px-3 sm:py-4">
-        <UrologicsHeader current="Mocks" product="Grand Mocks" tag="Exam session library" />
+        <UrologicsHeader current="Mocks" product="Mock Exams" tag="Exam session library" />
 
         {/* Filter and Search Bar (matching AI Viva design system) */}
         <section className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-3 sm:mb-5 sm:p-4">
@@ -561,9 +562,7 @@ export default function TodayMocksPage() {
 
                         {/* Description — only shown when provided */}
                         {mock.description ? (
-                          <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">
-                            {mock.description}
-                          </p>
+                          <DescriptionBullets value={mock.description} />
                         ) : null}
 
                         {/* Previous attempt pill */}

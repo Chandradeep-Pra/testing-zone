@@ -3,9 +3,11 @@
 import { ArrowRight, ArrowUpRight, BrainCircuit, ClipboardList, Clock3, LockKeyhole, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { latestLiveTests, type OverviewTest } from "@/lib/overview-tests";
+import DescriptionBullets from "@/components/ui/DescriptionBullets";
 
-export type MockItem = {
+export type MockItem = OverviewTest & {
   id: string;
   title: string;
   description?: string;
@@ -37,7 +39,9 @@ export default function TestsTabSection({ mocks, vivaCases, mocksLoading, vivaLo
   const [filter, setFilter] = useState("all");
   const router = useRouter();
   const vivaMode = filter === "viva";
-  const filtered = mocks.filter((mock) => filter === "public" ? mock.accessType === "public" : filter === "attended" ? mock.hasAttempted : true);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer); }, []);
+  const filtered = latestLiveTests(mocks, now, filter);
   const loading = vivaMode ? vivaLoading : mocksLoading;
   const items = vivaMode ? vivaCases : filtered;
 
@@ -52,7 +56,7 @@ export default function TestsTabSection({ mocks, vivaCases, mocksLoading, vivaLo
     <section className="overview-card overview-tests" aria-labelledby="available-tests-heading">
       <div className="overview-card-heading">
         <span className="overview-section-icon">{vivaMode ? <BrainCircuit size={20} aria-hidden="true" /> : <ClipboardList size={20} aria-hidden="true" />}</span>
-        <h2 id="available-tests-heading">{vivaMode ? "AI viva cases" : "Available mock tests"}</h2>
+        <h2 id="available-tests-heading">{vivaMode ? "AI viva cases" : "Latest live tests"}</h2>
         <div className="overview-test-controls">
           <select aria-label="Filter available tests" value={filter} onChange={(event) => setFilter(event.target.value)}>
             <option value="all">All mocks</option>
@@ -64,7 +68,7 @@ export default function TestsTabSection({ mocks, vivaCases, mocksLoading, vivaLo
         </div>
       </div>
       {loading ? <div className="overview-tests-loading" aria-label="Loading tests" aria-busy="true">{[1, 2, 3].map((key) => <div key={key} className="overview-skeleton" />)}</div>
-      : !items.length ? <div className="overview-empty-inline"><p>{vivaMode ? isLoggedIn ? "New viva cases will appear here when available." : "Sign in to access your AI viva cases." : filter === "attended" ? "Your completed mocks will appear here for review." : "New mock tests will appear here when available."}</p></div>
+      : !items.length ? <div className="overview-empty-inline"><p>{vivaMode ? isLoggedIn ? "New viva cases will appear here when available." : "Sign in to access your AI viva cases." : filter === "attended" ? "Your completed mocks will appear here for review." : "No tests are live right now. View all tests for upcoming sessions."}</p></div>
       : <div className="overview-test-list">
         <div className="overview-test-table-heading" aria-hidden="true"><span>{vivaMode ? "Case" : "Test"}</span><span>{vivaMode ? "Specialty" : "Questions"}</span><span>{vivaMode ? "Difficulty" : "Duration"}</span><span /></div>
         {vivaMode ? vivaCases.slice(0, 3).map((viva) => <article key={viva.id} className="overview-test-row">
@@ -75,7 +79,7 @@ export default function TestsTabSection({ mocks, vivaCases, mocksLoading, vivaLo
           const entitled = mock.accessType === "public" || (mock.access?.allowed === true && mock.access?.mode !== "locked");
           const count = mock.questionCount ?? mock.totalQuestions;
           return <article key={mock.id} className="overview-test-row">
-            <div className="overview-test-name"><span className="overview-test-icon"><ClipboardList size={17} aria-hidden="true" /></span><div><h3>{mock.title}</h3>{mock.description && <p className="overview-test-description">{mock.description}</p>}<p className="overview-test-mobile-meta"><Clock3 size={12} aria-hidden="true" />{mock.durationMinutes} min{mock.hasAttempted && ` \u00b7 Score: ${mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}`}</p></div></div>
+            <div className="overview-test-name"><span className="overview-test-icon"><ClipboardList size={17} aria-hidden="true" /></span><div><h3>{mock.title}</h3>{mock.description && <DescriptionBullets value={mock.description} className="!text-xs" />}<p className="overview-test-mobile-meta"><Clock3 size={12} aria-hidden="true" />{mock.durationMinutes} min{mock.hasAttempted && ` \u00b7 Score: ${mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}`}</p></div></div>
             <span className="overview-test-detail">{count !== undefined ? `${count} questions` : "Not set"}</span>
             <span className="overview-test-detail">{mock.durationMinutes} min</span>
             <div className="overview-test-actions">

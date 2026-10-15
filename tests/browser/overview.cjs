@@ -27,13 +27,14 @@ const puppeteer = require('puppeteer-core');
     await page.setRequestInterception(true);
     page.on('request', request => {
       const url = new URL(request.url());
+      if (url.pathname.endsWith('/overview-missing-image.png')) return request.respond({ status: 404, body: '' });
       if (url.pathname.includes('/api/')) {
         let body = {};
         if (url.pathname.endsWith('/submit-quiz')) { submissions.push(JSON.parse(request.postData())); body = { correct: true }; }
         else if (url.pathname.endsWith('/announcements')) body = { announcements: empty ? [] : [
           { id: 'a1', title: 'International Travel Fellowship 2026', description: 'Explore this year’s programme, eligibility and upcoming mock sessions.', media: { type: 'image', src: '/web/exhibits/img-ct-001.png' } },
           { id: 'a2', title: 'Your next grand mock is here', kind: 'grand-mock', description: 'Prepare for your next exam with a timed mock session and detailed question review.' },
-          { id: 'a3', title: 'Clinical teaching update', description: 'Explore the latest learning resources.' }
+          { id: 'a3', title: 'Clinical teaching update', description: 'Explore the latest learning resources.', media: { type: 'image', src: '/web/overview-missing-image.png' } }
         ] };
         else if (url.pathname.endsWith('/daily-quiz')) body = { quiz: empty ? null : { id: 'q1', question: 'A patient undergoes radical nephrectomy for renal cell carcinoma. Which pathological feature indicates invasion beyond the kidney?', topic: 'Renal oncology', options: ['Tumour confined to the renal cortex', 'Invasion into perinephric fat', 'Tumour size greater than 4 cm', 'Low nuclear grade'], correctIndex: 1, explanation: '**Correct.** Extension into perinephric fat indicates invasion beyond the kidney.' } };
         else if (url.pathname.endsWith('/exam-schedules')) body = { schedules: empty ? [] : [{ id: 's1', examName: 'FRCS Section 1', examDate: '2027-01-05' }, { id: 's2', examName: 'FRCS Section 2', examDate: '2027-03-10' }] };
@@ -68,6 +69,17 @@ const puppeteer = require('puppeteer-core');
     assert.equal(await page.$$eval('.overview-bottom-nav a', nodes => nodes.length), 5);
     await page.click('[aria-label="Next announcement"]');
     assert.match(await page.$eval('.overview-announcement-content', node => node.textContent), /Your next grand mock/);
+    assert.equal(await page.$('.overview-announcement-media'), null, 'No media block without an image');
+    const dotsPosition = await page.evaluate(() => {
+      const card = document.querySelector('.overview-announcements');
+      const dots = card.querySelector('.overview-carousel-dots');
+      return { directChild: dots.parentElement === card, bottomGap: card.getBoundingClientRect().bottom - dots.getBoundingClientRect().bottom };
+    });
+    assert.equal(dotsPosition.directChild, true);
+    assert.ok(dotsPosition.bottomGap >= 12 && dotsPosition.bottomGap <= 22, 'Dots remain at the card bottom');
+    await page.click('[aria-label="Next announcement"]');
+    await page.waitForSelector('.overview-announcement-media', { hidden: true });
+    await page.click('[aria-label="Previous announcement"]');
     await page.click('[aria-label="Previous announcement"]');
     await page.click('.overview-announcement-media button');
     await page.waitForSelector('[role="dialog"]');

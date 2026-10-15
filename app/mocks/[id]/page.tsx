@@ -9,6 +9,7 @@ import GlobalLoading from "@/components/ui/GlobalLoading";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { useAuth } from "@/components/auth/AuthProvider";
 import toast from "react-hot-toast";
+import { getMockCandidateEmail, saveCompletedMockAttempt } from "@/lib/mock-session";
 
 interface Question {
   id: string;
@@ -191,21 +192,6 @@ export default function Page() {
       const marks = Math.max(0, Math.min(correct, total));
       const wrong = Math.max(0, total - correct - skipped);
 
-      localStorage.setItem(`mock-${id}-final`, JSON.stringify(answers));
-      if (!mock.hasAttempted && !localStorage.getItem(`mock-${id}-first-final`)) {
-        localStorage.setItem(`mock-${id}-first-final`, JSON.stringify(answers));
-      }
-      localStorage.setItem(
-        `mock-${id}-summary`,
-        JSON.stringify({
-          total,
-          correct,
-          wrong,
-          skipped,
-          marks,
-        })
-      );
-
       const runId =
         localStorage.getItem(`mock-${id}-run-id`) ||
         `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -246,6 +232,21 @@ export default function Page() {
           const data = await response.json().catch(() => ({}));
           throw new Error(data.error || "Unable to save your attempt. Please try again.");
         }
+        // Cache only completed submissions. Reattempts never replace the first-attempt snapshot.
+        try {
+          localStorage.setItem(`mock-${id}-final`, JSON.stringify(answers));
+          if (!mock.hasAttempted && !localStorage.getItem(`mock-${id}-first-final`)) {
+            localStorage.setItem(`mock-${id}-first-final`, JSON.stringify(answers));
+          }
+          localStorage.setItem(`mock-${id}-summary`, JSON.stringify({ total, correct, wrong, skipped, marks }));
+        } catch (error) { console.warn("Attempt saved, but browser storage is unavailable:", error); }
+        saveCompletedMockAttempt(String(id), {
+          candidateEmail: getMockCandidateEmail(user?.email || candidateEmail),
+          answers,
+          marks,
+          totalQuestions: total,
+          submittedAt: new Date().toISOString(),
+        });
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Unable to save your attempt. Please try again.");
         setSubmitting(false);
@@ -254,7 +255,7 @@ export default function Page() {
     }
 
     router.push(`/mocks/${id}/rank`);
-  }, [answers, id, mock, router, timeLeft, user?.profileImageUrl]);
+  }, [answers, id, mock, router, timeLeft, user?.email, user?.profileImageUrl]);
 
   useEffect(() => {
     if (!mock) return;

@@ -9,6 +9,15 @@ exam schedule, mock filters, quiz submission, theme switching, and empty states.
 Screenshots are saved under `.viva-test-artifacts/overview/`. It does not submit
 answers to the real backend.
 
+## Mock attempts and rankings
+
+Run `node --test tests/mock-attempts.test.cjs` for the first-attempt ranking,
+percentile, account-scoped completion cache, and results-proxy checks.
+
+With the app on port 3023, run `node tests/browser/mock-attempts.cjs` to verify
+a failed submission/retry, the latest score alongside the first-attempt rank,
+and read-only review. Set `MOCK_ORIGIN` to use another local origin.
+
 ## Viva startup
 
 Start an isolated development server in PowerShell:

@@ -16,6 +16,7 @@ export type LessonEntry = {
 interface Props { lessons: LessonEntry[]; loading: boolean; isLoggedIn: boolean }
 
 export default function LessonHistorySection({ lessons, loading, isLoggedIn }: Props) {
+  if (!isLoggedIn || (!loading && lessons.length === 0)) return null;
   return (
     <section className="overview-card overview-learning" aria-labelledby="learning-heading">
       <div className="overview-card-heading">

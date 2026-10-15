@@ -43,7 +43,7 @@
 .overview-announcement-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: 6px; font-size: 14px; line-height: 1.6; color: var(--text-secondary); white-space: pre-line; }
 .overview-announcement-description.is-expanded { display: block; }
 .overview-announcement-content > .overview-text-link { margin-top: 7px; }
-.overview-carousel-dots { display: flex; justify-content: center; gap: 1px; width: 100%; margin-top: auto; padding-top: 10px; }
+.overview-carousel-dots { flex-shrink: 0; display: flex; justify-content: center; gap: 1px; width: 100%; margin-top: auto; padding-top: 10px; }
 .overview-carousel-dots button { display: grid; width: 23px; height: 27px; place-items: center; cursor: pointer; }
 .overview-carousel-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
 .overview-carousel-dots [aria-current="true"] span { background: var(--accent); }
