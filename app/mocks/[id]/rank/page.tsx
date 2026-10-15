@@ -1,6 +1,6 @@
 "use client";
 
-import { Trophy } from "lucide-react";
+import { ArrowLeft, Medal, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -25,7 +25,6 @@ type Result = {
 };
 
 type RankedResult = Result & { rank: number };
-type Summary = { total: number; correct: number; wrong: number; skipped: number };
 
 const MIN_LOADER_MS = 2500;
 
@@ -34,58 +33,16 @@ export default function RankPage() {
   const { user } = useAuth();
   const [ready, setReady] = useState(false);
   const [results, setResults] = useState<Result[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [title, setTitle] = useState("Mock leaderboard");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const minDelay = new Promise((resolve) => setTimeout(resolve, MIN_LOADER_MS));
 
     const loadData = async () => {
-      // 1. Recover exam summary from local storage
-      try {
-        const savedSummary = localStorage.getItem(`mock-${id}-summary`);
-        if (savedSummary) {
-          const parsed = JSON.parse(savedSummary) as Summary;
-          if (parsed && typeof parsed.total === "number") {
-            setSummary(parsed);
-          }
-        } else {
-          // Fallback calculation if summary wasn't stored
-          const res = await fetch(appPath(`/api/mocks/${id}`), { cache: "no-store" });
-          const data = await res.json();
-          const questions: Array<{ id?: string; correctAnswer?: unknown; options?: unknown[] }> =
-            data?.mock?.questions ?? [];
-          const savedAnswers = JSON.parse(
-            localStorage.getItem(`mock-${id}-final`) || "{}"
-          ) as Record<string, unknown>;
-
-          let correct = 0;
-          let skipped = 0;
-          for (const q of questions) {
-            const ans = q.id !== undefined ? savedAnswers[q.id] : undefined;
-            if (ans === undefined || ans === null) {
-              skipped += 1;
-            } else if (
-              Number.isInteger(q.correctAnswer) &&
-              Number(ans) === Number(q.correctAnswer)
-            ) {
-              correct += 1;
-            }
-          }
-          const total = questions.length;
-          setSummary({
-            total,
-            correct,
-            wrong: Math.max(0, total - correct - skipped),
-            skipped,
-          });
-        }
-      } catch (err) {
-        console.error("Summary recovery error:", err);
-      }
-
       // 2. Fetch fresh leaderboard results (cache-busted)
       try {
-        const res = await fetch(appPath(`/api/public/mocks/${id}/results?_t=${Date.now()}`), {
+        const res = await fetch(appPath(`/api/mocks/${id}/results?_t=${Date.now()}`), {
           cache: "no-store",
           headers: {
             "Cache-Control": "no-cache",
@@ -93,11 +50,13 @@ export default function RankPage() {
           },
         });
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Unable to load rankings");
+        if (data.mock?.title) setTitle(data.mock.title);
         if (Array.isArray(data?.results)) {
           setResults(data.results);
         }
       } catch (error) {
-        console.error("Failed to load results:", error);
+        setError(error instanceof Error ? error.message : "Unable to load rankings");
       }
     };
 
@@ -112,14 +71,14 @@ export default function RankPage() {
   const ranked: RankedResult[] = results.map((item, idx) => ({
     ...item,
     rank: typeof item.rank === "number" && item.rank > 0 ? item.rank : idx + 1,
-  }));
+  })).sort((a, b) => a.rank - b.rank);
 
   const userEmail = user?.email?.trim().toLowerCase() || "";
   const userName = user?.name?.trim().toLowerCase() || "";
   let verifiedCandidateEmail = "";
   let verifiedCandidateName = "";
   try {
-    const verified = JSON.parse(localStorage.getItem("urologics-candidate-verification") || "{}");
+    const verified = JSON.parse(localStorage.getItem("urologics-candidate-verification") || localStorage.getItem("mockUser") || "{}");
     verifiedCandidateEmail = String(verified.email || "").trim().toLowerCase();
     verifiedCandidateName = String(verified.name || "").trim().toLowerCase();
   } catch {}
@@ -144,41 +103,41 @@ export default function RankPage() {
       return { entry, height: "h-24", color: "text-amber-600" };
     });
 
-  const latest = [...ranked]
-    .sort((a, b) => {
-      const timeA = Date.parse(a.submittedAt || a.createdAt || "") || 0;
-      const timeB = Date.parse(b.submittedAt || b.createdAt || "") || 0;
-      return timeB - timeA;
-    })
-    .slice(0, 10);
+
 
   return (
     <main className="urologics-shell min-h-screen px-4 py-10">
       <ConfettiOnLoad />
-      <div className="mx-auto max-w-3xl space-y-8">
-        <header className="text-center">
-          <div className="urologics-chip">Leaderboard</div>
-          <h1 className="mt-4 text-3xl font-semibold text-[var(--text-primary)]">Your Rank</h1>
+      <div className="mx-auto max-w-4xl space-y-6">
+        <header className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-[0_16px_40px_var(--shadow-soft)] sm:p-9">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-[var(--accent-soft)] blur-3xl" />
+          <Link href="/mocks" className="relative inline-flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]"><ArrowLeft size={16} />Back to mocks</Link>
+          <div className="relative mt-6 flex items-start gap-4">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]"><Trophy size={27} /></div>
+            <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">Leaderboard</p><h1 className="mt-2 break-words text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">{title}</h1><p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">Every first attempt counts. See where you stand.</p></div>
+          </div>
+          <div className="relative mt-6 flex flex-wrap gap-3 text-xs font-medium text-[var(--text-secondary)]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-muted)] px-3 py-2"><Users size={14} />{ranked.length} candidates</span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-muted)] px-3 py-2"><Medal size={14} />First attempts only</span>
+          </div>
         </header>
+        {error && <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
 
-        {me && summary && (
+        {me && (
           <YourRankCard
             stats={{
               rank: me.rank,
               totalAttendees: ranked.length,
               marks: me.marks,
-              totalQuestions: summary.total,
-              correct: summary.correct,
-              wrong: summary.wrong,
-              skipped: summary.skipped,
+              totalQuestions: me.maxMarks ?? 0,
             }}
           />
         )}
 
         {podium.length > 0 && (
-          <section className="flex items-end justify-center gap-3">
+          <section className="flex items-end justify-center gap-2 rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] px-3 pt-7 sm:gap-5 sm:px-8">
             {podium.map(({ entry, height, color }) => (
-              <div key={`${entry.email}-${entry.submittedAt || entry.rank}`} className="w-1/3 text-center">
+              <div key={`${entry.email}-${entry.submittedAt || entry.rank}`} className="min-w-0 w-1/3 text-center">
                 <Trophy className={`mx-auto h-8 w-8 ${color}`} />
                 <div className="mt-2 flex items-center justify-center gap-1.5">
                   {entry.userImage ? (
@@ -205,9 +164,9 @@ export default function RankPage() {
 
         <section className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_16px_40px_var(--shadow-soft)]">
           <div className="border-b border-[var(--border)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)]">
-            Last 10 attendees
+            Candidate rankings
           </div>
-          <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-left text-sm">
             <thead className="text-[var(--text-secondary)]">
               <tr>
                 <th className="px-5 py-2.5 font-medium">Rank</th>
@@ -217,14 +176,14 @@ export default function RankPage() {
               </tr>
             </thead>
             <tbody className="text-[var(--text-primary)]">
-              {latest.length === 0 && (
+              {ranked.length === 0 && (
                 <tr className="border-t border-[var(--border)]">
                   <td colSpan={4} className="px-5 py-4 text-center text-[var(--text-secondary)]">
                     No attempts yet.
                   </td>
                 </tr>
               )}
-              {latest.map((row) => (
+              {ranked.map((row) => (
                 <tr
                   key={`${row.email}-${row.submittedAt || row.createdAt || row.rank}`}
                   className={`border-t border-[var(--border)] transition hover:bg-[var(--surface-tint)] ${
@@ -260,7 +219,7 @@ export default function RankPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </section>
 
         <div className="flex flex-col gap-3 sm:flex-row">

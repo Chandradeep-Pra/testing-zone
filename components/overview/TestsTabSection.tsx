@@ -76,7 +76,7 @@ function MockCard({ mock, onClick }: { mock: MockItem; onClick: () => void }) {
           </span>
           {mock.hasAttempted && (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-              <Trophy size={11} /> Score: {mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}
+              <Trophy size={11} /> Review answers · Score: {mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}
             </span>
           )}
         </div>
@@ -190,7 +190,7 @@ export default function TestsTabSection({
                 <MockCard
                   key={m.id}
                   mock={m}
-                  onClick={() => router.push(`/mocks/${m.id}/rules`)}
+                  onClick={() => router.push(`/mocks/${m.id}/${m.hasAttempted ? "result" : "rules"}`)}
                 />
               ))}
               {mocks.length > 5 && (

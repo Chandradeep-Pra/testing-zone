@@ -3,7 +3,7 @@
 import { CheckCircle2, ShieldCheck, Trophy, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import toast from "react-hot-toast";
+
 
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { appPath } from "@/lib/app-path";
@@ -81,21 +81,28 @@ export default function ResultPage() {
   const [mock, setMock] = useState<MockDetail | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [preview, setPreview] = useState<string | null>(null);
-  const [submittedAttempt, setSubmittedAttempt] = useState(false);
+  const [hasSavedAnswers, setHasSavedAnswers] = useState(false);
+  const [recordedScore, setRecordedScore] = useState<number | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const load = async () => {
-      const res = await fetch(appPath(`/api/mocks/${id}`));
-      const data = (await res.json()) as { mock?: MockDetail };
-      setMock(normalizeMock(data.mock));
-
-      const saved = localStorage.getItem(`mock-${id}-final`);
-      if (saved) {
-        const parsed = JSON.parse(saved) as Record<string, unknown>;
-        const normalizedAnswers = Object.fromEntries(
-          Object.entries(parsed).map(([questionId, value]) => [questionId, Number(value)])
-        ) as Record<string, number>;
-        setAnswers(normalizedAnswers);
+      try {
+        let res = await fetch(appPath(`/api/mocks/${id}`), { cache: "no-store" });
+        if (res.status === 401) res = await fetch(appPath(`/api/public/mocks/${id}`), { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Unable to load this review");
+        setMock(normalizeMock(data.mock));
+        const attempt = data.mock?.userAttempt;
+        if (attempt) setRecordedScore(Number(attempt.score ?? attempt.marks ?? 0));
+        const saved = localStorage.getItem(`mock-${id}-first-final`) || localStorage.getItem(`mock-${id}-final`);
+        const parsed = attempt?.answers ?? (saved ? JSON.parse(saved) : null);
+        if (parsed && typeof parsed === "object") {
+          setAnswers(Object.fromEntries(Object.entries(parsed).filter(([, value]) => Number.isInteger(value) && Number(value) >= 0).map(([key, value]) => [key, Number(value)])));
+          setHasSavedAnswers(true);
+        }
+      } catch (error) {
+        setError(error instanceof Error ? error.message : "Unable to load this review");
       }
     };
 
@@ -122,45 +129,9 @@ export default function ResultPage() {
     }, 0);
   }, [answers, mock]);
 
-  useEffect(() => {
-    if (!mock || submittedAttempt) {
-      return;
-    }
-
-    const runId =
-      localStorage.getItem(`mock-${id}-run-id`) ||
-      `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    localStorage.setItem(`mock-${id}-run-id`, runId);
-    const submittedKey = `mock-${id}-${runId}-attempt-submitted`;
-    const alreadySubmitted = sessionStorage.getItem(submittedKey);
-    if (alreadySubmitted === "true") {
-      setSubmittedAttempt(true);
-      return;
-    }
-
-    const marks = Math.max(0, Math.min(score, mock.questions.length));
-
-    // Silent safety backup submission in case user navigated directly
-    void fetch(appPath(`/api/mocks/${id}/attempts`), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        marks,
-        correctCount: marks,
-        totalQuestions: mock.questions.length,
-      }),
-    })
-      .then(() => {
-        sessionStorage.setItem(submittedKey, "true");
-        setSubmittedAttempt(true);
-      })
-      .catch(() => {});
-  }, [id, mock, score, submittedAttempt]);
 
   if (!mock) {
-    return null;
+    return <main className="urologics-shell min-h-screen p-8 text-center text-[var(--text-secondary)]">{error || "Loading answer review..."}</main>;
   }
 
   return (
@@ -206,12 +177,13 @@ export default function ResultPage() {
             <div className="urologics-panel flex flex-col items-center justify-center p-5 text-center sm:p-8">
               <Trophy className="text-[var(--accent-strong)]" size={22} />
               <div className="mt-4 text-4xl font-semibold text-[var(--accent-strong)] sm:text-5xl">
-                {score}/{mock.questions.length}
+                {recordedScore ?? score}/{mock.questions.length}
               </div>
               <div className="mt-2 text-sm text-[var(--text-secondary)]">Final mock score</div>
             </div>
           </section>
 
+          {!hasSavedAnswers && <div className="urologics-panel p-4 text-sm text-[var(--text-secondary)]">Your selected answers are unavailable for this earlier attempt. You can still review every correct answer and explanation below.</div>}
           <section className="space-y-5">
             {mock.questions.map((question, index) => {
               const selectedIndex = answers[question.id];

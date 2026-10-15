@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type AttemptPayload = {
+  answers?: Record<string, number>;
   marks?: number;
   correctCount?: number;
   totalQuestions?: number;
@@ -43,6 +44,7 @@ export async function POST(
               name: body.name,
               email: body.email,
               marks: body.marks,
+              answers: body.answers,
               userImage: body.userImage,
               totalQuestions: body.totalQuestions,
             }),

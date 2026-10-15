@@ -73,7 +73,7 @@ export async function GET(
       }
     }
 
-    // Deduplicate by student email/name keeping latest attempt only
+    // Keep each candidate's first attempt.
     const candidateMap = new Map<string, UpstreamResult>();
     for (const item of rawList) {
       const email = String(item.candidate?.email || item.email || "").trim().toLowerCase();
@@ -88,7 +88,7 @@ export async function GET(
       } else {
         const existingTime = Date.parse(existing.submittedAt || existing.createdAt || "") || 0;
         const currentTime = Date.parse(dateStr) || 0;
-        if (currentTime >= existingTime) {
+        if (currentTime < existingTime) {
           candidateMap.set(key, item);
         }
       }
@@ -104,9 +104,6 @@ export async function GET(
       return timeA - timeB;
     });
 
-    let previousMarks: number | null = null;
-    let previousRank = 0;
-
     const results = deduplicated.map((entry, index) => {
       const name = entry.candidate?.name || entry.name || "Anonymous";
       const email = (entry.candidate?.email || entry.email || "").toLowerCase();
@@ -119,10 +116,7 @@ export async function GET(
       const marks = Number(entry.marks) || 0;
       const submittedAt = entry.submittedAt || entry.createdAt || null;
       const attended = entry.attended || formatRelativeAttended(submittedAt);
-      const rank = previousMarks === marks ? previousRank : index + 1;
-
-      previousMarks = marks;
-      previousRank = rank;
+      const rank = index + 1;
 
       return {
         rank,

@@ -8,6 +8,7 @@ import ResultsLoader from "@/components/ui/ResultsLoader";
 import GlobalLoading from "@/components/ui/GlobalLoading";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { useAuth } from "@/components/auth/AuthProvider";
+import toast from "react-hot-toast";
 
 interface Question {
   id: string;
@@ -191,6 +192,9 @@ export default function Page() {
       const wrong = Math.max(0, total - correct - skipped);
 
       localStorage.setItem(`mock-${id}-final`, JSON.stringify(answers));
+      if (!mock.hasAttempted && !localStorage.getItem(`mock-${id}-first-final`)) {
+        localStorage.setItem(`mock-${id}-first-final`, JSON.stringify(answers));
+      }
       localStorage.setItem(
         `mock-${id}-summary`,
         JSON.stringify({
@@ -212,7 +216,7 @@ export default function Page() {
       let candidateEmail: string | undefined;
       let candidateImage = user?.profileImageUrl || undefined;
       try {
-        const savedVerification = localStorage.getItem("urologics-candidate-verification");
+        const savedVerification = localStorage.getItem("urologics-candidate-verification") || localStorage.getItem("mockUser");
         if (savedVerification) {
           const parsed = JSON.parse(savedVerification);
           if (parsed.name) candidateName = parsed.name;
@@ -223,11 +227,12 @@ export default function Page() {
       } catch {}
 
       try {
-        await fetch(appPath(`/api/mocks/${id}/attempts`), {
+        const response = await fetch(appPath(`/api/mocks/${id}/attempts`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             marks,
+            answers,
             correctCount: marks,
             totalQuestions: total,
             timeTakenSeconds: (mock.durationMinutes * 60) - timeLeft,
@@ -237,8 +242,14 @@ export default function Page() {
           }),
           cache: "no-store",
         });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Unable to save your attempt. Please try again.");
+        }
       } catch (err) {
-        console.error("Attempt submission error:", err);
+        toast.error(err instanceof Error ? err.message : "Unable to save your attempt. Please try again.");
+        setSubmitting(false);
+        return;
       }
     }
 

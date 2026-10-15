@@ -103,17 +103,12 @@ export default function PublicMockPage() {
           String(attempt?.candidate?.email || "").trim().toLowerCase() === normalizedEmail
       );
 
-      if (alreadyAttempted) {
-        toast.error("This email has already been used for this mock");
-        return;
-      }
-
       localStorage.setItem(
         "mockUser",
         JSON.stringify({ name: trimmedName, email: normalizedEmail })
       );
 
-      router.push(`/mocks/${mock.id}/rules`);
+      router.push(`/mocks/${mock.id}/${alreadyAttempted ? "result" : "rules"}`);
     } catch (error) {
       console.error("Failed to validate mock attempt:", error);
       toast.error("Unable to verify this mock right now");

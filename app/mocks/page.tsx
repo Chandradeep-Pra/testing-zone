@@ -288,6 +288,10 @@ export default function TodayMocksPage() {
       return;
     }
 
+    if (mock.hasAttempted) {
+      router.push(`/mocks/${mock.id}/result`);
+      return;
+    }
     setSelectedMock(mock);
   };
 
@@ -573,7 +577,7 @@ export default function TodayMocksPage() {
 
                         {/* Description — only shown when provided */}
                         {mock.description ? (
-                          <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+                          <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">
                             {mock.description}
                           </p>
                         ) : null}
@@ -627,11 +631,12 @@ export default function TodayMocksPage() {
                       >
                         {isEntitled
                           ? mock.hasAttempted
-                            ? "Reattempt Session"
+                            ? "Review answers"
                             : "Start Mock Session"
                           : mock.access?.reason || "Locked (Members Only)"}
                         {isEntitled ? <ArrowRight size={16} /> : <LockKeyhole size={16} />}
                       </button>
+                      {mock.hasAttempted && isEntitled && <button type="button" className="mt-2 w-full rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--accent-soft)]" onClick={(event) => { event.stopPropagation(); setSelectedMock(mock); }}>Practice again</button>}
                     </article>
                   );
                 })}
@@ -674,7 +679,7 @@ export default function TodayMocksPage() {
                   Your marks: {selectedMock.userAttempt?.score ?? selectedMock.userAttempt?.marks ?? 0}
                 </p>
                 <p className="mt-2 text-xs text-emerald-700/80 dark:text-emerald-300/80">
-                  You can start a fresh reattempt session below.
+                  Practice again below. Your first attempt remains your ranked score.
                 </p>
               </div>
             ) : (

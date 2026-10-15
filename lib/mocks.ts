@@ -34,6 +34,7 @@ export type MockRecord = {
   id: string;
   quizId: string;
   title: string;
+  description?: string;
   accessType?: "private" | "public" | string;
   startTime: string | number | TimestampLike;
   endTime?: string | number | TimestampLike;
@@ -91,6 +92,7 @@ export function normalizeMock(payload: unknown): MockRecord {
     id: typeof source.id === "string" ? source.id : fallback.id,
     quizId: typeof source.quizId === "string" ? source.quizId : fallback.quizId,
     title: typeof source.title === "string" ? source.title : "Mock Quiz",
+    description: typeof source.description === "string" ? source.description : String(asRecord(source.quiz)?.description || ""),
     accessType:
       typeof source.accessType === "string" ? source.accessType : fallback.accessType,
     startTime:
