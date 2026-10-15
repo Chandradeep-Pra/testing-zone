@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Mic, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, Mic, X } from "lucide-react";
 import Link from "next/link";
 import "./overview.css";
 import OverviewMobileNav from "@/components/overview/OverviewMobileNav";
@@ -247,7 +247,7 @@ export default function Home() {
               lessons={user?.uid === lessonsUserId ? lessons : []}
               loading={authLoading || Boolean(user && (lessonsLoading || user.uid !== lessonsUserId))}
               isLoggedIn={Boolean(user)}
-              hasPurchasedCourses={Boolean(user?.activeCourseIds?.length)}
+              hasPurchasedCourses={user?.tier === "paid" && Boolean(user.activeCourseIds?.length)}
               error={user?.uid === lessonsUserId ? lessonsError : ""}
             />
           </div>

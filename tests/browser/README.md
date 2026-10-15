@@ -5,7 +5,11 @@
 Start the application on port 3023, then run `node tests/browser/overview.cjs`.
 Set `OVERVIEW_ORIGIN` to use a different local origin. The test intercepts API
 responses and checks responsive layouts, the announcement carousel, image modal,
-exam schedule, mock filters, quiz submission, theme switching, and empty states.
+3-second announcement rotation/pause, 2-second exam pair rotation, simplified
+mock actions, quiz submission, theme switching, purchased/free learning states,
+and full-width course search. Lesson progress uses the actual backend response
+shape. Run `node --test tests/lesson-history.test.cjs` for the history mapping,
+completed-video fallback and authorized proxy checks.
 Screenshots are saved under `.viva-test-artifacts/overview/`. It does not submit
 answers to the real backend.
 
