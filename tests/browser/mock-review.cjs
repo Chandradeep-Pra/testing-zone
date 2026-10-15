@@ -52,12 +52,12 @@ const puppeteer = require('puppeteer-core');
     await page.reload({ waitUntil: 'networkidle0' });
     assert.equal(writes.length, 0, 'Refreshing review must never submit an attempt');
     await page.goto('http://127.0.0.1:3022/web/mocks', { waitUntil: 'networkidle0', timeout: 120000 });
-    await page.waitForFunction(() => document.body.innerText.includes('Review answers'));
+    await page.waitForFunction(() => document.body.innerText.includes('Review Answers'));
     assert.match(await page.$eval('body', node => node.textContent), new RegExp(description.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     const buttons = await page.$$('article button');
     for (const button of buttons) {
       const text = await button.evaluate(node => node.textContent);
-      if (text.includes('Review answers')) { await button.click(); break; }
+      if (text.includes('Review Answers')) { await button.click(); break; }
     }
     await page.waitForFunction(() => location.pathname.endsWith('/result'));
     assert.equal(writes.length, 0);

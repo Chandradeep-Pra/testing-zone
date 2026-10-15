@@ -4,9 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   Clock3,
-  CircleDot,
   Filter,
-  ListOrdered,
   LockKeyhole,
   Search,
   ShieldCheck,
@@ -528,10 +526,6 @@ export default function TodayMocksPage() {
               <div className="grid min-w-0 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
                 {filteredMocks.map((mock) => {
                   const isEntitled = isUserEntitledToMock(mock);
-                  const start = getTimestamp(mock.startTime);
-                  const end = getTimestamp(mock.endTime) || (start ? start + mock.durationMinutes * 60 * 1000 : 0);
-                  const now = Date.now();
-                  const isLive = Boolean(start && end && now >= start && now <= end);
 
                   return (
                     <article
@@ -544,36 +538,26 @@ export default function TodayMocksPage() {
                       onClick={() => openMock(mock)}
                       tabIndex={0}
                       onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return;
                         if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
                           openMock(mock);
                         }
                       }}
                     >
                       <div className="min-w-0">
-                        {/* Header Badges */}
-                        {/* <div className="flex min-w-0 items-center justify-between gap-3">
-                          <span className="inline-flex min-w-0 max-w-[62%] items-center truncate rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-strong)] sm:max-w-none sm:tracking-[0.22em]">
-                            {isLive ? (
-                              <>
-                                <span className="relative mr-1.5 flex h-2 w-2 shrink-0">
-                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-                                </span>
-                                Live Now
-                              </>
-                            ) : (
-                              <>
-                                <CircleDot size={10} className="mr-1.5 shrink-0" />
-                                {getMockKindLabel(mock)}
-                              </>
-                            )}
-                          </span>  
-                        </div> */}
-
-                        {/* Title */}
-                        <h2 className="mt-3 line-clamp-2 break-words text-lg font-semibold text-[var(--text-primary)] sm:text-xl">
-                          {mock.title || "Grand Mock"}
-                        </h2>
+                        <div className="flex min-w-0 items-start justify-between gap-3">
+                          <h2 className="min-w-0 line-clamp-2 break-words text-lg font-semibold text-[var(--text-primary)] sm:text-xl">
+                            {mock.title || "Grand Mock"}
+                          </h2>
+                          <span
+                            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-strong)]"
+                            aria-label={`Test time: ${mock.durationMinutes} minutes`}
+                          >
+                            <Clock3 size={14} aria-hidden="true" />
+                            {mock.durationMinutes} min
+                          </span>
+                        </div>
 
                         {/* Description — only shown when provided */}
                         {mock.description ? (
@@ -581,25 +565,6 @@ export default function TodayMocksPage() {
                             {mock.description}
                           </p>
                         ) : null}
-
-                        {/* Stats strip: question count + duration */}
-                        <div
-                          className="mt-3 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--accent-soft)] p-1.5"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="grid min-w-0 grid-cols-2 gap-2 text-center">
-                            <div className="flex min-w-0 items-center justify-center gap-1.5 rounded-[18px] bg-[var(--accent)] px-3 py-2 text-xs font-semibold text-[var(--accent-text)] shadow-[0_12px_28px_var(--shadow-brand)]">
-                              <ListOrdered size={14} className="shrink-0" />
-                              <span className="truncate">
-                                {mock.questionCount ?? mock.totalQuestions ?? "—"} Qs
-                              </span>
-                            </div>
-                            <div className="flex min-w-0 items-center justify-center gap-1.5 rounded-[18px] bg-[var(--surface-raised)] px-3 py-2 text-xs font-semibold text-[var(--accent-strong)]">
-                              <Clock3 size={14} className="shrink-0" />
-                              <span className="truncate">{mock.durationMinutes} min</span>
-                            </div>
-                          </div>
-                        </div>
 
                         {/* Previous attempt pill */}
                         {mock.hasAttempted ? (
@@ -617,26 +582,40 @@ export default function TodayMocksPage() {
                        
                       </div>
 
-                      {/* Primary CTA button */}
-                      <button
-                        className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                          isEntitled
-                            ? "bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
-                            : "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                        }`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openMock(mock);
-                        }}
-                      >
-                        {isEntitled
-                          ? mock.hasAttempted
-                            ? "Review answers"
-                            : "Start Mock Session"
-                          : mock.access?.reason || "Locked (Members Only)"}
-                        {isEntitled ? <ArrowRight size={16} /> : <LockKeyhole size={16} />}
-                      </button>
-                      {mock.hasAttempted && isEntitled && <button type="button" className="mt-2 w-full rounded-full border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--accent-soft)]" onClick={(event) => { event.stopPropagation(); setSelectedMock(mock); }}>Practice again</button>}
+                      <div className={`mt-5 grid gap-2 ${mock.hasAttempted && isEntitled ? "grid-cols-2" : "grid-cols-1"}`}>
+                        <button
+                          type="button"
+                          className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-2.5 text-xs font-semibold transition sm:text-sm ${
+                            isEntitled
+                              ? "bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+                              : "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openMock(mock);
+                          }}
+                        >
+                          {isEntitled
+                            ? mock.hasAttempted
+                              ? "Review Answers"
+                              : "Start Mock Session"
+                            : mock.access?.reason || "Locked (Members Only)"}
+                          {!isEntitled ? <LockKeyhole size={16} /> : !mock.hasAttempted ? <ArrowRight size={16} /> : null}
+                        </button>
+                        {mock.hasAttempted && isEntitled && (
+                          <button
+                            type="button"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--border)] px-3 py-2.5 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--accent-soft)] sm:text-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedMock(mock);
+                            }}
+                          >
+                            <TimerReset size={14} aria-hidden="true" />
+                            Reattempt
+                          </button>
+                        )}
+                      </div>
                     </article>
                   );
                 })}
