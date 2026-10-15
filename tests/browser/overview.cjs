@@ -51,13 +51,17 @@ const puppeteer = require('puppeteer-core');
       return request.continue();
     });
     await page.setViewport({ width: 1295, height: 1214 });
-    await page.goto('http://127.0.0.1:3023/web', { waitUntil: 'networkidle0', timeout: 120000 });
+    await page.goto(`${process.env.OVERVIEW_ORIGIN || 'http://127.0.0.1:3023'}/web`, { waitUntil: 'networkidle0', timeout: 120000 });
+    await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
     await page.waitForFunction(() => document.body.innerText.includes('Chandradeep') && document.body.innerText.includes('Bladder cancer: staging'));
     await page.screenshot({ path: path.join(artifacts, 'desktop.png'), fullPage: true });
     for (const width of [320, 375, 390, 768, 1024, 1295]) {
       await page.setViewport({ width, height: width < 768 ? 844 : 1000 });
       const dimensions = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: innerWidth }));
       assert.equal(dimensions.scroll <= dimensions.viewport, true, `No horizontal overflow at ${width}: ${JSON.stringify(dimensions)}`);
+      await page.waitForFunction(() => Math.abs(document.querySelector('header').getBoundingClientRect().top - (innerWidth < 640 ? 8 : 12)) < .25);
+      const headerLayout = await page.evaluate(() => ({ bottom: document.querySelector('header').getBoundingClientRect().bottom, examTop: document.querySelector('.overview-exams').getBoundingClientRect().top }));
+      assert.equal(headerLayout.bottom <= headerLayout.examTop + 1, true, `Header must not cover exam strip at ${width}: ${JSON.stringify(headerLayout)}`);
       if (width === 390 || width === 768) await page.screenshot({ path: path.join(artifacts, width === 390 ? 'mobile.png' : 'tablet.png'), fullPage: true });
     }
     await page.setViewport({ width: 390, height: 844 });
@@ -84,10 +88,15 @@ const puppeteer = require('puppeteer-core');
     assert.deepEqual(submissions, [{ selectedIndex: 1 }]);
     assert.equal(await page.$eval('.overview-submit', node => node.disabled), true);
     await page.screenshot({ path: path.join(artifacts, 'mobile-quiz-result.png'), fullPage: true });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForFunction(() => document.querySelector('header').getBoundingClientRect().top >= 0);
     await page.click('[aria-label="Toggle navigation"]');
-    await page.click('[aria-label="Switch to dark mode"]');
+    for (const button of await page.$$('[aria-label="Switch to dark mode"]')) {
+      if (await button.isIntersectingViewport()) { await button.click(); break; }
+    }
     await page.click('[aria-label="Toggle navigation"]');
-    await page.waitForFunction(() => document.body.classList.contains('dark'));
+    await page.waitForFunction(() => document.body.classList.contains('dark') && document.querySelectorAll('[aria-label="Switch to light mode"]').length === 2);
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('header > div:last-child')).opacity === '0');
     await page.screenshot({ path: path.join(artifacts, 'mobile-dark.png'), fullPage: true });
     await page.setViewport({ width: 1295, height: 1214 });
     await page.screenshot({ path: path.join(artifacts, 'desktop-dark.png'), fullPage: true });

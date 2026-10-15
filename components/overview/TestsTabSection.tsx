@@ -68,15 +68,15 @@ export default function TestsTabSection({ mocks, vivaCases, mocksLoading, vivaLo
       : <div className="overview-test-list">
         <div className="overview-test-table-heading" aria-hidden="true"><span>{vivaMode ? "Case" : "Test"}</span><span>{vivaMode ? "Specialty" : "Questions"}</span><span>{vivaMode ? "Difficulty" : "Duration"}</span><span /></div>
         {vivaMode ? vivaCases.slice(0, 3).map((viva) => <article key={viva.id} className="overview-test-row">
-          <div className="overview-test-name"><span className="overview-test-icon"><BrainCircuit size={17} aria-hidden="true" /></span><div><h3>{viva.title}</h3><p className="overview-test-mobile-meta">{viva.specialty}{viva.difficulty && ` ? ${viva.difficulty}`}</p></div></div>
+          <div className="overview-test-name"><span className="overview-test-icon"><BrainCircuit size={17} aria-hidden="true" /></span><div><h3>{viva.title}</h3><p className="overview-test-mobile-meta">{viva.specialty}{viva.difficulty && ` \u00b7 ${viva.difficulty}`}</p></div></div>
           <span className="overview-test-detail">{viva.specialty || "Urology"}</span><span className="overview-test-detail">{viva.difficulty || "All levels"}</span>
           <Link href={`/ai-viva/session/${viva.id}`} className="overview-test-start">Start case <ArrowRight size={15} aria-hidden="true" /></Link>
         </article>) : filtered.slice(0, 3).map((mock) => {
           const entitled = mock.accessType === "public" || (mock.access?.allowed === true && mock.access?.mode !== "locked");
           const count = mock.questionCount ?? mock.totalQuestions;
           return <article key={mock.id} className="overview-test-row">
-            <div className="overview-test-name"><span className="overview-test-icon"><ClipboardList size={17} aria-hidden="true" /></span><div><h3>{mock.title}</h3>{mock.description && <p className="overview-test-description">{mock.description}</p>}<p className="overview-test-mobile-meta"><Clock3 size={12} aria-hidden="true" />{mock.durationMinutes} min{mock.hasAttempted && ` ? Score: ${mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}`}</p></div></div>
-            <span className="overview-test-detail">{count !== undefined ? `${count} questions` : "?"}</span>
+            <div className="overview-test-name"><span className="overview-test-icon"><ClipboardList size={17} aria-hidden="true" /></span><div><h3>{mock.title}</h3>{mock.description && <p className="overview-test-description">{mock.description}</p>}<p className="overview-test-mobile-meta"><Clock3 size={12} aria-hidden="true" />{mock.durationMinutes} min{mock.hasAttempted && ` \u00b7 Score: ${mock.userAttempt?.score ?? mock.userAttempt?.marks ?? 0}`}</p></div></div>
+            <span className="overview-test-detail">{count !== undefined ? `${count} questions` : "Not set"}</span>
             <span className="overview-test-detail">{mock.durationMinutes} min</span>
             <div className="overview-test-actions">
               <button type="button" className="overview-test-start" onClick={() => openMock(mock)}>{!entitled ? "Unlock" : mock.hasAttempted ? "Review Answers" : "Start mock"}{!entitled ? <LockKeyhole size={14} /> : <ArrowRight size={14} />}</button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, Mic, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -64,6 +64,14 @@ export default function Home() {
 
   // ── Lightbox ───────────────────────────────────────────────────────────────
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const previewDialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (!previewImage) return;
+    const dialog = previewDialog.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, [previewImage]);
 
   // ── Fetch: announcements + daily quiz (always) ────────────────────────────
   useEffect(() => {
@@ -186,7 +194,7 @@ export default function Home() {
       setQuizResult(
         payload?.correct === true ? "correct" : payload?.correct === false ? "wrong" : "submitted",
       );
-      setQuizMessage(payload?.correct === true ? "Correct answer." : "Submitted.");
+      setQuizMessage(payload?.correct === true ? "Correct answer." : payload?.correct === false ? "Not quite. Review the explanation below." : "Answer submitted.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unable to submit quiz.";
       setQuizMessage(msg);
@@ -253,13 +261,13 @@ export default function Home() {
         </section>
       </div>
       {previewImage && (
-        <div role="dialog" aria-modal="true" aria-label="Image preview" className="overview-lightbox" onClick={(event) => { if (event.target === event.currentTarget) setPreviewImage(null); }} onKeyDown={(event) => { if (event.key === "Escape") setPreviewImage(null); }}>
+        <dialog ref={previewDialog} role="dialog" aria-label="Image preview" className="overview-lightbox" onCancel={() => setPreviewImage(null)} onClose={() => setPreviewImage(null)} onClick={(event) => { if (event.target === event.currentTarget) setPreviewImage(null); }}>
           <button type="button" onClick={() => setPreviewImage(null)} aria-label="Close preview" className="overview-lightbox-close" autoFocus>
             <X size={20} />
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={previewImage} alt="Preview" className="max-h-[86vh] max-w-[92vw] rounded-2xl object-contain" />
-        </div>
+        </dialog>
       )}
     </main>
   );

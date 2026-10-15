@@ -91,6 +91,8 @@ export default function UrologicsHeader({
         </div>
 
         <div
+          aria-hidden={!menuOpen}
+          inert={!menuOpen}
           className={`mt-2 rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_18px_46px_var(--shadow-soft)] transition-all duration-300 md:hidden ${
             menuOpen
               ? "max-h-[520px] overflow-visible opacity-100"

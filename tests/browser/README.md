@@ -1,5 +1,16 @@
 # Viva browser regression
 
+## Overview browser regression
+
+Start the application on port 3023, then run `node tests/browser/overview.cjs`.
+Set `OVERVIEW_ORIGIN` to use a different local origin. The test intercepts API
+responses and checks responsive layouts, the announcement carousel, image modal,
+exam schedule, mock filters, quiz submission, theme switching, and empty states.
+Screenshots are saved under `.viva-test-artifacts/overview/`. It does not submit
+answers to the real backend.
+
+## Viva startup
+
 Start an isolated development server in PowerShell:
 
 ```powershell

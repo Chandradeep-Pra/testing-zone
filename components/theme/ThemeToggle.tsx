@@ -4,6 +4,7 @@ import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "urologics-testing-zone-theme";
+const THEME_CHANGED_EVENT = "urologics:theme-changed";
 
 function getInitialTheme() {
   if (typeof window === "undefined") return "light";
@@ -19,11 +20,25 @@ export default function ThemeToggle() {
     document.body.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
+  useEffect(() => {
+    const syncTheme = () => setTheme(getInitialTheme() as "light" | "dark");
+    const syncStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY) syncTheme();
+    };
+    window.addEventListener(THEME_CHANGED_EVENT, syncTheme);
+    window.addEventListener("storage", syncStorage);
+    return () => {
+      window.removeEventListener(THEME_CHANGED_EVENT, syncTheme);
+      window.removeEventListener("storage", syncStorage);
+    };
+  }, []);
+
   function toggleTheme() {
     const nextTheme = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
     window.localStorage.setItem(STORAGE_KEY, nextTheme);
     document.body.classList.toggle("dark", nextTheme === "dark");
+    window.dispatchEvent(new Event(THEME_CHANGED_EVENT));
   }
 
   return (

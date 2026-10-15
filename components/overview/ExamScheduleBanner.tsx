@@ -35,7 +35,7 @@ export default function ExamScheduleBanner() {
         <div className="overview-exam-countdowns">
           {upcoming.slice(0, 2).map((schedule) => {
             const days = getDaysLeft(schedule.examDate);
-            return <p key={schedule.id}>{schedule.examName} <span aria-hidden="true">?</span> <strong>{days === 0 ? "Today" : days === 1 ? "1 day left" : `${days} days left`}</strong></p>;
+            return <p key={schedule.id}>{schedule.examName} <span aria-hidden="true">{String.fromCharCode(183)}</span> <strong>{days === 0 ? "Today" : days === 1 ? "1 day left" : `${days} days left`}</strong></p>;
           })}
         </div>
         <button type="button" className="overview-text-link overview-schedule-toggle" onClick={() => setExpanded(!expanded)} aria-expanded={expanded} aria-controls="overview-exam-dates">{expanded ? "Hide schedule" : "View schedule"}{expanded ? <ChevronUp size={16} /> : <ArrowUpRight size={16} />}</button>
