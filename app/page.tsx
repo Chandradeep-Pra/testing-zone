@@ -5,6 +5,7 @@ import { ArrowUpRight, Mic, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import "./overview.css";
+import OverviewMobileNav from "@/components/overview/OverviewMobileNav";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
@@ -199,7 +200,8 @@ export default function Home() {
   return (
     <main className="urologics-shell overview-experience">
       <div className="overview-container">
-        <UrologicsHeader current="Overview" product="Platform" tag="AI Viva, Mocks, and Grand Mocks" variant="overview" mobileApp />
+        <UrologicsHeader current="Overview" product="Platform" tag="AI Viva, Mocks, and Grand Mocks" />
+        <OverviewMobileNav />
         <section className="overview-content" aria-label="Your learning overview">
           <ExamScheduleBanner />
           <div className="overview-greeting">
