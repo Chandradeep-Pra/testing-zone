@@ -12,6 +12,8 @@
 !components/**
 !lib/
 !lib/**
+!data/
+!data/sample-mocks.ts
 !ai-viva-data/
 !ai-viva-data/**
 !public/

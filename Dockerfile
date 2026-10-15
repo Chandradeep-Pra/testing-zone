@@ -2,7 +2,14 @@
 FROM node:22-bookworm-slim AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund && npm cache clean --force
+# Native dependencies such as better-sqlite3 need node-gyp's build tools.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && npm ci --no-audit --no-fund \
+    && npm cache clean --force \
+    && rm -rf /var/lib/apt/lists/*
 
 FROM dependencies AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
