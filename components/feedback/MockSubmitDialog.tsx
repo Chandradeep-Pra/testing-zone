@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Star } from "lucide-react";
 
-export type MockFeedbackRatings = { difficulty: number; experience: number };
+export type MockFeedbackRatings = { difficulty: number; experience: number; comment?: string };
 
 const DIFFICULTY_LABELS = ["Very easy", "Easy", "Moderate", "Hard", "Very hard"];
 const EXPERIENCE_LABELS = ["Very poor", "Poor", "Okay", "Good", "Excellent"];
@@ -118,6 +118,22 @@ export default function MockSubmitDialog({ flaggedCount, ratings, onRatingsChang
             onChange={experience => onRatingsChange({ ...ratings, experience })}
             required={hasRating}
           />
+          {ratings.experience > 0 && ratings.experience <= 3 && (
+            <div>
+              <label htmlFor="mock-feedback-comment" className="text-[13px] font-medium text-[var(--text-secondary)]">
+                What could we improve? <span className="font-normal text-[var(--text-tertiary)]">(optional)</span>
+              </label>
+              <textarea
+                id="mock-feedback-comment"
+                value={ratings.comment ?? ""}
+                onChange={event => onRatingsChange({ ...ratings, comment: event.target.value })}
+                maxLength={2000}
+                rows={3}
+                placeholder="Share your feedback…"
+                className="mt-2 block w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2.5 text-base leading-6 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)] sm:text-sm"
+              />
+            </div>
+          )}
           <div className="flex min-h-5 items-center justify-between gap-3 text-[11px] text-[var(--text-tertiary)]">
             <span>Ratings are optional</span>
             {hasRating && <button type="button" onClick={() => onRatingsChange({ difficulty: 0, experience: 0 })} className="rounded px-2 py-1 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-[var(--accent-strong)]">Clear ratings</button>}

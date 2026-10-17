@@ -264,6 +264,7 @@ export default function Page() {
                 candidate: { name: user?.name || candidateName, email: user?.email || candidateEmail },
                 questionsRating: feedbackRatings.difficulty,
                 appRating: feedbackRatings.experience,
+                reason: feedbackRatings.experience <= 3 ? feedbackRatings.comment?.trim() || undefined : undefined,
               }),
               signal: AbortSignal.timeout(6000),
             });

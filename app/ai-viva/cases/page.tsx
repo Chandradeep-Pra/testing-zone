@@ -366,32 +366,32 @@ const VivaCasesPage: React.FC = () => {
   className="mt-3 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--accent-soft)] p-1.5"
   onClick={(e) => e.stopPropagation()}
 >
-  <div className="grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+  <div className="grid min-w-0 grid-cols-2 gap-1.5 sm:gap-2">
     <button
       type="button"
       onClick={() => handleModeChange(viva, false)}
-      className={`min-w-0 rounded-[18px] px-3 py-3 text-xs font-semibold leading-5 transition sm:px-4 sm:text-sm ${
+      className={`min-w-0 rounded-[18px] px-2 py-3 text-[11px] font-semibold leading-5 transition sm:px-4 sm:text-sm ${
         getSelectedMode(viva) === "calm"
           ? "bg-[var(--accent)] text-[var(--accent-text)] shadow-[0_12px_28px_var(--shadow-brand)]"
           : "text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
       }`}
     >
-      <span className="block truncate min-[420px]:whitespace-normal">Calm & Composed</span>
+      <span className="block whitespace-normal">Calm & Composed</span>
     </button>
 
     <button
       type="button"
       onClick={() => handleModeChange(viva, true)}
       disabled={!viva.modes?.fastAndFurious?.enabled}
-      className={`min-w-0 rounded-[18px] px-3 py-3 text-xs font-semibold leading-5 transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-4 sm:text-sm ${
+      className={`min-w-0 rounded-[18px] px-2 py-3 text-[11px] font-semibold leading-5 transition disabled:cursor-not-allowed disabled:opacity-45 sm:px-4 sm:text-sm ${
         getSelectedMode(viva) === "fast"
           ? "bg-[#FF6347] text-white shadow-[0_12px_28px_rgba(255,99,71,0.3)]"
           : "text-[var(--accent-strong)] hover:bg-[var(--surface-raised)]"
       }`}
     >
-      <span className="inline-flex min-w-0 items-center justify-center gap-2">
+      <span className="inline-flex min-w-0 items-center justify-center gap-1 sm:gap-2">
         <Zap size={15} className="shrink-0" />
-        <span className="truncate min-[420px]:whitespace-normal">Fast & Furious</span>
+        <span className="whitespace-normal">Fast & Furious</span>
       </span>
     </button>
   </div>
