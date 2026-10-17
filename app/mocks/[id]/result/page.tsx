@@ -8,6 +8,7 @@ import UrologicsBrand from "@/components/brand/UrologicsBrand";
 import { appPath } from "@/lib/app-path";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getMockCandidateEmail, readCompletedMockAttempt, resolveMockAttempt } from "@/lib/mock-session";
+import { firstAttemptRankings, mockEffectiveRank } from "@/lib/mock-ranking";
 
 type MockQuestion = {
   id: string;
@@ -78,6 +79,7 @@ function getOptionLabel(index: number) {
 }
 
 type ImagePreviewHandler = (src: string | null) => void;
+type RankComparison = { official: number; effective: number } | null;
 
 function getReviewStatus(question: MockQuestion, selectedIndex: number | undefined, hasSavedAnswers: boolean) {
   if (!hasSavedAnswers || !Number.isInteger(question.correctAnswer) || question.correctAnswer < 0 || question.correctAnswer >= question.options.length) return "unavailable";
@@ -94,7 +96,7 @@ function QuestionReviewNavigation({ questions, answers, hasSavedAnswers }: {
 
   return (
     <nav aria-label="Review question numbers" className="sticky top-0 z-30 min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-2 shadow-[0_2px_8px_var(--shadow-soft)] md:hidden">
-      <div className="flex gap-2 overflow-x-auto overscroll-x-contain p-1">
+      <div className="flex gap-2 overflow-x-auto overscroll-x-contain p-1 [scrollbar-width:thin] [scrollbar-color:var(--border-strong)_transparent] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--border-strong)]">
         {questions.map((question, index) => {
           const status = getReviewStatus(question, answers[question.id], hasSavedAnswers);
           return (
@@ -102,12 +104,12 @@ function QuestionReviewNavigation({ questions, answers, hasSavedAnswers }: {
               key={question.id}
               href={`#review-question-${index + 1}`}
               aria-label={`Question ${index + 1}: ${status === "unavailable" ? "answer unavailable" : status}`}
-              className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)] ${
+              className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)] ${
                 status === "correct"
                   ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200"
-                  : status === "unavailable"
-                    ? "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-secondary)]"
-                    : "border-red-200 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200"
+                  : status === "incorrect"
+                    ? "border-red-200 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200"
+                    : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-secondary)]"
               }`}
             >
               #{index + 1}
@@ -164,7 +166,7 @@ function ReviewIntroduction({ title }: { title?: string }) {
   );
 }
 
-function ScoreCard({ score, total }: { score: number; total: number }) {
+function ScoreCard({ score, total, ranks }: { score: number; total: number; ranks: RankComparison }) {
   return (
     <div className="urologics-panel flex flex-col items-center justify-center p-5 text-center sm:p-8">
       <Trophy className="text-[var(--accent-strong)]" size={22} />
@@ -172,15 +174,28 @@ function ScoreCard({ score, total }: { score: number; total: number }) {
         {score}/{total}
       </div>
       <div className="mt-2 text-sm text-[var(--text-secondary)]">Current attempt score</div>
+      {ranks && <ReviewRankComparison ranks={ranks} />}
     </div>
   );
 }
 
-function ReviewSummary({ title, score, total }: { title?: string; score: number; total: number }) {
+function ReviewRankComparison({ ranks }: { ranks: NonNullable<RankComparison> }) {
+  return (
+    <div className="mt-5 w-full border-t border-[var(--border)] pt-4">
+      <dl className="grid grid-cols-2 gap-3">
+        <div><dt className="text-xs text-[var(--text-secondary)]">Official rank</dt><dd className="mt-1 text-xl font-semibold text-[var(--text-primary)]">#{ranks.official}</dd></div>
+        <div><dt className="text-xs text-[var(--text-secondary)]">Effective rank</dt><dd className="mt-1 text-xl font-semibold text-[var(--accent-strong)]">#{ranks.effective}</dd></div>
+      </dl>
+      <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">Effective rank compares this score with other candidates’ first attempts. Ties share an effective rank. Official rank remains based on your first attempt.</p>
+    </div>
+  );
+}
+
+function ReviewSummary({ title, score, total, ranks }: { title?: string; score: number; total: number; ranks: RankComparison }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[1fr_0.38fr]">
       <ReviewIntroduction title={title} />
-      <ScoreCard score={score} total={total} />
+      <ScoreCard score={score} total={total} ranks={ranks} />
     </section>
   );
 }
@@ -440,10 +455,12 @@ export default function ResultPage() {
   const [hasSavedAnswers, setHasSavedAnswers] = useState(false);
   const [recordedScore, setRecordedScore] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [ranks, setRanks] = useState<RankComparison>(null);
 
   useEffect(() => {
     if (authLoading) return;
     let active = true;
+    setRanks(null);
     const load = async () => {
       try {
         let res = await fetch(appPath(`/api/mocks/${id}`), { cache: "no-store" });
@@ -461,6 +478,18 @@ export default function ResultPage() {
         if (parsed && typeof parsed === "object") {
           setAnswers(Object.fromEntries(Object.entries(parsed).filter(([, value]) => Number.isInteger(value) && Number(value) >= 0).map(([key, value]) => [key, Number(value)])));
           setHasSavedAnswers(true);
+        }
+        if (candidateEmail) {
+          try {
+            const rankingsResponse = await fetch(appPath(`/api/mocks/${id}/results`), { cache: "no-store" });
+            if (!rankingsResponse.ok) return;
+            const rankings = firstAttemptRankings(await rankingsResponse.json());
+            const me = rankings.find((row) => row.email === candidateEmail);
+            if (active && me) {
+              const effective = mockEffectiveRank(attempt?.marks ?? me.marks, rankings.filter((row) => row.email !== candidateEmail));
+              if (effective !== null) setRanks({ official: me.rank, effective });
+            }
+          } catch { /* Answer review remains available if the leaderboard is unavailable. */ }
         }
       } catch (error) {
         if (active) setError(error instanceof Error ? error.message : "Unable to load this review");
@@ -506,6 +535,7 @@ export default function ResultPage() {
             title={mock.title}
             score={recordedScore ?? score}
             total={mock.questions.length}
+            ranks={ranks}
           />
           <QuestionReviewNavigation questions={mock.questions} answers={answers} hasSavedAnswers={hasSavedAnswers} />
           {!hasSavedAnswers && <MissingAnswersNotice />}

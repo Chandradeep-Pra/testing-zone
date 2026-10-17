@@ -76,6 +76,26 @@ test('percentile counts lower first-attempt scores and gives equal scores equal 
   assert.equal(ranking.mockPercentile(0, []), 0);
 });
 
+test('effective rank compares the current score without changing first-attempt ranks', () => {
+  const leaderboard = ranking.firstAttemptRankings([
+    { email: 'a@test', marks: 10, attemptNumber: 1 },
+    { email: 'b@test', marks: 5, attemptNumber: 1 },
+    { email: 'me@test', marks: 0, attemptNumber: 1 },
+    { email: 'me@test', marks: 12, attemptNumber: 2 },
+  ]);
+  const before = JSON.stringify(leaderboard);
+  const others = leaderboard.filter(row => row.email !== 'me@test');
+  assert.equal(ranking.mockEffectiveRank(12, others), 1);
+  assert.equal(ranking.mockEffectiveRank(5, others), 2, 'Equal scores share an effective position');
+  assert.equal(ranking.mockEffectiveRank(0, others), 3);
+  assert.equal(ranking.mockEffectiveRank(0, []), 1, 'The only attendee has effective rank one');
+  assert.equal(ranking.mockEffectiveRank(NaN, others), null);
+  assert.equal(ranking.mockEffectiveRank(-1, others), null);
+  assert.equal(JSON.stringify(leaderboard), before);
+  assert.equal(leaderboard.find(row => row.email === 'me@test').rank, 3);
+  assert.equal(leaderboard.find(row => row.email === 'me@test').marks, 0);
+});
+
 test('hidden accounts are removed from upstream ranks, podium, counts and percentiles', () => {
   const result = ranking.firstAttemptRankings({ results: [
     { rank: 1, email: ' UROLOGOICS.ORG@gmail.com ', marks: 20 },

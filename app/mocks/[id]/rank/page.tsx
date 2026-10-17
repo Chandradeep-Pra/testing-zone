@@ -12,7 +12,7 @@ import RankAvatar from "@/components/ui/RankAvatar";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { appPath } from "@/lib/app-path";
 import { formatRelativeAttended } from "@/lib/format-relative-time";
-import { firstAttemptRankings, mockPercentile, type MockRankResult } from "@/lib/mock-ranking";
+import { firstAttemptRankings, mockEffectiveRank, mockPercentile, type MockRankResult } from "@/lib/mock-ranking";
 import { getMockCandidateEmail, readCompletedMockAttempt, resolveMockAttempt, type MockAttemptView } from "@/lib/mock-session";
 
 type Result = MockRankResult;
@@ -49,11 +49,11 @@ export default function RankPage() {
           detailRequest,
         ]);
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Unable to load rankings");
         if (!active) return;
         if (data.mock?.title || detail?.mock?.title) setTitle(data.mock?.title || detail.mock.title);
-        setResults(firstAttemptRankings(data));
         setCurrentAttempt(resolveMockAttempt(detail?.mock, cached, candidateEmail));
+        if (!response.ok) throw new Error(data.error || "Unable to load rankings");
+        setResults(firstAttemptRankings(data));
       } catch (error) {
         if (active) setError(error instanceof Error ? error.message : "Unable to load rankings");
       }
@@ -88,6 +88,7 @@ export default function RankPage() {
   };
 
   const me = ranked.find(isMe);
+  const hasAttended = Boolean(me || currentAttempt);
   const [first, second, third] = ranked;
   const podium = [second, first, third]
     .filter((entry): entry is RankedResult => Boolean(entry))
@@ -113,20 +114,22 @@ export default function RankPage() {
           <div className="relative mt-6 flex flex-wrap gap-3 text-xs font-medium text-[var(--text-secondary)]">
             <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-muted)] px-3 py-2"><Users size={14} />{ranked.length} candidates</span>
             <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-muted)] px-3 py-2"><Medal size={14} />First attempts only</span>
+            {hasAttended && <a href="#your-rank" className="inline-flex items-center gap-2 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2 text-[var(--accent-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)]">Your rank: {me ? `#${me.rank}` : "not available yet"}</a>}
           </div>
         </header>
         {error && <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
 
-        {me && (
+        {hasAttended && (
           <YourRankCard
             stats={{
-              rank: me.rank,
+              rank: me?.rank ?? null,
               totalAttendees: ranked.length,
-              marks: currentAttempt?.marks ?? me.marks,
-              totalQuestions: currentAttempt?.totalQuestions || me.maxMarks || 0,
-              firstAttemptMarks: me.marks,
-              firstAttemptTotalQuestions: me.maxMarks ?? 0,
-              percentile: mockPercentile(me.marks, ranked),
+              marks: currentAttempt?.marks ?? me?.marks ?? 0,
+              totalQuestions: currentAttempt?.totalQuestions || me?.maxMarks || 0,
+              firstAttemptMarks: me?.marks,
+              firstAttemptTotalQuestions: me?.maxMarks ?? 0,
+              percentile: me ? mockPercentile(me.marks, ranked) : undefined,
+              effectiveRank: me ? mockEffectiveRank(currentAttempt?.marks ?? me.marks, ranked.filter((row) => !isMe(row))) : null,
             }}
           />
         )}

@@ -118,3 +118,9 @@ export function mockPercentile(marks: number, results: Array<{ marks: number }>)
   if (!results.length) return 0;
   return Math.round(results.filter((row) => row.marks < marks).length / results.length * 1000) / 10;
 }
+
+/** Display-only standing against other candidates' first attempts; equal scores share a position. */
+export function mockEffectiveRank(marks: number, otherFirstAttempts: ReadonlyArray<{ marks: number }>): number | null {
+  if (!Number.isFinite(marks) || marks < 0) return null;
+  return 1 + otherFirstAttempts.filter((row) => Number.isFinite(row.marks) && row.marks > marks).length;
+}
