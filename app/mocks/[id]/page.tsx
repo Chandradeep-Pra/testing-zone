@@ -10,7 +10,7 @@ import ThemeToggle from "@/components/theme/ThemeToggle";
 import { useAuth } from "@/components/auth/AuthProvider";
 import toast from "react-hot-toast";
 import { getMockCandidateEmail, saveCompletedMockAttempt } from "@/lib/mock-session";
-import ExperienceFeedback from "@/components/feedback/ExperienceFeedback";
+import MockSubmitDialog, { type MockFeedbackRatings } from "@/components/feedback/MockSubmitDialog";
 
 interface Question {
   id: string;
@@ -82,7 +82,7 @@ export default function Page() {
   const router = useRouter();
   const { user } = useAuth();
   const submissionLock = useRef(false);
-  const [feedback, setFeedback] = useState<{ submissionId: string; candidate: { name?: string; email?: string } } | null>(null);
+  const [feedbackRatings, setFeedbackRatings] = useState<MockFeedbackRatings>({ difficulty: 0, experience: 0 });
   const [mock, setMock] = useState<Mock | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [currentQ, setCurrentQ] = useState(0);
@@ -252,7 +252,27 @@ export default function Page() {
           totalQuestions: total,
           submittedAt: new Date().toISOString(),
         });
-        setFeedback({ submissionId: runId, candidate: { name: user?.name || candidateName, email: user?.email || candidateEmail } });
+        if (feedbackRatings.difficulty > 0 && feedbackRatings.experience > 0) {
+          try {
+            const feedbackResponse = await fetch(appPath("/api/experience-feedback"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                kind: "mock",
+                contextId: String(id),
+                submissionId: runId,
+                candidate: { name: user?.name || candidateName, email: user?.email || candidateEmail },
+                questionsRating: feedbackRatings.difficulty,
+                appRating: feedbackRatings.experience,
+              }),
+              signal: AbortSignal.timeout(6000),
+            });
+            if (!feedbackResponse.ok) throw new Error("Feedback could not be saved.");
+          } catch {
+            toast("Your mock was submitted, but your ratings could not be saved.");
+          }
+        }
+        router.push(`/mocks/${id}/rank`);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Unable to save your attempt. Please try again.");
         setSubmitting(false);
@@ -261,11 +281,10 @@ export default function Page() {
       }
     }
 
-    setSubmitting(false);
-  }, [answers, id, mock, timeLeft, user?.name, user?.email, user?.profileImageUrl]);
+  }, [answers, feedbackRatings, id, mock, router, timeLeft, user?.name, user?.email, user?.profileImageUrl]);
 
   useEffect(() => {
-    if (!mock || submitting || feedback) return;
+    if (!mock || submitting || submissionLock.current) return;
 
     const timer = setInterval(() => {
       if (isBreak) {
@@ -290,7 +309,7 @@ export default function Page() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [mock, isBreak, submit, submitting, feedback]);
+  }, [mock, isBreak, submit, submitting]);
 
   const format = (seconds: number) =>
     `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
@@ -307,10 +326,6 @@ export default function Page() {
 
   const q = mock.questions[currentQ];
   const options = Array.isArray(q?.options) ? q.options : [];
-
-  if (feedback) {
-    return <ExperienceFeedback kind="mock" contextId={String(id)} contextTitle={mock.title} submissionId={feedback.submissionId} candidate={feedback.candidate} onContinue={() => router.push(`/mocks/${id}/rank`)} />;
-  }
 
   if (submitting) {
     return <ResultsLoader />;
@@ -329,38 +344,19 @@ export default function Page() {
       )}
 
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-6 text-center shadow-[0_24px_60px_var(--shadow-medium)] sm:p-8">
-            <div className="text-2xl font-semibold text-[var(--text-primary)]">
-              {flaggedCount > 0 ? "Review flagged questions?" : "Submit mock?"}
-            </div>
-            <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
-              {flaggedCount > 0
-                ? `You have ${flaggedCount} flagged question${flaggedCount > 1 ? "s" : ""}, do you want to review them?`
-                : "This will end the current Urologics mock session and move you to the results page."}
-            </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <button
-                onClick={submit}
-                className="flex-1 rounded-full bg-[var(--surface-muted)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--border)]"
-              >
-                {flaggedCount > 0 ? "Submit Anyway" : "Submit"}
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowConfirm(false);
-                  if (flaggedCount > 0) {
-                    const firstFlagged = mock.questions.findIndex((item) => flagged[item.id]);
-                    if (firstFlagged >= 0) setCurrentQ(firstFlagged);
-                  }
-                }}
-                className="flex-1 rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-hover)]"
-              >
-                Cancel
-              </button>
-            </div>          </div>
-        </div>
+        <MockSubmitDialog
+          flaggedCount={flaggedCount}
+          ratings={feedbackRatings}
+          onRatingsChange={setFeedbackRatings}
+          onSubmit={submit}
+          onCancel={() => {
+            setShowConfirm(false);
+            if (flaggedCount > 0) {
+              const firstFlagged = mock.questions.findIndex((item) => flagged[item.id]);
+              if (firstFlagged >= 0) setCurrentQ(firstFlagged);
+            }
+          }}
+        />
       )}
 
       {previewImage && (

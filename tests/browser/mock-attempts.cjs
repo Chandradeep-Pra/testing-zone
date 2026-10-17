@@ -8,8 +8,8 @@ const puppeteer = require('puppeteer-core');
   const browser = await puppeteer.launch({ executablePath, headless: true, pipe: true, args: ['--no-sandbox'], timeout: 60000 });
   const artifacts = path.resolve('.viva-test-artifacts/mocks');
   fs.mkdirSync(artifacts, { recursive: true });
-  const errors = [], submissions = [];
-  let saved = false;
+  const errors = [], submissions = [], feedbackSubmissions = [];
+  let saved = false, feedbackFails = false;
   const cacheKey = 'mock-reattempt-latest-attempt:candidate%40example.test';
   const origin = process.env.MOCK_ORIGIN || 'http://127.0.0.1:3023';
   const firstAnswers = { q1: 0, q2: 0, q3: 1 };
@@ -33,7 +33,11 @@ const puppeteer = require('puppeteer-core');
       const url = new URL(request.url());
       if (url.pathname.includes('/api/')) {
         let payload = {}, status = 200;
-        if (request.method() === 'POST' && url.pathname.endsWith('/attempts')) {
+        if (request.method() === 'POST' && url.pathname.endsWith('/experience-feedback')) {
+          feedbackSubmissions.push(JSON.parse(request.postData()));
+          status = feedbackFails ? 503 : 200;
+          payload = feedbackFails ? { error: 'Feedback unavailable' } : { success: true };
+        } else if (request.method() === 'POST' && url.pathname.endsWith('/attempts')) {
           submissions.push(JSON.parse(request.postData()));
           if (submissions.length === 1) { status = 503; payload = { error: 'Fixture save failed. Please retry.' }; }
           else { saved = true; payload = { success: true }; }
@@ -62,15 +66,35 @@ const puppeteer = require('puppeteer-core');
       }
     }
     await clickButton('Submit Mock');
+    await page.waitForSelector('dialog[open]');
+    assert.equal(await page.$$eval('dialog fieldset', nodes => nodes.length), 2);
+    assert.match(await page.$eval('dialog', node => node.textContent), /difficulty level of the questions/);
+    assert.match(await page.$eval('dialog', node => node.textContent), /mock platform experience/);
+    await page.click('label:has(input[name="mock-difficulty"][value="4"])');
+    await page.click('label:has(input[name="mock-platform-experience"][value="5"])');
+    await page.setViewport({ width: 320, height: 700 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.screenshot({ path: path.join(artifacts, 'mock-submit-feedback-mobile.png'), fullPage: true });
+    await page.evaluate(() => document.documentElement.classList.add('dark'));
+    await new Promise(resolve => setTimeout(resolve, 250));
+    await page.screenshot({ path: path.join(artifacts, 'mock-submit-feedback-mobile-dark.png'), fullPage: true });
+    await page.evaluate(() => document.documentElement.classList.remove('dark'));
+    await page.setViewport({ width: 1440, height: 1100 });
+    await clickButton('Cancel');
+    assert.equal(submissions.length, 0, 'Cancel does not submit the mock');
+    assert.equal(feedbackSubmissions.length, 0, 'Cancel does not save feedback');
+    await clickButton('Submit Mock');
     await clickButton('Submit');
     await page.waitForFunction(() => document.body.innerText.includes('Fixture save failed. Please retry.'));
     assert.equal(await page.evaluate(key => localStorage.getItem(key), cacheKey), null, 'Failed submissions must not become the latest completed attempt');
+    assert.equal(feedbackSubmissions.length, 0, 'A failed attempt does not save feedback');
     await clickButton('Submit Mock');
     await clickButton('Submit');
-    await page.waitForFunction(() => document.body.innerText.includes('How was your experience?'), { timeout: 60000 });
-    assert.equal(submissions.length, 2, 'Feedback must only appear after the attempt is saved');
-    await clickButton('Skip to rankings');
     await page.waitForFunction(() => location.pathname.endsWith('/rank') && document.body.innerText.includes('Current attempt score'), { timeout: 60000 });
+    assert.equal(feedbackSubmissions.length, 1, 'Feedback is saved once after the successful attempt');
+    assert.equal(feedbackSubmissions[0].questionsRating, 4);
+    assert.equal(feedbackSubmissions[0].appRating, 5);
+    assert.equal(await page.$('[name="assessment-rating"]'), null, 'Mocks have no post-submit feedback screen');
     assert.equal(submissions.length, 2);
     assert.equal(submissions[1].marks, 3);
     const body = await page.$eval('body', node => node.innerText);
@@ -92,7 +116,23 @@ const puppeteer = require('puppeteer-core');
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForFunction(() => document.body.innerText.includes('3/3'));
     assert.equal(submissions.length, 2, 'Review and refresh never submit attempts');
+
+    await page.goto(`${origin}/web/mocks/reattempt`, { waitUntil: 'networkidle0' });
+    await clickButton('Submit Mock');
+    await clickButton('Submit');
+    await page.waitForFunction(() => location.pathname.endsWith('/rank'), { timeout: 60000 });
+    assert.equal(feedbackSubmissions.length, 1, 'Unrated mocks submit directly without sending feedback');
+
+    feedbackFails = true;
+    await page.goto(`${origin}/web/mocks/reattempt`, { waitUntil: 'networkidle0' });
+    await clickButton('Submit Mock');
+    await page.click('label:has(input[name="mock-difficulty"][value="2"])');
+    await page.click('label:has(input[name="mock-platform-experience"][value="4"])');
+    await clickButton('Submit');
+    await page.waitForFunction(() => location.pathname.endsWith('/rank'), { timeout: 60000 });
+    assert.equal(feedbackSubmissions.length, 2, 'A feedback outage still allows navigation to rankings');
+    assert.equal(submissions.length, 4, 'Feedback failures never resubmit the saved attempt');
     assert.deepEqual(errors, []);
-    console.log('Reattempt browser checks passed: failed save, successful retry, current 3/3 score, first-attempt rank #2 and 33.3 percentile, current answer review, persistence and read-only refresh.');
+    console.log('Mock browser checks passed: inline ratings, cancel, failed save/retry, direct rankings, optional ratings, feedback outage, mobile themes, current score/first-attempt rank and read-only review.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
