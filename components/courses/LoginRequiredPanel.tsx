@@ -11,7 +11,7 @@ export default function LoginRequiredPanel() {
         <p className="mx-auto mt-2 max-w-md text-sm leading-7 text-[#071014]/65">
           Sign in to load your course videos.
         </p>
-        <a href="https://urologics.co.uk/login" className="urologics-button-primary mt-6 inline-flex">
+        <a href="https://urologics.co.uk/login?mode=login" className="urologics-button-primary mt-6 inline-flex">
           Login to continue
         </a>
       </div>

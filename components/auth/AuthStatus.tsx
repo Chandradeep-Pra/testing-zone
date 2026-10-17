@@ -33,7 +33,7 @@ export default function AuthStatus() {
   if (!user) {
     return (
       <a
-        href="https://urologics.co.uk/login"
+        href="https://urologics.co.uk/login?mode=login"
         className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-text)] transition hover:bg-[var(--accent-hover)]"
       >
         Login

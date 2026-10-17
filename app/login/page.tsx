@@ -6,8 +6,9 @@ export const revalidate = 0;
 
 // Keep old bookmarks working while sharing the CMS account page.
 export default async function LoginPage({ searchParams }: {
-  searchParams: Promise<{ redirect?: string; next?: string; mode?: string }>;
+  searchParams: Promise<{ redirect?: string | string[]; next?: string | string[]; mode?: string | string[] }>;
 }) {
   const query = await searchParams;
-  redirect(mainLoginUrl(query.redirect ?? query.next ?? null, query.mode === "signup"));
+  const returnTo = typeof query.redirect === "string" ? query.redirect : typeof query.next === "string" ? query.next : null;
+  redirect(mainLoginUrl(returnTo, query.mode === "signup"));
 }

@@ -20,6 +20,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import type { VivaCaseRecord } from "@/lib/viva-case";
 import { CALM_VIVA_TOTAL_DURATION_SEC, getCalmPhaseTiming } from "@/lib/viva-flow";
 import { appPath } from "@/lib/app-path";
+import ExperienceFeedback from "@/components/feedback/ExperienceFeedback";
+import { useFeedbackStep } from "@/lib/use-feedback-step";
 
 type VivaMode = "calm" | "fast";
 type QaHistoryItem = { question?: string; answer?: string };
@@ -114,6 +116,8 @@ export default function VivaVoiceAi({
   aiMode?: boolean;
 }) {
   const { user } = useAuth();
+  const feedback = useFeedbackStep();
+  const [generatingReport, setGeneratingReport] = useState(false);
   const isFastMode = selectedMode === "fast";
 
   const [candidate, setCandidate] = useState(initialCandidate || { name: "", email: "" });
@@ -853,6 +857,7 @@ export default function VivaVoiceAi({
     endingRef.current = true;
     advanceLockRef.current = true;
     setEnding(true);
+    setGeneratingReport(false);
     setReportGenerationFailed(false);
     setSessionError(null);
     stopExaminerAudio();
@@ -908,12 +913,15 @@ export default function VivaVoiceAi({
 
     try {
       await liveSessionClosed;
+      if (!await feedback.request()) return;
+      setGeneratingReport(true);
       await generateScore(liveQa);
     } catch (error) {
       console.error("Unable to generate the viva report:", error);
       setSessionError(error instanceof Error ? error.message : "The viva ended, but the report could not be generated.");
       setReportGenerationFailed(true);
       setEnding(false);
+      setGeneratingReport(false);
       endingRef.current = false;
       advanceLockRef.current = false;
     }
@@ -931,6 +939,10 @@ export default function VivaVoiceAi({
     setIsListening(true);
     setCandidateStatusDot("idle");
   }, [liveActive, liveTurns]);
+
+  if (feedback.visible) {
+    return <ExperienceFeedback kind="viva" contextId={vivaCase.id} contextTitle={vivaCase.case.title} submissionId={feedback.submissionId} candidate={candidate} onContinue={feedback.complete} />;
+  }
 
   return (
     <main
@@ -956,8 +968,8 @@ export default function VivaVoiceAi({
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm">
           <div className="text-center space-y-3">
             <div className="h-10 w-10 rounded-full border-4 border-white border-t-transparent animate-spin mx-auto" />
-            <p className="text-lg font-medium">Generating Final Score...</p>
-            <p className="text-sm text-slate-400">Please wait while evaluation completes</p>
+            <p className="text-lg font-medium">{generatingReport ? "Generating Final Score..." : "Finishing your viva..."}</p>
+            <p className="text-sm text-slate-400">{generatingReport ? "Please wait while evaluation completes" : "Closing the audio session"}</p>
           </div>
         </div>
       )}

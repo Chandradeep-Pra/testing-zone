@@ -1,7 +1,7 @@
 "use client";
 
 import { AlarmClock, Coffee, Flag, Send, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { appPath } from "@/lib/app-path";
 import ResultsLoader from "@/components/ui/ResultsLoader";
@@ -10,6 +10,7 @@ import ThemeToggle from "@/components/theme/ThemeToggle";
 import { useAuth } from "@/components/auth/AuthProvider";
 import toast from "react-hot-toast";
 import { getMockCandidateEmail, saveCompletedMockAttempt } from "@/lib/mock-session";
+import ExperienceFeedback from "@/components/feedback/ExperienceFeedback";
 
 interface Question {
   id: string;
@@ -80,6 +81,8 @@ export default function Page() {
   const { id } = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const submissionLock = useRef(false);
+  const [feedback, setFeedback] = useState<{ submissionId: string; candidate: { name?: string; email?: string } } | null>(null);
   const [mock, setMock] = useState<Mock | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [currentQ, setCurrentQ] = useState(0);
@@ -167,6 +170,8 @@ export default function Page() {
   const flaggedCount = Object.keys(flagged).length;
 
   const submit = useCallback(async () => {
+    if (submissionLock.current) return;
+    submissionLock.current = true;
     setShowConfirm(false);
     setSubmitting(true);
 
@@ -247,18 +252,20 @@ export default function Page() {
           totalQuestions: total,
           submittedAt: new Date().toISOString(),
         });
+        setFeedback({ submissionId: runId, candidate: { name: user?.name || candidateName, email: user?.email || candidateEmail } });
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Unable to save your attempt. Please try again.");
         setSubmitting(false);
+        submissionLock.current = false;
         return;
       }
     }
 
-    router.push(`/mocks/${id}/rank`);
-  }, [answers, id, mock, router, timeLeft, user?.email, user?.profileImageUrl]);
+    setSubmitting(false);
+  }, [answers, id, mock, timeLeft, user?.name, user?.email, user?.profileImageUrl]);
 
   useEffect(() => {
-    if (!mock) return;
+    if (!mock || submitting || feedback) return;
 
     const timer = setInterval(() => {
       if (isBreak) {
@@ -283,7 +290,7 @@ export default function Page() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [mock, isBreak, submit]);
+  }, [mock, isBreak, submit, submitting, feedback]);
 
   const format = (seconds: number) =>
     `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
@@ -300,6 +307,10 @@ export default function Page() {
 
   const q = mock.questions[currentQ];
   const options = Array.isArray(q?.options) ? q.options : [];
+
+  if (feedback) {
+    return <ExperienceFeedback kind="mock" contextId={String(id)} contextTitle={mock.title} submissionId={feedback.submissionId} candidate={feedback.candidate} onContinue={() => router.push(`/mocks/${id}/rank`)} />;
+  }
 
   if (submitting) {
     return <ResultsLoader />;

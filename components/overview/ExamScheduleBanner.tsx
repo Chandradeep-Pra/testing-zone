@@ -60,13 +60,29 @@ export default function ExamScheduleBanner() {
 
   const renderExam = (schedule: ExamSchedule) => {
     const days = getDaysLeft(schedule.examDate);
-    return <p key={schedule.id}><span className="overview-exam-name" title={schedule.examName}>{schedule.examName}</span><span aria-hidden="true">·</span><strong>{days === 0 ? "Today" : days === 1 ? "1 day left" : `${days} days left`}</strong></p>;
+    return (
+      <p key={schedule.id}>
+        <span className="overview-exam-detail">
+          <span className="overview-exam-name" title={schedule.examName}>{schedule.examName}</span>
+          <time dateTime={schedule.examDate}>
+            {new Date(`${schedule.examDate.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+          </time>
+        </span>
+        <strong className="overview-exam-remaining">
+          <span>{days === 0 ? "Today" : days}</span>
+          {days > 0 && <span>{days === 1 ? "day left" : "days left"}</span>}
+        </strong>
+      </p>
+    );
   };
 
   return (
     <section className="overview-exams" aria-label="Upcoming exams" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocus={() => setFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }}>
       <div className="overview-exams-strip">
-        <div className="overview-exams-label"><span><CalendarDays size={19} aria-hidden="true" /></span><h2>Upcoming exams</h2></div>
+        <div className="overview-exams-label">
+          <span><CalendarDays size={20} strokeWidth={1.6} aria-hidden="true" /></span>
+          <div><h2>Upcoming exams</h2><p>{upcoming.length} {upcoming.length === 1 ? "exam scheduled" : "exams scheduled"}</p></div>
+        </div>
         <div className="overview-exam-countdowns" aria-live="off" data-exam-page={currentPage + 1}>
           {rotation > 0 && pageCount > 1 && <div key={`out-${rotation}-${pageSize}`} className="overview-exam-page is-previous" aria-hidden="true">{pages[(currentPage + pageCount - 1) % pageCount].map(renderExam)}</div>}
           <div key={`in-${rotation}-${pageSize}`} className={`overview-exam-page${rotation > 0 && pageCount > 1 ? " is-entering" : ""}`}>{pages[currentPage].map(renderExam)}</div>

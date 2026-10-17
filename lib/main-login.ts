@@ -10,6 +10,6 @@ export function mainLoginUrl(requested: string | null = null, signup = false) {
     ? APP_BASE_PATH || "/"
     : appPath(route);
   login.searchParams.set("redirect", destination);
-  if (signup) login.searchParams.set("mode", "signup");
+  login.searchParams.set("mode", signup ? "signup" : "login");
   return login.toString();
 }

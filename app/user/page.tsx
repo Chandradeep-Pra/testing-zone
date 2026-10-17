@@ -315,7 +315,7 @@ export default function UserPage() {
             <UserRound className="mx-auto h-12 w-12 text-[var(--accent-strong)]" />
             <h1 className="mt-4 text-2xl font-semibold text-[var(--text-primary)]">Login required</h1>
             <p className="mt-2 text-sm text-[var(--text-secondary)]">Please login to view your account.</p>
-            <a href="https://urologics.co.uk/login" className="urologics-button-primary mt-5 inline-flex">
+            <a href="https://urologics.co.uk/login?mode=login" className="urologics-button-primary mt-5 inline-flex">
               Login
             </a>
           </section>

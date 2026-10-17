@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import ResultsLoader from "@/components/ui/ResultsLoader";
 import ConfettiOnLoad from "@/components/ui/ConfettiOnLoad";
 import YourRankCard from "@/components/ui/YourRankCard";
+import RankAvatar from "@/components/ui/RankAvatar";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { appPath } from "@/lib/app-path";
 import { formatRelativeAttended } from "@/lib/format-relative-time";
@@ -136,13 +137,7 @@ export default function RankPage() {
               <div key={`${entry.email}-${entry.submittedAt || entry.rank}`} className="min-w-0 w-1/3 text-center">
                 <Trophy className={`mx-auto h-8 w-8 ${color}`} />
                 <div className="mt-2 flex items-center justify-center gap-1.5">
-                  {entry.userImage ? (
-                    <img
-                      src={entry.userImage}
-                      alt=""
-                      className="h-5 w-5 rounded-full object-cover border border-[var(--border)]"
-                    />
-                  ) : null}
+                  <RankAvatar name={entry.name} src={entry.userImage} className="h-5 w-5 text-[9px]" />
                   <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
                     {entry.name}
                   </span>
@@ -189,17 +184,7 @@ export default function RankPage() {
                   <td className="px-5 py-3">#{row.rank}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2.5">
-                      {row.userImage ? (
-                        <img
-                          src={row.userImage}
-                          alt=""
-                          className="h-7 w-7 rounded-full object-cover border border-[var(--border)]"
-                        />
-                      ) : (
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface-muted)] text-[11px] font-semibold text-[var(--text-secondary)]">
-                          {(row.name || "A").slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
+                      <RankAvatar name={row.name} src={row.userImage} />
                       <span className="truncate">{row.name}</span>
                       {isMe(row) && (
                         <span className="rounded-full bg-[var(--accent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-text)]">

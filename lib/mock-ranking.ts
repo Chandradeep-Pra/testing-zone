@@ -16,6 +16,17 @@ type Row = Record<string, unknown>;
 const record = (value: unknown): Row => value && typeof value === "object" ? value as Row : {};
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
 
+// Keep in sync with urocms/lib/server/mockAttempts.ts.
+const HIDDEN_RANK_EMAILS = new Set([
+  "urologoics.org@gmail.com",
+  "chandradeepp611@gmail.com",
+  "ankitgoel042@gmail.com",
+]);
+
+function imageFrom(...values: unknown[]): string | null {
+  return values.map(text).find(Boolean) || null;
+}
+
 export function extractMockAttempts(payload: unknown): Row[] {
   if (Array.isArray(payload)) return payload.map(record);
   const source = record(payload);
@@ -50,6 +61,7 @@ export function firstAttemptRankings(payload: unknown): MockRankResult[] {
   let hadDuplicates = false;
   let selectedEmbeddedFirst = false;
   let excludedReattempts = false;
+  let excludedAccounts = false;
   for (const original of extractMockAttempts(payload)) {
     const first = record(original.firstAttempt);
     const row = Object.keys(first).length ? {
@@ -62,6 +74,7 @@ export function firstAttemptRankings(payload: unknown): MockRankResult[] {
     if (row.isFirstAttempt === false || Number(row.attemptNumber) > 1) { excludedReattempts = true; continue; }
     const candidate = record(row.candidate);
     const email = text(candidate.email || row.email).toLowerCase();
+    if (HIDDEN_RANK_EMAILS.has(email)) { excludedAccounts = true; continue; }
     const name = text(candidate.name || row.name);
     const key = email || text(candidate.uid || row.userId) || name.toLowerCase();
     if (!key) continue;
@@ -86,10 +99,11 @@ export function firstAttemptRankings(payload: unknown): MockRankResult[] {
     const submittedAt = text(row.submittedAt) || text(row.createdAt) || null;
     const maxMarks = row.maxMarks ?? row.totalQuestions;
     return {
-      rank: preserveRanks ? Number(row.rank) : index + 1,
+      rank: preserveRanks && !excludedAccounts ? Number(row.rank) : index + 1,
       name: text(candidate.name || row.name) || "Anonymous",
       email: text(candidate.email || row.email).toLowerCase(),
-      userImage: text(candidate.image || candidate.userImage || candidate.profileImageUrl || row.userImage) || null,
+      userImage: imageFrom(candidate.image, candidate.userImage, candidate.profileImageUrl,
+        candidate.photoURL, row.userImage, row.profileImageUrl, row.photoURL, row.image),
       marks: Number(row.marks ?? row.score) || 0,
       maxMarks: maxMarks !== undefined && maxMarks !== null && Number.isFinite(Number(maxMarks)) ? Number(maxMarks) : null,
       submittedAt,

@@ -172,7 +172,7 @@ export default function Home() {
   // ── Quiz submit ───────────────────────────────────────────────────────────
   async function submitQuiz() {
     if (!user?.idToken) {
-      window.location.assign("/login?redirect=%2Fweb");
+      window.location.assign("/login?mode=login&redirect=%2Fweb");
       return;
     }
     if (selectedOption === null) {
@@ -214,7 +214,7 @@ export default function Home() {
     <main className="urologics-shell overview-experience">
       <div className="overview-container">
         <UrologicsHeader current="Overview" product="Platform" tag="AI Viva, Mocks, and Grand Mocks" />
-        <OverviewMobileNav />
+        {/* <OverviewMobileNav /> */}
         <section className="overview-content" aria-label="Your learning overview">
           <ExamScheduleBanner />
           <div className="overview-greeting">

@@ -76,6 +76,43 @@ test('percentile counts lower first-attempt scores and gives equal scores equal 
   assert.equal(ranking.mockPercentile(0, []), 0);
 });
 
+test('hidden accounts are removed from upstream ranks, podium, counts and percentiles', () => {
+  const result = ranking.firstAttemptRankings({ results: [
+    { rank: 1, email: ' UROLOGOICS.ORG@gmail.com ', marks: 20 },
+    { rank: 2, email: 'a@test', marks: 12, submittedAt: '2026-10-16T10:00:00Z' },
+    { rank: 3, candidate: { email: 'chandradeepp611@gmail.com' }, marks: 11 },
+    { rank: 4, email: 'b@test', marks: 12, submittedAt: '2026-10-16T09:00:00Z' },
+    { rank: 5, email: 'ankitgoel042@gmail.com', marks: 8 },
+    { rank: 6, email: 'c@test', marks: 5 },
+  ] });
+  // Keep upstream tie ordering, while assigning consecutive visible ranks.
+  assert.deepEqual(Array.from(result, row => [row.email, row.rank]), [['a@test', 1], ['b@test', 2], ['c@test', 3]]);
+  assert.equal(result.slice(0, 3).length, 3);
+  assert.equal(ranking.mockPercentile(12, result), 33.3);
+  assert.deepEqual(Array.from(ranking.firstAttemptRankings(result), row => row.rank), [1, 2, 3]);
+});
+
+test('raw fallback attempts exclude hidden accounts before choosing the first score', () => {
+  const result = ranking.firstAttemptRankings({ mock: { attempts: [
+    { candidate: { name: 'Hidden', email: 'ankitgoel042@gmail.com' }, marks: 20 },
+    { email: 'a@test', marks: 1, createdAt: '2026-10-15' },
+    { email: 'a@test', marks: 19, createdAt: '2026-10-16' },
+  ] } });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].marks, 1);
+  assert.equal(result[0].rank, 1);
+  assert.equal(ranking.firstAttemptRankings([{ email: 'ankitgoel042@gmail.com', marks: 20 }]).length, 0);
+});
+
+test('profile photos survive legacy payload shapes and whitespace image fields', () => {
+  const result = ranking.firstAttemptRankings([
+    { email: 'a@test', marks: 2, candidate: { image: ' ', profileImageUrl: ' https://photos.test/a.jpg ' } },
+    { email: 'b@test', marks: 1, profileImageUrl: 'https://photos.test/b.jpg' },
+    { email: 'c@test', marks: 0, photoURL: 'https://photos.test/c.jpg' },
+  ]);
+  assert.deepEqual(Array.from(result, row => row.userImage), ['https://photos.test/a.jpg', 'https://photos.test/b.jpg', 'https://photos.test/c.jpg']);
+});
+
 function session() {
   const values = new Map();
   const storage = { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
@@ -120,7 +157,9 @@ test('corrupt cached scores and another candidate verification cannot override t
 
 for (const visibility of ['app', 'public']) test(`${visibility} results proxy applies the same first-attempt policy`, async () => {
   const file = visibility === 'app' ? 'app/api/mocks/[id]/results/route.ts' : 'app/api/public/mocks/[id]/results/route.ts';
-  const route = load(file, { fetch: async () => Response.json({ mock: { title: 'Mock' }, results: rows }) }, {
+  const route = load(file, { fetch: async () => Response.json({ mock: { title: 'Mock' }, results: [
+    ...rows, { email: 'chandradeepp611@gmail.com', marks: 20 },
+  ] }) }, {
     'next/server': { NextResponse: { json: (body, init) => Response.json(body, init) } },
     '@/lib/urologics-api': { getUrologicsApiUrl: value => `https://upstream.test${value}` },
   });

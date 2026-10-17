@@ -86,7 +86,7 @@ export default function DailyQuizPanel({
     <section className="overview-card overview-quiz" aria-labelledby="daily-quiz-heading">
       <div className="overview-card-heading">
         <span className="overview-section-icon overview-quiz-icon"><CircleHelp size={21} aria-hidden="true" /></span>
-        <h2 id="daily-quiz-heading">Question of the day</h2>
+        <h2 id="daily-quiz-heading">Quiz of the day</h2>
       </div>
       {quiz ? <>
       <div className="overview-quiz-content" role="region" aria-label="Daily question and answers" tabIndex={0}>
