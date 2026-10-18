@@ -641,7 +641,7 @@ export default function TodayMocksPage() {
                             </button>
                           )}
                         </div>
-                        {isEntitled && (
+                        {mock.hasAttempted && isEntitled && (
                           <Link
                             href={`/mocks/${mock.id}/rank?from=mocks`}
                             prefetch={false}

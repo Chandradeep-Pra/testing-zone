@@ -14,8 +14,8 @@ const puppeteer = require('puppeteer-core');
   const mocks = Array.from({ length: 12 }, (_, index) => ({
     id: `entry-${index}`, title: `${index % 2 ? 'Renal' : 'Urology'} mock ${index + 1}`,
     description: 'Clinical questions for exam preparation.', durationMinutes: 30,
-    accessType: 'public', hasAttempted: index === 1,
-    ...(index === 1 ? { userAttempt: { marks: 12, totalQuestions: 20 } } : {}),
+    accessType: 'public', hasAttempted: index === 1 || index === 10,
+    ...(index === 1 || index === 10 ? { userAttempt: { marks: 12, totalQuestions: 20 } } : {}),
   }));
   const rankings = [
     { email: 'first@example.test', name: 'First Candidate', marks: 18, maxMarks: 20, rank: 1 },
@@ -56,32 +56,37 @@ const puppeteer = require('puppeteer-core');
     };
 
     await page.goto(`${origin}/web/mocks`, { waitUntil: 'networkidle0', timeout: 120000 });
-    await page.waitForSelector(cardLink('entry-0'));
-    assert.equal(await page.$$eval('article a', nodes => nodes.length), mocks.length);
+    await page.waitForSelector(cardLink('entry-1'));
+    assert.equal(await page.$$eval('article a', nodes => nodes.length), 2, 'Only attempted mocks show a leaderboard entry');
+    assert.equal(await page.$(cardLink('entry-0')), null);
+    assert.deepEqual(await page.$$eval('article:first-of-type button', nodes => nodes.map(node => node.textContent.trim())), ['Start Mock Session'], 'A fresh mock has only its start action');
     await page.screenshot({ path: path.join(artifacts, 'cards-desktop.png'), fullPage: true });
     await page.type('input[type="search"]', 'Urology');
     await page.$eval(cardLink('entry-10'), node => node.scrollIntoView({ block: 'center' }));
     const returnY = await page.evaluate(() => window.scrollY);
     await page.click(cardLink('entry-10'));
     await waitForRank();
-    assert.equal(await page.$('#your-rank'), null);
+    assert.notEqual(await page.$('#your-rank'), null);
     const start = await page.$('a.urologics-button-primary');
-    assert.equal(await start.evaluate(node => node.textContent), 'Start mock');
-    assert.match(await start.evaluate(node => node.getAttribute('href')), /entry-10\/rules$/);
-    assert.equal(await page.$('a[href$="/result"]'), null, 'Non-attendees do not see answer review');
-    await page.screenshot({ path: path.join(artifacts, 'leaderboard-visitor-desktop.png'), fullPage: true });
+    assert.equal(await start.evaluate(node => node.textContent.trim()), 'View analysis');
+    assert.match(await start.evaluate(node => node.getAttribute('href')), /entry-10\/result$/);
+    await page.screenshot({ path: path.join(artifacts, 'leaderboard-attendee-desktop.png'), fullPage: true });
     await page.click('header a[href="/web/mocks"]');
     await page.waitForSelector(cardLink('entry-10'));
     await page.waitForFunction(() => document.querySelector('input[type="search"]')?.value === 'Urology');
     await page.waitForFunction(y => Math.abs(window.scrollY - y) < 3, {}, returnY);
     assert.equal(await page.$$eval('article', nodes => nodes.length), 6, 'Back preserves the filtered list');
 
-    await page.$eval(cardLink('entry-0'), node => node.scrollIntoView());
-    await page.focus(cardLink('entry-0'));
+    await page.$eval(cardLink('entry-10'), node => node.scrollIntoView());
+    await page.focus(cardLink('entry-10'));
     await page.keyboard.press('Enter');
     await waitForRank();
-    assert.match(page.url(), /entry-0\/rank/);
+    assert.match(page.url(), /entry-10\/rank/);
     assert.equal(await page.$('div.fixed.inset-0.z-50'), null, 'Leaderboard link does not open the card start modal');
+    await page.goto(`${origin}/web/mocks/entry-0/rank?from=mocks`, { waitUntil: 'networkidle0' });
+    await waitForRank();
+    assert.equal(await page.$('#your-rank'), null);
+    assert.equal(await page.$('a[href$="/result"]'), null, 'Non-attendees do not see answer review');
     await page.click('a.urologics-button-primary');
     await page.waitForFunction(() => location.pathname.endsWith('/entry-0/rules'));
     assert.equal(writes.length, 0, 'Opening the leaderboard and rules never starts or submits a mock');
@@ -100,10 +105,11 @@ const puppeteer = require('puppeteer-core');
 
     await page.setViewport({ width: 390, height: 844 });
     await page.goto(`${origin}/web/mocks`, { waitUntil: 'networkidle0' });
-    await page.waitForSelector(cardLink('entry-0'));
+    await page.waitForSelector(cardLink('entry-10'));
     await page.screenshot({ path: path.join(artifacts, 'cards-mobile.png'), fullPage: true });
-    assert.ok(await page.$eval(cardLink('entry-0'), node => node.getBoundingClientRect().height >= 44));
-    await page.click(cardLink('entry-0'));
+    assert.equal(await page.$(cardLink('entry-0')), null);
+    assert.ok(await page.$eval(cardLink('entry-10'), node => node.getBoundingClientRect().height >= 44));
+    await page.click(cardLink('entry-10'));
     await waitForRank();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.screenshot({ path: path.join(artifacts, 'leaderboard-mobile.png'), fullPage: true });
