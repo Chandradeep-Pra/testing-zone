@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import ResultsLoader from "@/components/ui/ResultsLoader";
+import GlobalLoading from "@/components/ui/GlobalLoading";
 import ConfettiOnLoad from "@/components/ui/ConfettiOnLoad";
 import YourRankCard from "@/components/ui/YourRankCard";
 import RankAvatar from "@/components/ui/RankAvatar";
@@ -14,6 +15,7 @@ import { appPath } from "@/lib/app-path";
 import { formatRelativeAttended } from "@/lib/format-relative-time";
 import { firstAttemptRankings, mockEffectiveRank, mockPercentile, type MockRankResult } from "@/lib/mock-ranking";
 import { getMockCandidateEmail, readCompletedMockAttempt, resolveMockAttempt, type MockAttemptView } from "@/lib/mock-session";
+import type { Mock } from "@/data/sample-mocks";
 
 type Result = MockRankResult;
 type RankedResult = MockRankResult;
@@ -28,16 +30,27 @@ export default function RankPage() {
   const [title, setTitle] = useState("Mock leaderboard");
   const [error, setError] = useState("");
   const [currentAttempt, setCurrentAttempt] = useState<MockAttemptView | null>(null);
+  const [mock, setMock] = useState<Mock | null>(null);
+  const [browsing, setBrowsing] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (authLoading) return;
     let active = true;
     setReady(false);
     setError("");
+    setResults([]);
+    setMock(null);
+    const fromMocks = new URLSearchParams(window.location.search).get("from") === "mocks";
+    setBrowsing(fromMocks);
+    try {
+      setHasSession(Boolean(localStorage.getItem(`mock-${id}-started-at`)) && !localStorage.getItem(`mock-${id}-final`));
+    } catch { setHasSession(false); }
     const candidateEmail = getMockCandidateEmail(user?.email);
     const cached = readCompletedMockAttempt(id, candidateEmail);
     setCurrentAttempt(cached);
-    const minDelay = new Promise((resolve) => setTimeout(resolve, MIN_LOADER_MS));
+    const minDelay = new Promise((resolve) => setTimeout(resolve, fromMocks ? 0 : MIN_LOADER_MS));
 
     const loadData = async () => {
       try {
@@ -51,6 +64,7 @@ export default function RankPage() {
         const data = await response.json();
         if (!active) return;
         if (data.mock?.title || detail?.mock?.title) setTitle(data.mock?.title || detail.mock.title);
+        setMock(detail?.mock || null);
         setCurrentAttempt(resolveMockAttempt(detail?.mock, cached, candidateEmail));
         if (!response.ok) throw new Error(data.error || "Unable to load rankings");
         setResults(firstAttemptRankings(data));
@@ -61,9 +75,10 @@ export default function RankPage() {
 
     void Promise.all([loadData(), minDelay]).then(() => { if (active) setReady(true); });
     return () => { active = false; };
-  }, [authLoading, id, user?.email]);
+  }, [authLoading, id, user?.email, reloadKey]);
 
   if (!ready) {
+    if (browsing) return <main className="urologics-shell flex min-h-screen items-center justify-center"><GlobalLoading label="Loading leaderboard" /></main>;
     return <ResultsLoader title="Ranking Candidate Performance" />;
   }
 
@@ -88,7 +103,18 @@ export default function RankPage() {
   };
 
   const me = ranked.find(isMe);
-  const hasAttended = Boolean(me || currentAttempt);
+  const hasAttended = Boolean(me || currentAttempt || mock?.hasAttempted);
+  const canStart = Boolean(mock && (
+    mock.accessType === "public" ||
+    (mock.access?.allowed === true && mock.access.mode !== "locked") ||
+    (!mock.access && user)
+  ));
+  const attemptHref = hasAttended
+    ? `/mocks/${id}/result`
+    : !user
+      ? `/public-mocks/${id}`
+      : hasSession ? `/mocks/${id}` : `/mocks/${id}/rules`;
+  const attemptLabel = hasAttended ? "View analysis" : hasSession ? "Resume mock" : "Start mock";
   const [first, second, third] = ranked;
   const podium = [second, first, third]
     .filter((entry): entry is RankedResult => Boolean(entry))
@@ -102,24 +128,42 @@ export default function RankPage() {
 
   return (
     <main className="urologics-shell min-h-screen px-4 py-10">
-      <ConfettiOnLoad />
+      {!browsing && <ConfettiOnLoad />}
       <div className="mx-auto max-w-4xl space-y-6">
         <header className="relative overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--surface-raised)] p-6 shadow-[0_16px_40px_var(--shadow-soft)] sm:p-9">
           <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-[var(--accent-soft)] blur-3xl" />
           <Link href="/mocks" className="relative inline-flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]"><ArrowLeft size={16} />Back to mocks</Link>
           <div className="relative mt-6 flex items-start gap-4">
             <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]"><Trophy size={27} /></div>
-            <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">Leaderboard</p><h1 className="mt-2 break-words text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">{title}</h1><p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">Every first attempt counts. See where you stand.</p></div>
+            <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-strong)]">Leaderboard</p><h1 className="mt-2 break-words text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">{title}</h1><p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">Rankings are based on each candidate’s first attempt.</p></div>
           </div>
           <div className="relative mt-6 flex flex-wrap gap-3 text-xs font-medium text-[var(--text-secondary)]">
-            <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-muted)] px-3 py-2"><Users size={14} />{ranked.length} candidates</span>
+            {!error && <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-muted)] px-3 py-2"><Users size={14} />{ranked.length} candidates</span>}
             <span className="inline-flex items-center gap-2 rounded-full bg-[var(--surface-muted)] px-3 py-2"><Medal size={14} />First attempts only</span>
-            {hasAttended && <a href="#your-rank" className="inline-flex items-center gap-2 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2 text-[var(--accent-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)]">Your rank: {me ? `#${me.rank}` : "not available yet"}</a>}
+            {(me || currentAttempt) && <a href="#your-rank" className="inline-flex items-center gap-2 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2 text-[var(--accent-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)]">Your rank: {me ? `#${me.rank}` : "not available yet"}</a>}
           </div>
         </header>
-        {error && <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
+        {error && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 text-sm text-[var(--text-secondary)]">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() => setReloadKey((key) => key + 1)}
+              className="min-h-11 rounded-lg px-3 font-medium text-[var(--accent-strong)] hover:bg-[var(--accent-soft)] focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
+            >
+              Try again
+            </button>
+          </div>
+        )}
 
-        {hasAttended && (
+        {!hasAttended && !error && canStart && (
+          <section className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-[var(--text-secondary)]">{hasSession ? "Finish your attempt to see your rank." : "Take this mock to see your rank."}</p>
+            <Link href={attemptHref} className="urologics-button-primary shrink-0 text-center">{attemptLabel}</Link>
+          </section>
+        )}
+
+        {(me || currentAttempt) && (
           <YourRankCard
             stats={{
               rank: me?.rank ?? null,
@@ -156,7 +200,7 @@ export default function RankPage() {
           </section>
         )}
 
-        <section className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_16px_40px_var(--shadow-soft)]">
+        {!error && <section className="overflow-hidden rounded-[24px] border border-[var(--border)] bg-[var(--surface-raised)] shadow-[0_16px_40px_var(--shadow-soft)]">
           <div className="border-b border-[var(--border)] px-5 py-3 text-sm font-semibold text-[var(--text-primary)]">
             Candidate rankings
           </div>
@@ -204,17 +248,17 @@ export default function RankPage() {
               ))}
             </tbody>
           </table></div>
-        </section>
+        </section>}
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Link href={`/mocks/${id}/result`} className="urologics-button-primary flex-1 text-center">
-            Review your answers
-          </Link>
+          {hasAttended && <Link href={attemptHref} className="urologics-button-primary flex-1 text-center">
+            View analysis
+          </Link>}
           <Link
             href="/mocks"
             className="flex-1 rounded-full bg-[var(--surface-muted)] px-4 py-3 text-center text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--border)]"
           >
-            Attend another mock
+            Browse mocks
           </Link>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Clock3,
@@ -13,6 +13,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import toast from "react-hot-toast";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -31,6 +32,7 @@ const ENABLE_SAMPLE_MOCKS = false;
 import { SAMPLE_MOCKS, type Mock, type TimestampLike } from "@/data/sample-mocks";
 
 const PRICING_URL = "https://urologics.co.uk/pricing";
+const MOCK_LIST_RETURN_KEY = "urologics-mock-list-return";
 
 const getTimestamp = (value?: string | number | TimestampLike): number => {
   if (typeof value === "object" && value?._seconds) {
@@ -166,7 +168,30 @@ export default function TodayMocksPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedMock, setSelectedMock] = useState<Mock | null>(null);
   const [checkingMockId, setCheckingMockId] = useState<string | null>(null);
+  const returnScroll = useRef<number | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    if (authLoading) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(MOCK_LIST_RETURN_KEY) || "null");
+      sessionStorage.removeItem(MOCK_LIST_RETURN_KEY);
+      if (!saved || saved.candidate !== (user?.email || "")) return;
+      if (typeof saved.search === "string") setSearch(saved.search);
+      if (["all", "grand-mock", "mock", "public", "members"].includes(saved.typeFilter)) setTypeFilter(saved.typeFilter);
+      if (["all", "live", "grand-mock", "mock", "public", "attended"].includes(saved.category)) setSelectedCategory(saved.category);
+      if (Number.isFinite(saved.scrollY)) returnScroll.current = saved.scrollY;
+    } catch { /* Browsing still works when session storage is unavailable. */ }
+  }, [authLoading, user?.email]);
+
+  useEffect(() => {
+    if (loading || returnScroll.current === null) return;
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo(0, returnScroll.current || 0);
+      returnScroll.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [loading]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -581,38 +606,57 @@ export default function TodayMocksPage() {
                        
                       </div>
 
-                      <div className={`mt-5 grid gap-2 ${mock.hasAttempted && isEntitled ? "grid-cols-2" : "grid-cols-1"}`}>
-                        <button
-                          type="button"
-                          className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-2.5 text-xs font-semibold transition sm:text-sm ${
-                            isEntitled
-                              ? "bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
-                              : "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openMock(mock);
-                          }}
-                        >
-                          {isEntitled
-                            ? mock.hasAttempted
-                              ? "Review Answers"
-                              : "Start Mock Session"
-                            : mock.access?.reason || "Locked (Members Only)"}
-                          {!isEntitled ? <LockKeyhole size={16} /> : !mock.hasAttempted ? <ArrowRight size={16} /> : null}
-                        </button>
-                        {mock.hasAttempted && isEntitled && (
+                      <div className="mt-5">
+                        <div className={`grid gap-2 ${mock.hasAttempted && isEntitled ? "grid-cols-2" : "grid-cols-1"}`}>
                           <button
                             type="button"
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--border)] px-3 py-2.5 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--accent-soft)] sm:text-sm"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedMock(mock);
+                            className={`inline-flex w-full items-center justify-center gap-2 rounded-full px-3 py-2.5 text-xs font-semibold transition sm:text-sm ${
+                              isEntitled
+                                ? "bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+                                : "border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openMock(mock);
                             }}
                           >
-                            <TimerReset size={14} aria-hidden="true" />
-                            Reattempt
+                            {isEntitled
+                              ? mock.hasAttempted
+                                ? "Review Answers"
+                                : "Start Mock Session"
+                              : mock.access?.reason || "Locked (Members Only)"}
+                            {!isEntitled ? <LockKeyhole size={16} /> : !mock.hasAttempted ? <ArrowRight size={16} /> : null}
                           </button>
+                          {mock.hasAttempted && isEntitled && (
+                            <button
+                              type="button"
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--border)] px-3 py-2.5 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--accent-soft)] sm:text-sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelectedMock(mock);
+                              }}
+                            >
+                              <TimerReset size={14} aria-hidden="true" />
+                              Reattempt
+                            </button>
+                          )}
+                        </div>
+                        {isEntitled && (
+                          <Link
+                            href={`/mocks/${mock.id}/rank?from=mocks`}
+                            prefetch={false}
+                            aria-label={`View leaderboard for ${mock.title}`}
+                            className="mt-1 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg px-3 text-xs font-medium text-[var(--text-secondary)] transition hover:bg-[var(--surface-muted)] hover:text-[var(--accent-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] sm:text-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              try {
+                                sessionStorage.setItem(MOCK_LIST_RETURN_KEY, JSON.stringify({ candidate: user?.email || "", search, typeFilter, category: selectedCategory, scrollY: window.scrollY }));
+                              } catch { /* Navigation does not depend on storage. */ }
+                            }}
+                          >
+                            <Trophy size={14} aria-hidden="true" />
+                            View leaderboard
+                          </Link>
                         )}
                       </div>
                     </article>
