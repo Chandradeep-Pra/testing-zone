@@ -80,7 +80,7 @@ function getOptionLabel(index: number) {
 export default function Page() {
   const { id } = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const submissionLock = useRef(false);
   const [feedbackRatings, setFeedbackRatings] = useState<MockFeedbackRatings>({ difficulty: 0, experience: 0 });
   const [mock, setMock] = useState<Mock | null>(null);
@@ -218,6 +218,9 @@ export default function Page() {
       } catch {}
 
       try {
+        // Long exams can outlast both the session cookie and the ID token.
+        // Renew authentication and sync the cookie before sending the attempt.
+        await refreshUser();
         const response = await fetch(appPath(`/api/mocks/${id}/attempts`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -282,7 +285,7 @@ export default function Page() {
       }
     }
 
-  }, [answers, feedbackRatings, id, mock, router, timeLeft, user?.name, user?.email, user?.profileImageUrl]);
+  }, [answers, feedbackRatings, id, mock, refreshUser, router, timeLeft, user?.name, user?.email, user?.profileImageUrl]);
 
   useEffect(() => {
     if (!mock || submitting || submissionLock.current) return;
