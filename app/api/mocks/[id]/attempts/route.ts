@@ -10,6 +10,7 @@ type AttemptPayload = {
   correctCount?: number;
   totalQuestions?: number;
   timeTakenSeconds?: number;
+  submissionId?: string;
   name?: string;
   email?: string;
   userImage?: string;
@@ -47,6 +48,8 @@ export async function POST(
               answers: body.answers,
               userImage: body.userImage,
               totalQuestions: body.totalQuestions,
+              timeTakenSeconds: body.timeTakenSeconds,
+              submissionId: body.submissionId,
             }),
             cache: "no-store",
           }

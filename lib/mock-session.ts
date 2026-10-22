@@ -8,6 +8,7 @@ export type CompletedMockAttempt = {
   marks: number;
   totalQuestions: number;
   submittedAt: string;
+  timeTakenSeconds?: number | null;
 };
 
 export function getMockCandidateEmail(userEmail?: string | null): string {
@@ -46,6 +47,7 @@ export type MockAttemptView = {
   totalQuestions: number;
   answers: Record<string, number> | null;
   submittedAt: string | null;
+  timeTakenSeconds?: number | null;
 };
 
 /** Prefer a newer completed run without changing the ranked first-attempt record. */
@@ -75,6 +77,7 @@ export function resolveMockAttempt(mock: unknown, cached: CompletedMockAttempt |
     marks: Number(score),
     totalQuestions: Number(total) || 0,
     submittedAt,
+    timeTakenSeconds: typeof raw?.timeTakenSeconds === "number" && Number.isFinite(raw.timeTakenSeconds) && raw.timeTakenSeconds >= 0 ? raw.timeTakenSeconds : null,
     answers: answers && typeof answers === "object" && !Array.isArray(answers) ? answers as Record<string, number> : null,
   };
 }

@@ -7,6 +7,7 @@ export type MockRankResult = {
   userImage: string | null;
   marks: number;
   maxMarks: number | null;
+  timeTakenSeconds: number | null;
   submittedAt: string | null;
   createdAt: string | null;
   attended: string;
@@ -15,6 +16,23 @@ export type MockRankResult = {
 type Row = Record<string, unknown>;
 const record = (value: unknown): Row => value && typeof value === "object" ? value as Row : {};
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
+
+export function recordedMockTime(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+export function formatMockDuration(seconds: number | null | undefined): string {
+  const value = recordedMockTime(seconds);
+  if (value === null) return "Not recorded";
+  const rounded = Math.floor(value);
+  return `${Math.floor(rounded / 60)}m ${String(rounded % 60).padStart(2, "0")}s`;
+}
+
+function compareCompletionTime(a: Row, b: Row): number {
+  const first = recordedMockTime(a.timeTakenSeconds) ?? Infinity;
+  const second = recordedMockTime(b.timeTakenSeconds) ?? Infinity;
+  return first === second ? 0 : first - second;
+}
 
 // Keep in sync with urocms/lib/server/mockAttempts.ts.
 const HIDDEN_RANK_EMAILS = new Set([
@@ -69,6 +87,7 @@ export function firstAttemptRankings(payload: unknown): MockRankResult[] {
       marks: first.marks ?? first.score,
       submittedAt: first.submittedAt ?? first.createdAt ?? null,
       maxMarks: first.maxMarks ?? first.totalQuestions ?? original.maxMarks ?? original.totalQuestions,
+      timeTakenSeconds: recordedMockTime(first.timeTakenSeconds),
     } : original;
     if (Object.keys(first).length) selectedEmbeddedFirst = true;
     if (row.isFirstAttempt === false || Number(row.attemptNumber) > 1) { excludedReattempts = true; continue; }
@@ -92,6 +111,7 @@ export function firstAttemptRankings(payload: unknown): MockRankResult[] {
     && rows.every((row) => Number.isInteger(row.rank) && Number(row.rank) > 0);
   rows.sort((a, b) => preserveRanks ? Number(a.rank) - Number(b.rank)
     : (Number(b.marks ?? b.score) || 0) - (Number(a.marks ?? a.score) || 0)
+      || compareCompletionTime(a, b)
       || (attemptTime(a) ?? Infinity) - (attemptTime(b) ?? Infinity));
 
   return rows.map((row, index) => {
@@ -106,6 +126,7 @@ export function firstAttemptRankings(payload: unknown): MockRankResult[] {
         candidate.photoURL, row.userImage, row.profileImageUrl, row.photoURL, row.image),
       marks: Number(row.marks ?? row.score) || 0,
       maxMarks: maxMarks !== undefined && maxMarks !== null && Number.isFinite(Number(maxMarks)) ? Number(maxMarks) : null,
+      timeTakenSeconds: recordedMockTime(row.timeTakenSeconds),
       submittedAt,
       createdAt: submittedAt,
       attended: text(row.attended) || formatRelativeAttended(submittedAt),
@@ -119,8 +140,9 @@ export function mockPercentile(marks: number, results: Array<{ marks: number }>)
   return Math.round(results.filter((row) => row.marks < marks).length / results.length * 1000) / 10;
 }
 
-/** Display-only standing against other candidates' first attempts; equal scores share a position. */
-export function mockEffectiveRank(marks: number, otherFirstAttempts: ReadonlyArray<{ marks: number }>): number | null {
+/** Display-only standing using score then duration. Equal score and time share a position. */
+export function mockEffectiveRank(marks: number, otherFirstAttempts: ReadonlyArray<{ marks: number; timeTakenSeconds?: number | null }>, timeTakenSeconds?: number | null): number | null {
   if (!Number.isFinite(marks) || marks < 0) return null;
-  return 1 + otherFirstAttempts.filter((row) => Number.isFinite(row.marks) && row.marks > marks).length;
+  return 1 + otherFirstAttempts.filter((row) => Number.isFinite(row.marks) &&
+    (row.marks > marks || row.marks === marks && compareCompletionTime(row, { timeTakenSeconds }) < 0)).length;
 }

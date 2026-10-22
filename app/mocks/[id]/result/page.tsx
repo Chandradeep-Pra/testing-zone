@@ -186,7 +186,7 @@ function ReviewRankComparison({ ranks }: { ranks: NonNullable<RankComparison> })
         <div><dt className="text-xs text-[var(--text-secondary)]">Official rank</dt><dd className="mt-1 text-xl font-semibold text-[var(--text-primary)]">#{ranks.official}</dd></div>
         <div><dt className="text-xs text-[var(--text-secondary)]">Effective rank</dt><dd className="mt-1 text-xl font-semibold text-[var(--accent-strong)]">#{ranks.effective}</dd></div>
       </dl>
-      <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">Effective rank compares this score with other candidates’ first attempts. Ties share an effective rank. Official rank remains based on your first attempt.</p>
+      <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">Effective rank compares this attempt with other candidates’ first attempts. Faster completion breaks score ties. Official rank remains based on your first attempt.</p>
     </div>
   );
 }
@@ -486,7 +486,7 @@ export default function ResultPage() {
             const rankings = firstAttemptRankings(await rankingsResponse.json());
             const me = rankings.find((row) => row.email === candidateEmail);
             if (active && me) {
-              const effective = mockEffectiveRank(attempt?.marks ?? me.marks, rankings.filter((row) => row.email !== candidateEmail));
+              const effective = mockEffectiveRank(attempt?.marks ?? me.marks, rankings.filter((row) => row.email !== candidateEmail), attempt ? attempt.timeTakenSeconds : me.timeTakenSeconds);
               if (effective !== null) setRanks({ official: me.rank, effective });
             }
           } catch { /* Answer review remains available if the leaderboard is unavailable. */ }

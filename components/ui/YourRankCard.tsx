@@ -1,4 +1,5 @@
 import { Trophy } from "lucide-react";
+import MockCompletionTime from "@/components/ui/MockCompletionTime";
 
 export type YourRankStats = {
   rank: number | null; totalAttendees: number; marks: number; totalQuestions: number;
@@ -7,6 +8,7 @@ export type YourRankStats = {
   firstAttemptTotalQuestions?: number;
   percentile?: number;
   effectiveRank?: number | null;
+  firstAttemptTimeSeconds?: number | null;
 };
 
 export default function YourRankCard({ stats }: { stats: YourRankStats }) {
@@ -28,10 +30,11 @@ export default function YourRankCard({ stats }: { stats: YourRankStats }) {
           <p className="mt-2 text-sm text-[var(--text-secondary)]">of {stats.totalAttendees} candidates</p>
           <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">{stats.rank === null ? "Your attempt is saved. Your rank is not available on this leaderboard yet." : "Rank and percentile use your first attempt."}</p>
           {stats.firstAttemptMarks !== undefined && <p className="mt-1 text-xs font-semibold text-[var(--accent-strong)]">First attempt: {stats.firstAttemptMarks}{stats.firstAttemptTotalQuestions ? ` / ${stats.firstAttemptTotalQuestions}` : ""}</p>}
+          {stats.firstAttemptTimeSeconds !== undefined && <div className="mt-3"><MockCompletionTime seconds={stats.firstAttemptTimeSeconds} /></div>}
         </div>
         <div className="flex flex-col justify-center gap-3 p-5 sm:p-7">
           {items.map((item) => <div key={item.label} className="flex items-center justify-between gap-4 rounded-2xl bg-[var(--surface-muted)] px-4 py-4" title={item.label === "Percentile" ? "Percentage of candidates with a lower first-attempt score. Equal scores share a percentile." : undefined}><span className="text-sm text-[var(--text-secondary)]">{item.label}</span><span className="text-lg font-semibold text-[var(--text-primary)]">{item.value}</span></div>)}
-          {stats.effectiveRank != null && <p className="px-1 text-xs leading-5 text-[var(--text-secondary)]">Effective rank compares this attempt with other candidates’ first-attempt scores. Tied scores share an effective rank; your official rank stays unchanged.</p>}
+          {stats.effectiveRank != null && <p className="px-1 text-xs leading-5 text-[var(--text-secondary)]">Effective rank compares this attempt with other candidates’ first attempts. Higher marks rank first; faster completion breaks score ties. Your official rank uses your first attempt.</p>}
         </div>
       </div>
     </section>

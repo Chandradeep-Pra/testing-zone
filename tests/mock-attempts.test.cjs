@@ -68,6 +68,47 @@ test('already-ranked unique upstream rows preserve authoritative order', () => {
   assert.equal(tied[1].rank, 1);
 });
 
+test('fallback rankings break score ties with first-attempt duration and never treat missing time as zero', () => {
+  const result = ranking.firstAttemptRankings([
+    { email: 'unknown@test', marks: 5, submittedAt: '2026-01-01' },
+    { email: 'slow@test', marks: 5, timeTakenSeconds: 120, submittedAt: '2026-01-01' },
+    { email: 'fast@test', marks: 5, timeTakenSeconds: 60, submittedAt: '2026-01-02' },
+    { email: 'higher@test', marks: 6 },
+  ]);
+  assert.deepEqual(Array.from(result, row => row.email), ['higher@test', 'fast@test', 'slow@test', 'unknown@test']);
+  assert.deepEqual(Array.from(result, row => row.timeTakenSeconds), [null, 60, 120, null]);
+});
+
+test('embedded first attempts never inherit the duration of a later retake', () => {
+  const result = ranking.firstAttemptRankings([{ email: 'one@test', marks: 10, timeTakenSeconds: 1, firstAttempt: { marks: 5 } }]);
+  assert.equal(result[0].timeTakenSeconds, null);
+  assert.equal(result[0].marks, 5);
+});
+
+test('duration labels and effective standings use the same faster-finish rule', () => {
+  assert.equal(ranking.formatMockDuration(125), '2m 05s');
+  assert.equal(ranking.formatMockDuration(0), '0m 00s');
+  assert.equal(ranking.formatMockDuration(null), 'Not recorded');
+  assert.equal(ranking.formatMockDuration(-1), 'Not recorded');
+  const others = [{ marks: 10, timeTakenSeconds: 200 }, { marks: 5, timeTakenSeconds: 60 }, { marks: 5, timeTakenSeconds: 120 }];
+  assert.equal(ranking.mockEffectiveRank(5, others, 90), 3);
+  assert.equal(ranking.mockEffectiveRank(5, others, 60), 2);
+  assert.equal(ranking.mockEffectiveRank(5, others, null), 4);
+});
+
+test('public submission proxy forwards timing and a stable submission ID', async () => {
+  let forwarded;
+  const route = load('app/api/mocks/[id]/attempts/route.ts', {
+    fetch: async (_, options) => { forwarded = JSON.parse(options.body); return new Response(JSON.stringify({ success: true }), { status: 200 }); },
+  }, {
+    'next/server': { NextResponse: { json: (body, options) => ({ body, ...options }) } },
+    '@/lib/urologics-api': { getUrologicsApiUrl: value => value },
+  });
+  await route.POST({ cookies: { get: () => undefined }, json: async () => ({ name: 'Candidate', email: 'candidate@example.test', marks: 5, totalQuestions: 10, timeTakenSeconds: 90, submissionId: 'run-one' }) }, { params: Promise.resolve({ id: 'one' }) });
+  assert.equal(forwarded.timeTakenSeconds, 90);
+  assert.equal(forwarded.submissionId, 'run-one');
+});
+
 test('percentile counts lower first-attempt scores and gives equal scores equal values', () => {
   const scores = [{ marks: 10 }, { marks: 8 }, { marks: 8 }, { marks: 0 }];
   assert.equal(ranking.mockPercentile(8, scores), 25);

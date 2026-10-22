@@ -196,6 +196,7 @@ export default function Page() {
       const total = mock.questions.length;
       const marks = Math.max(0, Math.min(correct, total));
       const wrong = Math.max(0, total - correct - skipped);
+      const timeTakenSeconds = Math.max(0, (mock.durationMinutes * 60) - timeLeft);
 
       const runId =
         localStorage.getItem(`mock-${id}-run-id`) ||
@@ -229,7 +230,8 @@ export default function Page() {
             answers,
             correctCount: marks,
             totalQuestions: total,
-            timeTakenSeconds: (mock.durationMinutes * 60) - timeLeft,
+            timeTakenSeconds,
+            submissionId: runId,
             name: candidateName,
             email: candidateEmail,
             userImage: candidateImage,
@@ -254,6 +256,7 @@ export default function Page() {
           marks,
           totalQuestions: total,
           submittedAt: new Date().toISOString(),
+          timeTakenSeconds,
         });
         if (feedbackRatings.difficulty > 0 && feedbackRatings.experience > 0) {
           try {
