@@ -5,11 +5,17 @@
 export type CompletedMockAttempt = {
   candidateEmail: string;
   answers: Record<string, number>;
+  flaggedQuestionIds?: string[];
   marks: number;
   totalQuestions: number;
   submittedAt: string;
   timeTakenSeconds?: number | null;
 };
+
+function normalizeFlaggedQuestionIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)));
+}
 
 export function getMockCandidateEmail(userEmail?: string | null): string {
   if (userEmail?.trim()) return userEmail.trim().toLowerCase();
@@ -38,7 +44,7 @@ export function readCompletedMockAttempt(id: string, candidateEmail: string): Co
     if (attempt.candidateEmail !== email || !Number.isFinite(attempt.marks) || !Number.isInteger(attempt.totalQuestions)
       || attempt.totalQuestions <= 0 || attempt.marks < 0 || attempt.marks > attempt.totalQuestions
       || !Number.isFinite(Date.parse(attempt.submittedAt)) || !attempt.answers || typeof attempt.answers !== "object" || Array.isArray(attempt.answers)) return null;
-    return attempt;
+    return { ...attempt, flaggedQuestionIds: normalizeFlaggedQuestionIds(attempt.flaggedQuestionIds) };
   } catch { return null; }
 }
 
@@ -46,6 +52,7 @@ export type MockAttemptView = {
   marks: number;
   totalQuestions: number;
   answers: Record<string, number> | null;
+  flaggedQuestionIds?: string[];
   submittedAt: string | null;
   timeTakenSeconds?: number | null;
 };
@@ -79,6 +86,7 @@ export function resolveMockAttempt(mock: unknown, cached: CompletedMockAttempt |
     submittedAt,
     timeTakenSeconds: typeof raw?.timeTakenSeconds === "number" && Number.isFinite(raw.timeTakenSeconds) && raw.timeTakenSeconds >= 0 ? raw.timeTakenSeconds : null,
     answers: answers && typeof answers === "object" && !Array.isArray(answers) ? answers as Record<string, number> : null,
+    flaggedQuestionIds: normalizeFlaggedQuestionIds(raw?.flaggedQuestionIds),
   };
 }
 

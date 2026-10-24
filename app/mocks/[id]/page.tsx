@@ -253,6 +253,7 @@ export default function Page() {
         saveCompletedMockAttempt(String(id), {
           candidateEmail: getMockCandidateEmail(user?.email || candidateEmail),
           answers,
+          flaggedQuestionIds: Object.keys(flagged),
           marks,
           totalQuestions: total,
           submittedAt: new Date().toISOString(),
@@ -288,7 +289,7 @@ export default function Page() {
       }
     }
 
-  }, [answers, feedbackRatings, id, mock, refreshUser, router, timeLeft, user?.name, user?.email, user?.profileImageUrl]);
+  }, [answers, feedbackRatings, flagged, id, mock, refreshUser, router, timeLeft, user?.name, user?.email, user?.profileImageUrl]);
 
   useEffect(() => {
     if (!mock || submitting || submissionLock.current) return;

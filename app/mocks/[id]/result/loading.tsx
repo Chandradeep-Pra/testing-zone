@@ -20,7 +20,10 @@ function QuestionNavigationSkeleton() {
           <div key={index} className="h-11 w-11 shrink-0 animate-pulse rounded-full border border-[var(--border)] bg-[var(--surface-muted)]" />
         ))}
       </div>
-      <div className="h-10 w-16 shrink-0 animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-muted)]" />
+      <div className="flex shrink-0 gap-2">
+        <div className="h-10 w-16 animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-muted)]" />
+        <div className="h-10 w-12 animate-pulse rounded-xl border border-[var(--border)] bg-[var(--surface-muted)]" />
+      </div>
     </div>
   );
 }

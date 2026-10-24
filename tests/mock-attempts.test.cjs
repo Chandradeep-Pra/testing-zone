@@ -189,6 +189,21 @@ test('latest completed score is account-scoped and survives a fresh session', ()
   assert.equal(api.readCompletedMockAttempt('one', 'a@test').marks, 0);
 });
 
+test('completed attempts retain sanitized flagged questions locally', () => {
+  const { api } = session();
+  api.saveCompletedMockAttempt('one', {
+    candidateEmail: 'a@test',
+    marks: 1,
+    totalQuestions: 3,
+    answers: { q1: 0 },
+    flaggedQuestionIds: ['q2', 'q2', '', 'q3'],
+    submittedAt: '2026-10-15',
+  });
+  const attempt = api.readCompletedMockAttempt('one', 'a@test');
+  assert.deepEqual(Array.from(attempt.flaggedQuestionIds), ['q2', 'q3']);
+  assert.deepEqual(Array.from(api.resolveMockAttempt({ questions: [1, 2, 3] }, attempt).flaggedQuestionIds), ['q2', 'q3']);
+});
+
 test('latest local completion wins over first attempt; newer server completion wins over cache', () => {
   const { api } = session();
   const cached = { candidateEmail: 'a@test', marks: 2, totalQuestions: 2, answers: { q1: 0, q2: 0 }, submittedAt: '2026-10-15' };

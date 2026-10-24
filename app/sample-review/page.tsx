@@ -21,7 +21,8 @@ const answers = Object.fromEntries(questions.flatMap((question, index) =>
 ));
 const mock: MockDetail = { title: "FRCS Urology Grand Mock", accessType: "public", questions };
 const score = questions.filter((question) => answers[question.id] === question.correctAnswer).length;
+const flaggedQuestionIds = [4, 9, 18, 27, 42, 60].map((questionNumber) => `sample-question-${questionNumber}`);
 
 export default function SampleReviewPage() {
-  return <ReviewAnswers mock={mock} answers={answers} hasSavedAnswers score={score} ranks={{ official: 12, effective: 9 }} />;
+  return <ReviewAnswers mock={mock} answers={answers} flaggedQuestionIds={flaggedQuestionIds} hasSavedAnswers score={score} ranks={{ official: 12, effective: 9 }} />;
 }

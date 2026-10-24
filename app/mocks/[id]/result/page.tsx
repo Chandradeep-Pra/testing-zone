@@ -59,6 +59,7 @@ export default function ResultPage() {
   const { user, loading: authLoading } = useAuth();
   const [mock, setMock] = useState<MockDetail | null>(null);
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [flaggedQuestionIds, setFlaggedQuestionIds] = useState<string[]>([]);
   const [hasSavedAnswers, setHasSavedAnswers] = useState(false);
   const [recordedScore, setRecordedScore] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -79,6 +80,7 @@ export default function ResultPage() {
         const candidateEmail = getMockCandidateEmail(user?.email);
         const attempt = resolveMockAttempt(data.mock, readCompletedMockAttempt(id, candidateEmail), candidateEmail);
         setRecordedScore(attempt?.marks ?? null);
+        setFlaggedQuestionIds(attempt?.flaggedQuestionIds ?? []);
         const parsed = attempt?.answers;
         setAnswers({});
         setHasSavedAnswers(false);
@@ -131,5 +133,5 @@ export default function ResultPage() {
     return <main className="urologics-shell min-h-screen p-8 text-center text-[var(--text-secondary)]">{error || "Loading answer review..."}</main>;
   }
 
-  return <ReviewAnswers mock={mock} answers={answers} hasSavedAnswers={hasSavedAnswers} score={recordedScore ?? score} ranks={ranks} />;
+  return <ReviewAnswers mock={mock} answers={answers} flaggedQuestionIds={flaggedQuestionIds} hasSavedAnswers={hasSavedAnswers} score={recordedScore ?? score} ranks={ranks} />;
 }

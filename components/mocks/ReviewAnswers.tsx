@@ -1,6 +1,6 @@
 "use client";
 
-import { Trophy } from "lucide-react";
+import { Flag, Trophy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import UrologicsBrand from "@/components/brand/UrologicsBrand";
 
@@ -35,9 +35,10 @@ function getReviewStatus(question: MockQuestion, selectedIndex: number | undefin
   return selectedIndex === question.correctAnswer ? "correct" : "incorrect";
 }
 
-function QuestionReviewNavigation({ questions, answers, hasSavedAnswers, activeQuestion, onSelect }: {
+function QuestionReviewNavigation({ questions, answers, flaggedQuestionIds, hasSavedAnswers, activeQuestion, onSelect }: {
   questions: MockQuestion[];
   answers: Record<string, number>;
+  flaggedQuestionIds: string[];
   hasSavedAnswers: boolean;
   activeQuestion: number;
   onSelect: (questionNumber: number) => void;
@@ -45,6 +46,8 @@ function QuestionReviewNavigation({ questions, answers, hasSavedAnswers, activeQ
   const numberList = useRef<HTMLDivElement>(null);
   const jumpTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [jumpValue, setJumpValue] = useState("");
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
+  const flaggedQuestions = new Set(flaggedQuestionIds);
   const parsedJump = Number(jumpValue);
   const jumpInvalid = jumpValue !== "" && (!Number.isInteger(parsedJump) || parsedJump < 1 || parsedJump > questions.length);
 
@@ -57,7 +60,7 @@ function QuestionReviewNavigation({ questions, answers, hasSavedAnswers, activeQ
     if (buttonBounds.left < listBounds.left || buttonBounds.right > listBounds.right) {
       list.scrollLeft += buttonBounds.left - listBounds.left - (list.clientWidth - buttonBounds.width) / 2;
     }
-  }, [activeQuestion]);
+  }, [activeQuestion, flaggedOnly]);
 
   useEffect(() => () => {
     if (jumpTimer.current) clearTimeout(jumpTimer.current);
@@ -67,20 +70,22 @@ function QuestionReviewNavigation({ questions, answers, hasSavedAnswers, activeQ
 
   const selectQuestion = (questionNumber: number) => {
     if (questionNumber < 1 || questionNumber > questions.length) return;
+    if (flaggedOnly && !flaggedQuestions.has(questions[questionNumber - 1].id)) setFlaggedOnly(false);
     onSelect(questionNumber);
     window.history.replaceState(window.history.state, "", `#review-question-${questionNumber}`);
   };
 
-  const questionButtons = questions.map((question, index) => {
+  const questionButtons = questions.map((question, index) => ({ question, index })).filter(({ question }) => !flaggedOnly || flaggedQuestions.has(question.id)).map(({ question, index }) => {
     const status = getReviewStatus(question, answers[question.id], hasSavedAnswers);
+    const isFlagged = flaggedQuestions.has(question.id);
     return (
       <button
         type="button"
         key={question.id}
-        aria-label={`Question ${index + 1}: ${status === "unavailable" ? "answer unavailable" : status}`}
+        aria-label={`Question ${index + 1}: ${status === "unavailable" ? "answer unavailable" : status}${isFlagged ? ", flagged" : ""}`}
         aria-current={activeQuestion === index + 1 ? "location" : undefined}
         onClick={() => selectQuestion(index + 1)}
-        className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm font-semibold tabular-nums transition-[box-shadow,transform] hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)] motion-reduce:transform-none motion-reduce:transition-none ${activeQuestion === index + 1 ? "ring-2 ring-[var(--accent-strong)] ring-offset-2 ring-offset-[var(--surface-raised)]" : ""} ${
+        className={`relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm font-semibold tabular-nums transition-[box-shadow,transform] hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)] motion-reduce:transform-none motion-reduce:transition-none ${activeQuestion === index + 1 ? "ring-2 ring-[var(--accent-strong)] ring-offset-2 ring-offset-[var(--surface-raised)]" : ""} ${
           status === "correct"
             ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200"
             : status === "incorrect"
@@ -89,6 +94,7 @@ function QuestionReviewNavigation({ questions, answers, hasSavedAnswers, activeQ
         }`}
       >
         {index + 1}
+        {isFlagged && <Flag size={10} fill="currentColor" className="absolute right-0.5 top-0.5 text-amber-500" aria-hidden="true" />}
       </button>
     );
   });
@@ -96,37 +102,59 @@ function QuestionReviewNavigation({ questions, answers, hasSavedAnswers, activeQ
   return (
     <nav aria-label="Review question navigation" className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-2 shadow-[0_2px_8px_var(--shadow-soft)]">
       <div ref={numberList} className="urologics-minimal-scrollbar flex min-w-0 gap-2 overflow-x-auto overscroll-x-contain p-1 [&::-webkit-scrollbar]:h-1">
-        {questionButtons}
+        {questionButtons.length > 0 ? questionButtons : (
+          <span className="flex h-11 items-center px-2 text-sm text-[var(--text-secondary)]">No flagged questions</span>
+        )}
       </div>
-      <label className="relative flex shrink-0 items-center gap-2 border-l border-[var(--border)] pl-3 text-xs font-medium text-[var(--text-secondary)]">
-        <span className="hidden sm:inline">Jump to</span>
-        <span className="sr-only sm:hidden">Jump to question</span>
-        <input
-          value={jumpValue}
-          onChange={(event) => {
-            const value = event.target.value.replace(/\D/g, "").slice(0, String(questions.length).length);
-            setJumpValue(value);
-            if (jumpTimer.current) clearTimeout(jumpTimer.current);
-            const questionNumber = Number(value);
-            if (value && questionNumber >= 1 && questionNumber <= questions.length) {
-              jumpTimer.current = setTimeout(() => selectQuestion(questionNumber), 150);
+      <div className="flex shrink-0 items-center gap-2 border-l border-[var(--border)] pl-3">
+        <label className="relative flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
+          <span className="hidden sm:inline">Jump to</span>
+          <span className="sr-only sm:hidden">Jump to question</span>
+          <input
+            value={jumpValue}
+            onChange={(event) => {
+              const value = event.target.value.replace(/\D/g, "").slice(0, String(questions.length).length);
+              setJumpValue(value);
+              if (jumpTimer.current) clearTimeout(jumpTimer.current);
+              const questionNumber = Number(value);
+              if (value && questionNumber >= 1 && questionNumber <= questions.length) {
+                jumpTimer.current = setTimeout(() => selectQuestion(questionNumber), 150);
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              if (jumpTimer.current) clearTimeout(jumpTimer.current);
+              if (!jumpInvalid && jumpValue) selectQuestion(parsedJump);
+            }}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            aria-label={`Jump to question, 1 to ${questions.length}`}
+            aria-invalid={jumpInvalid}
+            aria-describedby="review-jump-range"
+            placeholder="#"
+            className={`h-10 w-12 rounded-xl border bg-[var(--surface)] px-2 text-center text-sm font-semibold tabular-nums text-[var(--text-primary)] outline-none transition-[border-color,box-shadow] focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--focus)] ${jumpInvalid ? "border-red-400" : "border-[var(--border)]"}`}
+          />
+          <span id="review-jump-range" className={`absolute right-0 top-full mt-1 whitespace-nowrap text-[10px] text-red-600 dark:text-red-300 ${jumpInvalid ? "block" : "hidden"}`}>1–{questions.length}</span>
+        </label>
+        <button
+          type="button"
+          aria-label={flaggedOnly ? "Show all question numbers" : `Show ${flaggedQuestionIds.length} flagged question numbers`}
+          aria-pressed={flaggedOnly}
+          title={flaggedOnly ? "Show all questions" : "Show flagged questions"}
+          onClick={() => {
+            const nextFlaggedOnly = !flaggedOnly;
+            setFlaggedOnly(nextFlaggedOnly);
+            if (nextFlaggedOnly) {
+              const firstFlaggedIndex = questions.findIndex((question) => flaggedQuestions.has(question.id));
+              if (firstFlaggedIndex >= 0) selectQuestion(firstFlaggedIndex + 1);
             }
           }}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            if (jumpTimer.current) clearTimeout(jumpTimer.current);
-            if (!jumpInvalid && jumpValue) selectQuestion(parsedJump);
-          }}
-          inputMode="numeric"
-          pattern="[0-9]*"
-          aria-label={`Jump to question, 1 to ${questions.length}`}
-          aria-invalid={jumpInvalid}
-          aria-describedby="review-jump-range"
-          placeholder="#"
-          className={`h-10 w-12 rounded-xl border bg-[var(--surface)] px-2 text-center text-sm font-semibold tabular-nums text-[var(--text-primary)] outline-none transition-[border-color,box-shadow] focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--focus)] ${jumpInvalid ? "border-red-400" : "border-[var(--border)]"}`}
-        />
-        <span id="review-jump-range" className={`absolute right-0 top-full mt-1 whitespace-nowrap text-[10px] text-red-600 dark:text-red-300 ${jumpInvalid ? "block" : "hidden"}`}>1–{questions.length}</span>
-      </label>
+          className={`inline-flex h-10 min-w-10 items-center justify-center gap-1 rounded-xl border px-2 text-xs font-semibold tabular-nums transition-[background-color,border-color,color,transform] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 motion-reduce:transform-none motion-reduce:transition-none ${flaggedOnly ? "border-amber-500 bg-amber-400 text-amber-950 shadow-sm dark:border-amber-400 dark:bg-amber-400 dark:text-amber-950" : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:border-amber-300 hover:text-amber-700 dark:hover:text-amber-300"}`}
+        >
+          <Flag size={15} fill={flaggedOnly ? "currentColor" : "none"} aria-hidden="true" />
+          <span>{flaggedQuestionIds.length}</span>
+        </button>
+      </div>
     </nav>
   );
 }
@@ -342,12 +370,14 @@ function QuestionReviewCard({
   index,
   selectedIndex,
   hasSavedAnswers,
+  isFlagged,
   onPreview,
 }: {
   question: MockQuestion;
   index: number;
   selectedIndex: number | undefined;
   hasSavedAnswers: boolean;
+  isFlagged: boolean;
   onPreview: ImagePreviewHandler;
 }) {
   const correctIndex = question.correctAnswer;
@@ -376,10 +406,18 @@ function QuestionReviewCard({
       }`}
     >
       <div className="min-w-0 [overflow-wrap:anywhere]">
-        <h2 id={`review-question-heading-${index + 1}`} className="text-base font-semibold leading-7 text-[var(--text-primary)] sm:text-lg sm:leading-8">
-          {index + 1}. {question.questionText}
-          <span className="sr-only"> — {status === "unavailable" ? "Your answer is unavailable" : status}</span>
-        </h2>
+        <div className="flex items-start gap-3">
+          <h2 id={`review-question-heading-${index + 1}`} className="min-w-0 flex-1 text-base font-semibold leading-7 text-[var(--text-primary)] sm:text-lg sm:leading-8">
+            {index + 1}. {question.questionText}
+            <span className="sr-only"> — {status === "unavailable" ? "Your answer is unavailable" : status}{isFlagged ? ", flagged during test" : ""}</span>
+          </h2>
+          {isFlagged && (
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:border-amber-400/50 dark:bg-amber-400/10 dark:text-amber-200">
+              <Flag size={13} fill="currentColor" aria-hidden="true" />
+              <span className="hidden sm:inline">Flagged</span>
+            </span>
+          )}
+        </div>
 
         {question.questionImage && <QuestionImage src={question.questionImage} onPreview={onPreview} />}
 
@@ -399,9 +437,10 @@ function QuestionReviewCard({
   );
 }
 
-export default function ReviewAnswers({ mock, answers, hasSavedAnswers, score, ranks }: {
+export default function ReviewAnswers({ mock, answers, flaggedQuestionIds = [], hasSavedAnswers, score, ranks }: {
   mock: MockDetail;
   answers: Record<string, number>;
+  flaggedQuestionIds?: string[];
   hasSavedAnswers: boolean;
   score: number;
   ranks: RankComparison;
@@ -414,6 +453,7 @@ export default function ReviewAnswers({ mock, answers, hasSavedAnswers, score, r
   const animationFrame = useRef<number | null>(null);
   const questionViewport = useRef<HTMLDivElement>(null);
   const total = mock.questions.length;
+  const flaggedQuestions = new Set(flaggedQuestionIds);
 
   const selectQuestion = (questionNumber: number) => {
     if (questionNumber < 1 || questionNumber > total || questionNumber === activeQuestion) return;
@@ -453,6 +493,7 @@ export default function ReviewAnswers({ mock, answers, hasSavedAnswers, score, r
           <QuestionReviewNavigation
             questions={mock.questions}
             answers={answers}
+            flaggedQuestionIds={flaggedQuestionIds}
             hasSavedAnswers={hasSavedAnswers}
             activeQuestion={activeQuestion}
             onSelect={selectQuestion}
@@ -471,6 +512,7 @@ export default function ReviewAnswers({ mock, answers, hasSavedAnswers, score, r
                   index={displayedQuestion - 1}
                   selectedIndex={answers[displayed.id]}
                   hasSavedAnswers={hasSavedAnswers}
+                  isFlagged={flaggedQuestions.has(displayed.id)}
                   onPreview={setPreview}
                 />
               </section>
