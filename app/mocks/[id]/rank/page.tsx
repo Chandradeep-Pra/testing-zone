@@ -260,7 +260,7 @@ export default function RankPage() {
 
         <div className="flex flex-col gap-3 sm:flex-row">
           {hasAttended && <Link href={attemptHref} className="urologics-button-primary flex-1 text-center">
-            View analysis
+            Review answers
           </Link>}
           <Link
             href="/mocks"
