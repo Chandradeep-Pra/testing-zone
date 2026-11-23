@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, ChevronDown, Clock3, Layers3, RefreshCw, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, Layers3, RefreshCw, ShieldCheck } from "lucide-react";
 import UrologicsHeader from "@/components/brand/UrologicsHeader";
 import type { PricingPlan, PricingPlanVersion, PricingResponse } from "@/components/pricing/types";
 import { appPath } from "@/lib/app-path";
+import { PricingCardLayout, SynchronizedPricingGrid } from "@/components/pricing/SynchronizedPricingGrid";
+import { cleanPricingFeatures, cleanPricingText, formatPricingDuration, formatPricingPlanName } from "@/lib/pricingDisplay";
 
 const money = (value: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: value % 1 ? 2 : 0 }).format(value);
 
@@ -18,53 +20,47 @@ function PlanCard({ plan }: { plan: PricingPlan }) {
   const active = versions.find((version) => version.id === activeId) || versions[0];
   const basePrice = active.price;
   const originalPrice = active.price;
+  const displayName = formatPricingPlanName(plan.name);
+  const featureLines = cleanPricingFeatures(plan.featureBullets.map((text) => ({ text })));
 
   function checkout() {
     window.location.assign(appPath(`/checkout?planId=${encodeURIComponent(plan.id)}&versionId=${encodeURIComponent(active.id)}`));
   }
 
   return (
-    <article className="relative flex h-full overflow-hidden rounded-[28px] border border-[#0f7896]/12 bg-white p-5 shadow-[0_16px_44px_rgba(15,120,150,0.08)] sm:p-7">
-      <div className="absolute inset-x-0 top-0 h-1 bg-[#0f7896]" />
-      <div className="flex min-h-0 w-full flex-col gap-4">
-        <div className="flex min-h-0 min-w-0 flex-col">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+    <PricingCardLayout
+      id={plan.id}
+      name={displayName}
+      className="rounded-[28px] border border-[#0f7896]/12 bg-white px-5 py-4 shadow-[0_16px_44px_rgba(15,120,150,0.08)] sm:px-7 sm:py-5"
+      disabled={!plan.isActive}
+      header={<><div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="flex flex-wrap items-center gap-2">
+              {plan.tag || !plan.isActive ? <div className="flex flex-wrap items-center gap-2">
                 
-                {plan.tag ? <span className="rounded-full bg-[#0f7896]/10 px-3 py-1 text-xs font-semibold text-[#0f7896]">{plan.tag}</span> : null}
+                {plan.tag ? <span className="rounded-full bg-[#0f7896]/10 px-3 py-1 text-xs font-semibold text-[#0f7896]">{cleanPricingText(plan.tag)}</span> : null}
                 {!plan.isActive ? <span className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-600">Coming soon</span> : null}
-              </div>
-              <h3 className="mt-4 text-2xl font-bold tracking-[-0.04em] text-[#071014]">{plan.name}</h3>
+              </div> : null}
+              <h3 className={`${plan.tag || !plan.isActive ? "mt-2" : ""} text-2xl font-bold tracking-[-0.04em] text-[#071014]`}>{displayName}</h3>
             </div>
-            {plan.availabilityNote ? <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">{plan.availabilityNote}</span> : null}
+            {plan.availabilityNote ? <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">{cleanPricingText(plan.availabilityNote)}</span> : null}
           </div>
-          <p className="mt-4 text-sm leading-7 text-[#071014]/60">{plan.description || "A focused Urologics learning plan built for your exam preparation."}</p>
-          <div className="mt-6 space-y-3">
-            {plan.featureBullets.map((feature) => <div key={feature} className="flex items-start gap-3 border-b border-[#0f7896]/8 pb-3 text-sm leading-6 text-[#071014]/72"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><span>{feature}</span></div>)}
-            {!plan.featureBullets.length ? <p className="rounded-2xl border border-dashed border-[#0f7896]/15 bg-cyan-50 p-4 text-sm text-[#071014]/55">Custom access bundle</p> : null}
-          </div>
-        </div>
-
-        <aside className="mt-auto border-t border-[#0f7896]/10 pt-4">
+          <p className="mt-2 text-sm leading-7 text-[#071014]/60">{cleanPricingText(plan.description) || "A focused Urologics learning plan built for your exam preparation."}</p></>}
+      features={<>{featureLines.map((feature) => <div key={feature.text} className="flex items-start gap-3 border-b border-[#0f7896]/8 pb-2 text-sm leading-6 text-[#071014]/72"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" /><span>{feature.text}</span></div>)}
+            {!featureLines.length ? <p className="rounded-2xl border border-dashed border-[#0f7896]/15 bg-cyan-50 p-4 text-sm text-[#071014]/55">Custom access bundle</p> : null}</>}
+      footer={<aside className="border-t border-[#0f7896]/10 pt-2">
           <div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0f7896]">Choose duration</p><p className="text-xs text-[#071014]/50">{versions.length} option{versions.length === 1 ? "" : "s"}</p></div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {versions.map((version) => <button key={version.id} type="button" disabled={!plan.isActive} onClick={() => setActiveId(version.id)} className={`min-h-10 rounded-full border px-3 py-2 text-sm font-medium transition ${version.id === active.id ? "border-[#0f7896] bg-[#0f7896] text-white shadow-[0_6px_16px_rgba(15,120,150,.18)]" : "border-[#0f7896]/15 bg-[#f8fdff] text-[#0f7896] hover:border-[#0f7896]/40"}`}>{version.durationLabel || `${version.months} months`}</button>)}
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {versions.map((version) => <button key={version.id} type="button" disabled={!plan.isActive} onClick={() => setActiveId(version.id)} className={`min-h-10 rounded-full border px-3 py-2 text-sm font-medium transition ${version.id === active.id ? "border-[#0f7896] bg-[#0f7896] text-white shadow-[0_6px_16px_rgba(15,120,150,.18)]" : "border-[#0f7896]/15 bg-[#f8fdff] text-[#0f7896] hover:border-[#0f7896]/40"}`}>{formatPricingDuration(version.durationLabel, version.months)}</button>)}
           </div>
-          <div className="mt-3 border-l-2 border-[#0f7896] bg-cyan-50 px-3 py-2 text-xs text-[#071014]/62">
-            <p className="flex items-center gap-2 font-medium text-[#0f7896]"><Clock3 className="h-4 w-4" />{active.durationLabel || `Valid for ${active.months} months`}</p>
-            {(active.billingLabel || plan.billingLabel) ? <p className="mt-2">{active.billingLabel || plan.billingLabel}</p> : null}
-            {plan.vivaMinutes ? <p className="mt-2">Includes {plan.vivaMinutes} AI viva minutes</p> : null}
-          </div>
-          <div className="mt-3 border-t border-[#0f7896]/10 pt-3">
+          {plan.vivaMinutes ? <p className="mt-2 text-xs text-[#071014]/60">Includes {plan.vivaMinutes} AI viva minutes</p> : null}
+          <div className="mt-2 border-t border-[#0f7896]/10 pt-2">
             {basePrice < originalPrice ? <p className="text-sm text-[#071014]/45 line-through decoration-2 decoration-orange-500">{money(originalPrice)}</p> : null}
             <div className="mt-1 flex items-end justify-between gap-3"><p className="text-3xl font-semibold tracking-[-0.04em] text-[#071014]">{money(basePrice)}</p>{originalPrice > basePrice ? <span className="text-xs font-semibold text-emerald-700">Save {money(originalPrice - basePrice)}</span> : null}</div>
-            <button type="button" onClick={checkout} disabled={!plan.isActive} className="group mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-[#0f7896] px-5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(15,120,150,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#0b647d] hover:shadow-[0_10px_24px_rgba(15,120,150,0.3)] active:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none disabled:hover:translate-y-0">{plan.isActive ? "Continue to payment" : "Coming soon"}{plan.isActive ? <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" /> : null}</button>
+            <button type="button" onClick={checkout} disabled={!plan.isActive} className="group mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-[#0f7896] px-5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(15,120,150,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#0b647d] hover:shadow-[0_10px_24px_rgba(15,120,150,0.3)] active:translate-y-0 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none disabled:hover:translate-y-0">{plan.isActive ? "Continue to payment" : "Coming soon"}{plan.isActive ? <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" /> : null}</button>
             <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[10px] text-[#071014]/45"><ShieldCheck className="h-3 w-3" />Secure checkout · Access starts after payment</p>
           </div>
-        </aside>
-      </div>
-    </article>
+        </aside>}
+    />
   );
 }
 
@@ -109,11 +105,11 @@ export default function PlansPage() {
     <main className="pricing-experience min-h-screen overflow-x-hidden bg-cyan-50 text-[#071014]">
       <div className="mx-auto w-full max-w-[1400px] px-3 pb-16 sm:px-6 lg:px-8">
         <UrologicsHeader current="Plans" product="Plans" tag="Membership & access" />
-        <header className="mb-10 mt-10 max-w-4xl sm:mb-14"><p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0f7896]">Plans & payment</p><h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[#071014] sm:text-6xl">Simple plans for serious FRCS preparation.</h1><p className="mt-5 max-w-2xl text-base leading-7 text-[#071014]/60">Choose the access that fits your preparation, apply an eligible offer, and continue to secure payment.</p></header>
+        <header className="mb-10 mt-10 max-w-4xl sm:mb-14"><p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0f7896]">Plans & Pricing</p><h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[#071014] sm:text-6xl">Urologics FRCS Plans</h1><p className="mt-5 max-w-2xl text-base leading-7 text-[#071014]/60">Choose the access that fits your preparation, apply an eligible offer, and continue to secure payment.</p></header>
         {loading ? <div className="space-y-5" aria-label="Loading pricing plans">{[0, 1, 2].map((item) => <div key={item} className="h-32 animate-pulse rounded-[28px] border border-[#0f7896]/10 bg-white" />)}</div>
         : error ? <div className="mx-auto max-w-xl rounded-[28px] border border-rose-200 bg-white p-8 text-center"><p className="font-semibold text-rose-700">Plans could not be loaded</p><p className="mt-2 text-sm text-rose-600">{error}</p><button type="button" onClick={() => void loadPlans()} className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#0f7896] px-5 py-3 text-sm font-semibold text-white"><RefreshCw className="h-4 w-4" />Try again</button></div>
         : groups.length === 0 ? <div className="rounded-[28px] border border-[#0f7896]/12 bg-white p-10 text-center text-[#071014]/60">No plans are available right now. Please check back soon.</div>
-        : <div className="space-y-6">{groups.map(([category, plans]) => { const open = openCategories.includes(category); return <section key={category} className="overflow-hidden rounded-[32px] border border-[#0f7896]/12 bg-white shadow-[0_18px_50px_rgba(15,120,150,0.08)]"><button type="button" aria-expanded={open} onClick={() => setOpenCategories((current) => open ? current.filter((item) => item !== category) : [...current, category])} className="relative z-10 flex w-full items-center justify-between gap-5 bg-gradient-to-r from-white via-cyan-50/70 to-white px-5 py-6 text-left hover:bg-cyan-50 sm:px-7"><div className="flex min-w-0 items-center gap-4"><span className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl bg-[#0f7896] text-white shadow-[0_10px_24px_rgba(15,120,150,.22)]"><Layers3 className="h-6 w-6" /></span><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#0f7896]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7896]">Category</span><span className="text-xs text-[#071014]/50">{plans.length} plan{plans.length === 1 ? "" : "s"}</span></div><h2 className="mt-2 text-xl font-bold tracking-[-0.03em] sm:text-2xl">{category}</h2></div></div><span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#0f7896]/12 bg-white text-[#0f7896] transition-transform duration-300 ${open ? "rotate-180" : ""}`}><ChevronDown className="h-5 w-5" /></span></button><div className={`grid transition-[grid-template-rows,opacity] duration-500 ease-in-out ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}><div className="min-h-0 overflow-hidden"><div className="grid items-stretch gap-5 border-t border-[#0f7896]/10 bg-[#fbfeff] p-4 md:grid-cols-2 sm:p-6 xl:grid-cols-3">{plans.map((plan) => <PlanCard key={plan.id} plan={plan} />)}</div></div></div></section>; })}</div>}
+        : <div className="space-y-6">{groups.map(([category, plans]) => { const open = openCategories.includes(category); return <section key={category} className="overflow-hidden rounded-[32px] border border-[#0f7896]/12 bg-white shadow-[0_18px_50px_rgba(15,120,150,0.08)]"><button type="button" aria-expanded={open} onClick={() => setOpenCategories((current) => open ? current.filter((item) => item !== category) : [...current, category])} className="relative z-10 flex w-full items-center justify-between gap-5 bg-gradient-to-r from-white via-cyan-50/70 to-white px-5 py-6 text-left hover:bg-cyan-50 sm:px-7"><div className="flex min-w-0 items-center gap-4"><span className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl bg-[#0f7896] text-white shadow-[0_10px_24px_rgba(15,120,150,.22)]"><Layers3 className="h-6 w-6" /></span><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#0f7896]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#0f7896]">Category</span><span className="text-xs text-[#071014]/50">{plans.length} plan{plans.length === 1 ? "" : "s"}</span></div><h2 className="mt-2 text-xl font-bold tracking-[-0.03em] sm:text-2xl">{category}</h2></div></div><span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#0f7896]/12 bg-white text-[#0f7896] transition-transform duration-300 ${open ? "rotate-180" : ""}`}><ChevronDown className="h-5 w-5" /></span></button><div className={`grid transition-[grid-template-rows,opacity] duration-500 ease-in-out ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}><div className="min-h-0 overflow-hidden"><SynchronizedPricingGrid className="grid items-start gap-5 border-t border-[#0f7896]/10 bg-[#fbfeff] p-4 md:grid-cols-2 sm:p-6 xl:grid-cols-3">{plans.map((plan) => <PlanCard key={plan.id} plan={plan} />)}</SynchronizedPricingGrid></div></div></section>; })}</div>}
       </div>
     </main>
   );

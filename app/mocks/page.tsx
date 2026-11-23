@@ -55,8 +55,11 @@ const isUserEntitledToMock = (mock: Mock): boolean => {
   return false;
 };
 
+const isChapterWiseTest = (mock: Mock): boolean =>
+  /chapter\s+wise\s+test/i.test(mock.title);
+
 const getMockKindLabel = (mock: Mock): string =>
-  mock.type === "grand-mock" ? "Grand Mock" : "Mock";
+  isChapterWiseTest(mock) ? "Chapter wise test" : mock.type === "grand-mock" ? "Grand Mock" : "Mock";
 
 // Elegant medical illustration in greenish light-greyish tones
 function MedicalNoMocksIllustration() {
@@ -178,8 +181,8 @@ export default function TodayMocksPage() {
       sessionStorage.removeItem(MOCK_LIST_RETURN_KEY);
       if (!saved || saved.candidate !== (user?.email || "")) return;
       if (typeof saved.search === "string") setSearch(saved.search);
-      if (["all", "grand-mock", "mock", "public", "members"].includes(saved.typeFilter)) setTypeFilter(saved.typeFilter);
-      if (["all", "live", "grand-mock", "mock", "public", "attended"].includes(saved.category)) setSelectedCategory(saved.category);
+      if (["all", "grand-mock", "mock", "chapter-wise", "members"].includes(saved.typeFilter)) setTypeFilter(saved.typeFilter);
+      if (["all", "live", "grand-mock", "mock", "chapter-wise", "attended"].includes(saved.category)) setSelectedCategory(saved.category);
       if (Number.isFinite(saved.scrollY)) returnScroll.current = saved.scrollY;
     } catch { /* Browsing still works when session storage is unavailable. */ }
   }, [authLoading, user?.email]);
@@ -252,9 +255,9 @@ export default function TodayMocksPage() {
 
       const matchesType =
         typeFilter === "all" ||
-        (typeFilter === "grand-mock" && mock.type === "grand-mock") ||
-        (typeFilter === "mock" && mock.type !== "grand-mock") ||
-        (typeFilter === "public" && mock.accessType === "public") ||
+        (typeFilter === "grand-mock" && mock.type === "grand-mock" && !isChapterWiseTest(mock)) ||
+        (typeFilter === "mock" && mock.type !== "grand-mock" && !isChapterWiseTest(mock)) ||
+        (typeFilter === "chapter-wise" && isChapterWiseTest(mock)) ||
         (typeFilter === "members" && mock.accessType !== "public");
 
       let matchesCategory = true;
@@ -263,11 +266,11 @@ export default function TodayMocksPage() {
         const end = getTimestamp(mock.endTime) || (start ? start + mock.durationMinutes * 60 * 1000 : 0);
         matchesCategory = Boolean(start && end && now >= start && now <= end);
       } else if (selectedCategory === "grand-mock") {
-        matchesCategory = mock.type === "grand-mock";
+        matchesCategory = mock.type === "grand-mock" && !isChapterWiseTest(mock);
       } else if (selectedCategory === "mock") {
-        matchesCategory = mock.type !== "grand-mock";
-      } else if (selectedCategory === "public") {
-        matchesCategory = mock.accessType === "public";
+        matchesCategory = mock.type !== "grand-mock" && !isChapterWiseTest(mock);
+      } else if (selectedCategory === "chapter-wise") {
+        matchesCategory = isChapterWiseTest(mock);
       } else if (selectedCategory === "attended") {
         matchesCategory = Boolean(mock.hasAttempted);
       }
@@ -284,8 +287,8 @@ export default function TodayMocksPage() {
         return "Grand Mocks";
       case "mock":
         return "Standard Mocks";
-      case "public":
-        return "Public Mock Sessions";
+      case "chapter-wise":
+        return "Chapter wise test";
       case "attended":
         return "Attended Mock Sessions";
       default:
@@ -410,14 +413,14 @@ export default function TodayMocksPage() {
            
             <button
               type="button"
-              onClick={() => setSelectedCategory("public")}
+              onClick={() => setSelectedCategory("chapter-wise")}
               className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                selectedCategory === "public"
+                selectedCategory === "chapter-wise"
                   ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-text)]"
                   : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--accent-soft)]"
               }`}
             >
-              Public Mocks
+              Chapter wise test
             </button>
             {attendedMocks.length > 0 ? (
               <button
@@ -458,7 +461,7 @@ export default function TodayMocksPage() {
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="grand-mock">Grand Mocks</SelectItem>
-                  <SelectItem value="public">Public Mocks</SelectItem>
+                  <SelectItem value="chapter-wise">Chapter wise test</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -584,6 +587,12 @@ export default function TodayMocksPage() {
                             {mock.durationMinutes} min
                           </span>
                         </div>
+
+                        {isChapterWiseTest(mock) ? (
+                          <span className="mt-3 inline-flex rounded-full border border-[var(--border)] bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--accent-strong)]">
+                            {getMockKindLabel(mock)}
+                          </span>
+                        ) : null}
 
                         {/* Description — only shown when provided */}
                         {mock.description ? (
