@@ -307,3 +307,26 @@
   .overview-lesson-grid { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; }
   .overview-lesson { min-width: 300px; flex-wrap: nowrap; scroll-snap-align: start; }
 }
+
+/* Customer-entered PayPal reminder dates; financial status remains with PayPal. */
+.overview-paypal { margin: 16px 0; color: var(--text-primary); }
+.overview-paypal-due { display: flex; align-items: flex-start; gap: 14px; padding: 18px 20px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface-raised); box-shadow: 0 3px 12px var(--shadow-soft); }
+.overview-paypal-due > svg { color: var(--accent-strong); flex-shrink: 0; margin-top: 3px; }
+.overview-paypal-due > div { flex: 1; min-width: 0; }
+.overview-paypal-due h2 { font-size: 15px; font-weight: 700; line-height: 1.5; }
+.overview-paypal-due p, .overview-paypal-settings > p { color: var(--text-tertiary); font-size: 13px; line-height: 1.65; margin-top: 4px; }
+.overview-paypal a, .overview-paypal button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding: 8px 12px; border-radius: 12px; color: var(--accent-strong); font-size: 13px; font-weight: 650; }
+.overview-paypal button:hover, .overview-paypal a:hover { background: var(--surface-raised); }
+.overview-paypal a { text-decoration: underline; text-underline-offset: 4px; }
+.overview-paypal button:disabled { opacity: .5; cursor: wait; }
+.overview-paypal-settings { border: 1px solid var(--border); border-radius: 16px; padding: 5px 16px; background: var(--surface-raised); }
+.overview-paypal-settings summary { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; font-weight: 650; color: var(--accent-strong); cursor: pointer; }
+.overview-paypal-settings > p { max-width: 75ch; margin-bottom: 12px; }
+.overview-paypal-plan { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.overview-paypal-plan strong { flex: 1; }
+.overview-paypal-plan form { width: 100%; }
+.overview-paypal-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 8px 0; }
+.overview-paypal-dates label { font-size: 13px; font-weight: 600; }
+.overview-paypal-dates input { display: block; width: 100%; min-height: 44px; margin-top: 6px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-raised); color: var(--text-primary); }
+.overview-paypal-error { margin-top: 8px; font-size: 13px; color: var(--text-secondary); }
+@media(max-width: 640px) { .overview-paypal-due { flex-wrap: wrap; gap: 8px; padding: 14px; } .overview-paypal-due > div { flex-basis: calc(100% - 38px); } .overview-paypal-dates { grid-template-columns: 1fr; } }

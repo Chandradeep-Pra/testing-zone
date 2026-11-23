@@ -14,6 +14,7 @@ import { loadLessonHistory } from "@/lib/lesson-history";
 import { readUrologicsJson } from "@/lib/client/urologicsQuery";
 
 // Modular overview sections
+import PayPalRepaymentReminders from "@/components/overview/PayPalRepaymentReminders";
 import ExamScheduleBanner from "@/components/overview/ExamScheduleBanner";
 import AnnouncementsPanel, { type Announcement } from "@/components/overview/AnnouncementsPanel";
 import DailyQuizPanel, { type DailyQuiz } from "@/components/overview/DailyQuizPanel";
@@ -228,6 +229,7 @@ export default function Home() {
             </time>}
           </div>
           <CompleteProfilePrompt />
+          <PayPalRepaymentReminders />
           <div className="overview-feature-grid">
             <AnnouncementsPanel announcements={announcements} onImagePreview={setPreviewImage} />
             <DailyQuizPanel

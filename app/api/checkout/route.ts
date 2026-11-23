@@ -8,6 +8,6 @@ export async function GET(req: NextRequest) {
   req.nextUrl.searchParams.forEach((value, key) => upstream.searchParams.set(key, value));
   try {
     const response = await fetch(upstream, { headers: { Authorization: auth }, cache: "no-store" });
-    return NextResponse.json(await response.json().catch(() => ({})), { status: response.status });
+    return NextResponse.json(await response.json().catch(() => ({})), { status: response.status, headers: { "Cache-Control": "private, no-store" } });
   } catch { return NextResponse.json({ error: "Unable to open checkout" }, { status: 502 }); }
 }
