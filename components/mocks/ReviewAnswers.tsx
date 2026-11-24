@@ -447,42 +447,71 @@ export default function ReviewAnswers({ mock, answers, flaggedQuestionIds = [], 
 }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [activeQuestion, setActiveQuestion] = useState(1);
-  const [displayedQuestion, setDisplayedQuestion] = useState(1);
-  const [cardVisible, setCardVisible] = useState(true);
-  const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const animationFrame = useRef<number | null>(null);
   const questionViewport = useRef<HTMLDivElement>(null);
   const total = mock.questions.length;
   const flaggedQuestions = new Set(flaggedQuestionIds);
 
   const selectQuestion = (questionNumber: number) => {
-    if (questionNumber < 1 || questionNumber > total || questionNumber === activeQuestion) return;
+    const viewport = questionViewport.current;
+    const question = viewport?.querySelector<HTMLElement>(`#review-question-${questionNumber}`);
+    if (!viewport || !question) return;
 
     setActiveQuestion(questionNumber);
-    if (transitionTimer.current) clearTimeout(transitionTimer.current);
-    if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current);
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setDisplayedQuestion(questionNumber);
-      setCardVisible(true);
-      questionViewport.current?.scrollTo({ top: 0 });
-      return;
-    }
-
-    setCardVisible(false);
-    transitionTimer.current = setTimeout(() => {
-      setDisplayedQuestion(questionNumber);
-      questionViewport.current?.scrollTo({ top: 0 });
-      animationFrame.current = requestAnimationFrame(() => setCardVisible(true));
-    }, 150);
+    viewport.scrollTo({
+      top: viewport.scrollTop + question.getBoundingClientRect().top - viewport.getBoundingClientRect().top,
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+    });
   };
 
-  useEffect(() => () => {
-    if (transitionTimer.current) clearTimeout(transitionTimer.current);
-    if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current);
-  }, []);
+  useEffect(() => {
+    const viewport = questionViewport.current;
+    if (!viewport) return;
+    const cards = Array.from(viewport.querySelectorAll<HTMLElement>("[data-review-status]"));
+    let frame: number | null = null;
 
-  const displayed = mock.questions[displayedQuestion - 1];
+    const updateActiveQuestion = () => {
+      frame = null;
+      if (!cards.length) return;
+      // Track the card being read near the top, including long explanations.
+      const readingLine = viewport.getBoundingClientRect().top + Math.min(120, viewport.clientHeight / 4);
+      let questionNumber = 1;
+      for (const [index, card] of cards.entries()) {
+        if (card.getBoundingClientRect().top > readingLine) break;
+        questionNumber = index + 1;
+      }
+      const maximumScroll = viewport.scrollHeight - viewport.clientHeight;
+      if (maximumScroll > 0 && viewport.scrollTop >= maximumScroll - 2) questionNumber = cards.length;
+      setActiveQuestion(questionNumber);
+    };
+    const scheduleUpdate = () => {
+      if (frame === null) frame = requestAnimationFrame(updateActiveQuestion);
+    };
+    const restoreHash = () => {
+      const match = /^#review-question-([1-9]\d*)$/.exec(window.location.hash);
+      const question = match ? cards[Number(match[1]) - 1] : undefined;
+      if (question) {
+        viewport.scrollTo({
+          top: viewport.scrollTop + question.getBoundingClientRect().top - viewport.getBoundingClientRect().top,
+          behavior: "instant",
+        });
+      }
+      scheduleUpdate();
+    };
+
+    viewport.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("hashchange", restoreHash);
+    const resizeObserver = new ResizeObserver(scheduleUpdate);
+    resizeObserver.observe(viewport);
+    // Images and wrapped text can change card heights after the initial render.
+    cards.forEach(card => resizeObserver.observe(card));
+    restoreHash();
+    return () => {
+      viewport.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("hashchange", restoreHash);
+      resizeObserver.disconnect();
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [mock.questions]);
 
   return (
     <>
@@ -499,24 +528,24 @@ export default function ReviewAnswers({ mock, answers, flaggedQuestionIds = [], 
             onSelect={selectQuestion}
           />
           {!hasSavedAnswers && <MissingAnswersNotice />}
-          <div ref={questionViewport} className="urologics-minimal-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-1">
-            {displayed ? (
-              <section
-                aria-live="polite"
-                aria-busy={!cardVisible}
-                className={`transition-opacity duration-150 ease-in-out motion-reduce:transition-none ${cardVisible ? "opacity-100" : "opacity-0"}`}
-              >
-                <QuestionReviewCard
-                  key={displayed.id}
-                  question={displayed}
-                  index={displayedQuestion - 1}
-                  selectedIndex={answers[displayed.id]}
-                  hasSavedAnswers={hasSavedAnswers}
-                  isFlagged={flaggedQuestions.has(displayed.id)}
-                  onPreview={setPreview}
-                />
-              </section>
-            ) : (
+          <div
+            ref={questionViewport}
+            role="region"
+            aria-label="Reviewed questions"
+            tabIndex={0}
+            className="urologics-minimal-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain rounded-[24px] pb-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent-strong)]"
+          >
+            {mock.questions.length ? mock.questions.map((question, index) => (
+              <QuestionReviewCard
+                key={question.id}
+                question={question}
+                index={index}
+                selectedIndex={answers[question.id]}
+                hasSavedAnswers={hasSavedAnswers}
+                isFlagged={flaggedQuestions.has(question.id)}
+                onPreview={setPreview}
+              />
+            )) : (
               <div className="urologics-panel p-6 text-center text-sm text-[var(--text-secondary)]">No questions are available for this review.</div>
             )}
           </div>
