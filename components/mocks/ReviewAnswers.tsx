@@ -208,13 +208,6 @@ function ReviewHeader({ title, score, total, ranks }: {
   );
 }
 
-function MissingAnswersNotice() {
-  return (
-    <div className="urologics-panel p-4 text-sm text-[var(--text-secondary)]">
-      Your selected answers are unavailable for this earlier attempt. You can still review every correct answer and explanation below.
-    </div>
-  );
-}
 
 function QuestionImage({ src, onPreview }: { src: string; onPreview: ImagePreviewHandler }) {
   return (
@@ -527,7 +520,6 @@ export default function ReviewAnswers({ mock, answers, flaggedQuestionIds = [], 
             activeQuestion={activeQuestion}
             onSelect={selectQuestion}
           />
-          {!hasSavedAnswers && <MissingAnswersNotice />}
           <div
             ref={questionViewport}
             role="region"

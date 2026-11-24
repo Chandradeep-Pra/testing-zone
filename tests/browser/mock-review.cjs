@@ -151,6 +151,12 @@ const puppeteer = require('puppeteer-core');
     }
     await page.waitForFunction(() => location.pathname.endsWith('/result'));
     assert.equal(writes.length, 0);
+    delete mock.userAttempt.answers;
+    await page.goto(`${process.env.MOCK_ORIGIN || 'http://127.0.0.1:3022'}/web/mocks/fixture/result`, { waitUntil: 'networkidle0', timeout: 120000 });
+    await page.waitForSelector('[data-review-status="unavailable"]');
+    assert.equal(await page.$$eval('[data-review-status]', cards => cards.every(card => card.dataset.reviewStatus === 'unavailable')), true);
+    assert.equal(await page.$eval('body', body => body.textContent.includes('Your selected answers are unavailable for this earlier attempt.')), false, 'Review gives the question viewport space without a separate notice');
+    assert.equal(writes.length, 0);
     assert.deepEqual(errors, []);
     console.log('Browser checks passed: rank order (12 rows), desktop/mobile layout, description, continuous review, number/jump navigation, wheel and keyboard scrolling, reduced motion, flagged navigation, read-only review and hash reload.');
   } finally {
