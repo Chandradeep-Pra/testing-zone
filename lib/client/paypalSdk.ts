@@ -10,7 +10,7 @@ export type PayPalButtonOptions = {
 type PayPalButton = { render: (element: HTMLElement) => Promise<void>; isEligible: () => boolean; close?: () => Promise<void> };
 export type PayPalSdk = {
   Buttons: (options: PayPalButtonOptions) => PayPalButton;
-  FUNDING: { PAYPAL: string; PAYLATER: string };
+  FUNDING: { PAYPAL: string; PAYLATER: string; CARD: string };
   Messages?: (options: { amount: string; placement: string; style: { layout: string; logo: { type: string }; text: { color: string; size: number } } }) => { render: (element: HTMLElement) => Promise<void> };
 };
 declare global { interface Window { paypal?: PayPalSdk } }
@@ -23,7 +23,7 @@ export function loadPayPalSdk(clientId: string, currency: string, sandbox: boole
   loadedKey = key;
   loading = new Promise<PayPalSdk>((resolve, reject) => {
     const script = document.createElement("script");
-    const params = new URLSearchParams({ "client-id": clientId, currency, intent: "capture", components: "buttons,messages", "enable-funding": "paylater" });
+    const params = new URLSearchParams({ "client-id": clientId, currency, intent: "capture", components: "buttons,messages,funding-eligibility", "enable-funding": "paylater" });
     if (sandbox) params.set("buyer-country", "GB");
     script.src = `https://www.paypal.com/sdk/js?${params}`;
     script.dataset.paypalSdk = "true";

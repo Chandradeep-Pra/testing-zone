@@ -165,6 +165,15 @@ function CheckoutContent() {
         const normalContainer = document.getElementById("paypal-button-container");
         if (normalContainer) { normalContainer.replaceChildren(); const button = sdk.Buttons(options("paypal")); controls.push(button); await button.render(normalContainer); }
         if (disposed) return;
+        const cardContainer = document.getElementById("paypal-card-button-container");
+        if (cardContainer) {
+          cardContainer.replaceChildren();
+          // Cards use the same server-verified PayPal order and capture flow.
+          const card = sdk.Buttons({ ...options("paypal"), fundingSource: sdk.FUNDING.CARD });
+          controls.push(card);
+          if (card.isEligible()) await card.render(cardContainer);
+        }
+        if (disposed) return;
         if (quote!.payLaterEligible && available.paypal.payLaterEnabled) {
           const later = sdk.Buttons(options("paylater")); controls.push(later);
           if (later.isEligible()) {
@@ -263,6 +272,7 @@ function CheckoutContent() {
       {!details.paypal.enabled ? <p role="status" className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">Online payments are being prepared. Please contact us if you need help purchasing this plan.</p> : <div className={`space-y-4 ${paymentState === "approving" || paymentState === "processing" || paymentState === "pending" ? "pointer-events-none opacity-50" : ""}`}>
         {details.paypal.environment === "sandbox" && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">Sandbox checkout - test payments only</p>}
         <div id="paypal-button-container" />
+        <div id="paypal-card-button-container" className="empty:hidden" />
         <section hidden={!payLaterVisible || !quote?.payLaterEligible || !details.paypal.payLaterEnabled} className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 to-white p-5">
           <p className="mb-3 text-sm font-semibold text-slate-900">More ways to pay</p>
           <div id="paypal-paylater-message" className="mb-4" />
