@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import SiriWaveComponent from "./SiriWaveForm";
+import ExaminerOrb from "./ExaminerOrb";
 
 type Props = {
   speaking: boolean;
@@ -19,13 +19,13 @@ export function AiPanel({
   thinking = false,
   transcript,
   exhibit,
-  amplitude = 0,
   keywordDetected = false,
   avatarVideo,
   listening = false,
 }: Props) {
   const activeExhibit = exhibit;
   const statusText = speaking ? "Examiner speaking" : thinking ? "Preparing response" : listening ? "Listening" : "Ready";
+  const orbState = speaking ? "composing" : thinking ? "solving" : listening ? "listening" : "breathing";
 
   return (
     <div
@@ -41,13 +41,11 @@ export function AiPanel({
       <div className="absolute inset-0 flex items-center justify-center pb-12">
         {avatarVideo ? (
           <div className="h-full w-full">{avatarVideo}</div>
-        ) : (
+        ) : !activeExhibit ? (
           <div className="flex h-[220px] w-full items-center justify-center sm:h-[300px]">
-            <div className={`transition-opacity duration-700 ${speaking ? "opacity-100" : "opacity-55"}`}>
-              <SiriWaveComponent amplitude={speaking ? amplitude : thinking ? 0.2 : 0.08} speed={speaking ? 0.08 : 0.025} />
-            </div>
+            <ExaminerOrb state={orbState} label={statusText} />
           </div>
-        )}
+        ) : null}
       </div>
 
       {activeExhibit && (
